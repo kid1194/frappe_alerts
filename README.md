@@ -2,6 +2,16 @@
 
 A small **Frappe** module that displays custom alerts to specific recipients after login.
 
+<div style="width:100%;text-align:center">
+    <img src="https://github.com/kid1194/frappe_alerts/blob/main/images/notice-alert-mobile.png?raw=true" alt="Alerts"/>
+</div>
+<div style="width:100%;text-align:center">
+    <img src="https://github.com/kid1194/frappe_alerts/blob/main/images/warning-alert-mobile.png?raw=true" alt="Alerts"/>
+</div>
+<div style="width:100%;text-align:center">
+    <img src="https://github.com/kid1194/frappe_alerts/blob/main/images/urgent-alert-mobile.png?raw=true" alt="Alerts"/>
+</div>
+
 ---
 
 ### Table of Contents
