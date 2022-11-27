@@ -1,0 +1,229 @@
+{
+ "actions": [],
+ "allow_copy": 1,
+ "allow_import": 1,
+ "autoname": "format:ALRT-{YY}{MM}{DD}-{#####}",
+ "creation": "2022-04-04 04:04:04.119400",
+ "description": "Alert data",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "engine": "InnoDB",
+ "field_order": [
+  "main_section",
+  "alert_type",
+  "title",
+  "main_column",
+  "from_date",
+  "until_date",
+  "content_section",
+  "content",
+  "recipients_section",
+  "for_roles",
+  "recipients_column",
+  "for_users",
+  "control_section",
+  "is_repeatable",
+  "control_column",
+  "reached",
+  "seen_by_section",
+  "seen_by_html",
+  "seen_by",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "main_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "alert_type",
+   "fieldtype": "Link",
+   "label": "Alert Type",
+   "options": "Alert Type",
+   "reqd": 1,
+   "bold": 1,
+   "in_list_view": 1,
+   "in_filter": 1,
+   "in_standard_filter": 1,
+   "in_preview": 1,
+   "search_index": 1,
+   "ignore_user_permissions": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "fetch_from": "alert_type.title",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "translatable": 1
+  },
+  {
+   "fieldname": "main_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "default": "Today",
+   "reqd": 1,
+   "bold": 1,
+   "in_list_view": 1,
+   "in_filter": 1,
+   "in_standard_filter": 1,
+   "in_preview": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "until_date",
+   "fieldtype": "Date",
+   "label": "Until Date",
+   "in_list_view": 1,
+   "in_filter": 1,
+   "in_standard_filter": 1,
+   "in_preview": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "content_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "content",
+   "fieldtype": "Text Editor",
+   "label": "Content",
+   "reqd": 1,
+   "bold": 1
+  },
+  {
+   "fieldname": "recipients_column",
+   "fieldtype": "Section Break",
+   "label": "Recipients"
+  },
+  {
+   "fieldname": "for_roles",
+   "fieldtype": "Table MultiSelect",
+   "label": "Roles",
+   "options": "Alert For Role"
+  },
+  {
+   "fieldname": "recipients_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "for_users",
+   "fieldtype": "Table MultiSelect",
+   "label": "Users",
+   "description": "Selected users will receive the alert regardless of the roles.",
+   "options": "Alert For User"
+  },
+  {
+   "fieldname": "control_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "is_repeatable",
+   "fieldtype": "Check",
+   "label": "Is Repeatable",
+   "description": "Display alert repeatedly to all recipients after evey login",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "control_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reached",
+   "fieldtype": "Int",
+   "label": "Reached",
+   "default": "0",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "seen_by_section",
+   "fieldtype": "Section Break",
+   "label": "Seen By",
+   "depends_on": "eval:doc.docstatus",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "seen_by_html",
+   "fieldtype": "HTML",
+   "label": "Seen By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "seen_by",
+   "fieldtype": "Table MultiSelect",
+   "label": "Seen By",
+   "options": "Alert Seen By",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nStarted\nFinished",
+   "read_only": 1,
+   "hidden": 1,
+   "search_index": 1
+  }
+ ],
+ "icon": "fa fa-bell",
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2022-04-04 04:04:04.119400",
+ "modified_by": "Administrator",
+ "module": "Alerts",
+ "name": "Alert",
+ "naming_rule": "By Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 0,
+   "import": 1,
+   "permlevel": 0,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "set_user_permissions": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 0,
+   "import": 1,
+   "permlevel": 0,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Administrator",
+   "set_user_permissions": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "translate_link_fields": 1,
+ "track_changes": 1
+}

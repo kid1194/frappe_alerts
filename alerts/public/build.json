@@ -1,0 +1,5 @@
+{
+  "alerts/js/alerts.js": [
+    "public/js/alerts.bundle.js"
+  ]
+}

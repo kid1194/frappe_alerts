@@ -1,0 +1,22 @@
+[project]
+name = "alerts"
+authors = [
+    {name = "Ameen Ahmed (Level Up)", email = "kid1194@gmail.com"}
+]
+description = "Frappe module that displays custom alerts to specific recipients after login."
+keywords = ["frappe", "alerts"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: JavaScript"
+]
+requires-python = ">=3.6"
+readme = "README.md"
+dynamic = ["version"]
+dependencies = [
+    "frappe>=12.0.0"
+]
+
+[project.urls]
+Documentation = "https://github.com/kid1194/frappe_alerts"
+Source = "https://github.com/kid1194/frappe_alerts"

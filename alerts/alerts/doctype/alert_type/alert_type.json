@@ -1,0 +1,192 @@
+{
+ "actions": [],
+ "allow_copy": 1,
+ "allow_import": 1,
+ "autoname": "field:title",
+ "creation": "2022-04-04 04:04:04.119400",
+ "description": "Alert type",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "engine": "InnoDB",
+ "field_order": [
+  "main_section",
+  "title",
+  "main_column",
+  "disabled",
+  "control_section",
+  "alert_timeout",
+  "control_column",
+  "alert_sound",
+  "custom_alert_sound",
+  "style_section",
+  "background",
+  "border_size",
+  "border_color",
+  "style_column",
+  "title_color",
+  "content_color",
+  "mock_section",
+  "mock_html"
+ ],
+ "fields": [
+  {
+   "fieldname": "main_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "unique": 1,
+   "reqd": 1,
+   "bold": 1,
+   "in_preview": 1,
+   "translatable": 1
+  },
+  {
+   "fieldname": "main_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Is Disabled",
+   "default": "0",
+   "depends_on": "eval:!doc.__islocal",
+   "search_index": 1
+  },
+  {
+   "fieldname": "control_section",
+   "fieldtype": "Section Break",
+   "label": "Alert Control"
+  },
+  {
+   "fieldname": "alert_timeout",
+   "fieldtype": "Int",
+   "label": "Alert Timeout (Seconds)",
+   "description": "Time to display the alert before closing automatically. Default: 0 - No Timeout",
+   "default": "0",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "control_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "alert_sound",
+   "fieldtype": "Select",
+   "label": "Alert Sound",
+   "options": "\nAlert\nError\nClick\nCancel\nSubmit\nCustom"
+  },
+  {
+   "fieldname": "custom_alert_sound",
+   "fieldtype": "Attach",
+   "label": "Alert Sound",
+   "description": "Sound audio file to be played when the alert display.",
+   "depends_on": "eval:doc.alert_sound === 'Custom'",
+   "mandatory_depends_on": "eval:doc.alert_sound === 'Custom'"
+  },
+  {
+   "fieldname": "style_section",
+   "fieldtype": "Section Break",
+   "label": "Alert Style"
+  },
+  {
+   "fieldname": "background",
+   "fieldtype": "Color",
+   "label": "Alert Background",
+   "description": "Background property value in the stylesheet"
+  },
+  {
+   "fieldname": "border_size",
+   "fieldtype": "Int",
+   "label": "Alert Border Size (Pixel)",
+   "description": "Border thickness in pixels. Set to 0 for no border.",
+   "default": "1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "border_color",
+   "fieldtype": "Color",
+   "label": "Alert Border Color"
+  },
+  {
+   "fieldname": "style_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "title_color",
+   "fieldtype": "Color",
+   "label": "Alert Title Color"
+  },
+  {
+   "fieldname": "content_color",
+   "fieldtype": "Color",
+   "label": "Alert Content Color"
+  },
+  {
+   "fieldname": "mock_section",
+   "fieldtype": "Section Break",
+   "label": "Alert Mock"
+  },
+  {
+   "fieldname": "mock_html",
+   "fieldtype": "HTML",
+   "label": "Alert Mock",
+   "read_only": 1
+  }
+ ],
+ "icon": "fa fa-bell-o",
+ "links": [],
+ "modified": "2022-04-04 04:04:04.119400",
+ "modified_by": "Administrator",
+ "module": "Alerts",
+ "name": "Alert Type",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 0,
+   "import": 1,
+   "permlevel": 0,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "set_user_permissions": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 0,
+   "import": 1,
+   "permlevel": 0,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Administrator",
+   "set_user_permissions": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "translate_link_fields": 1,
+ "track_changes": 1
+}
