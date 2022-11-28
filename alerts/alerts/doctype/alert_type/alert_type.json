@@ -14,13 +14,12 @@
   "main_column",
   "disabled",
   "control_section",
-  "alert_timeout",
+  "display_timeout",
   "control_column",
-  "alert_sound",
-  "custom_alert_sound",
+  "display_sound",
+  "custom_display_sound",
   "style_section",
   "background",
-  "border_size",
   "border_color",
   "style_column",
   "title_color",
@@ -61,9 +60,9 @@
    "label": "Alert Control"
   },
   {
-   "fieldname": "alert_timeout",
+   "fieldname": "display_timeout",
    "fieldtype": "Int",
-   "label": "Alert Timeout (Seconds)",
+   "label": "Display Timeout (Seconds)",
    "description": "Time to display the alert before closing automatically. Default: 0 - No Timeout",
    "default": "0",
    "non_negative": 1
@@ -73,18 +72,18 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "alert_sound",
+   "fieldname": "display_sound",
    "fieldtype": "Select",
-   "label": "Alert Sound",
-   "options": "\nAlert\nError\nClick\nCancel\nSubmit\nCustom"
+   "label": "Display Sound",
+   "options": "Mute\nAlert\nError\nClick\nCancel\nSubmit\nCustom",
+   "default": "Mute"
   },
   {
-   "fieldname": "custom_alert_sound",
+   "fieldname": "custom_display_sound",
    "fieldtype": "Attach",
-   "label": "Alert Sound",
-   "description": "Sound audio file to be played when the alert display.",
-   "depends_on": "eval:doc.alert_sound === 'Custom'",
-   "mandatory_depends_on": "eval:doc.alert_sound === 'Custom'"
+   "label": "Custom Display Sound",
+   "depends_on": "eval:doc.display_sound === 'Custom'",
+   "mandatory_depends_on": "eval:doc.display_sound === 'Custom'"
   },
   {
    "fieldname": "style_section",
@@ -94,21 +93,12 @@
   {
    "fieldname": "background",
    "fieldtype": "Color",
-   "label": "Alert Background",
-   "description": "Background property value in the stylesheet"
-  },
-  {
-   "fieldname": "border_size",
-   "fieldtype": "Int",
-   "label": "Alert Border Size (Pixel)",
-   "description": "Border thickness in pixels. Set to 0 for no border.",
-   "default": "1",
-   "non_negative": 1
+   "label": "Background Color"
   },
   {
    "fieldname": "border_color",
    "fieldtype": "Color",
-   "label": "Alert Border Color"
+   "label": "Border Color"
   },
   {
    "fieldname": "style_column",
@@ -117,12 +107,12 @@
   {
    "fieldname": "title_color",
    "fieldtype": "Color",
-   "label": "Alert Title Color"
+   "label": "Title Color"
   },
   {
    "fieldname": "content_color",
    "fieldtype": "Color",
-   "label": "Alert Content Color"
+   "label": "Content Color"
   },
   {
    "fieldname": "mock_section",

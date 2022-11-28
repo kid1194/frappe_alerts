@@ -26,12 +26,6 @@ frappe.ui.form.on('Alert Type', {
     background: function(frm) {
         if (frm.doc.background) frm.A.refresh();
     },
-    border_size: function(frm) {
-        if (cint(frm.doc.border_size) < 0)
-            frm.set_value('border_size', 0);
-        else frm.A.refresh();
-        
-    },
     border_color: function(frm) {
         if (frm.doc.border_color) frm.A.refresh();
     },

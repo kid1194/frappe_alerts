@@ -4,8 +4,15 @@
 # Licence: Please refer to LICENSE file
 
 
+from datetime import datetime
+
 import frappe
-from frappe.utils import cint, nowdate
+from frappe.utils import (
+    cint,
+    nowdate,
+    get_datetime,
+    has_common
+)
 
 from pypika.terms import Criterion
 from pypika.functions import IfNull
@@ -25,12 +32,22 @@ _DT_ = "Alert"
 
     
 def update_alerts():
+    now = nowdate()
     doc = frappe.qb.DocType(_DT_)
     (
         frappe.qb.update(doc)
         .set(doc.status, "Finished")
-        .where(doc.until_date.lte(nowdate()))
-        .where(doc.status == "Started")
+        .where(doc.from_date.lt(now))
+        .where(doc.until_date.lte(now))
+        .where(doc.status == "Active")
+        .where(doc.docstatus == 1)
+    ).run()
+    (
+        frappe.qb.update(doc)
+        .set(doc.status, "Active")
+        .where(doc.from_date.lte(now))
+        .where(doc.until_date.gt(now))
+        .where(doc.status == "Pending")
         .where(doc.docstatus == 1)
     ).run()
 
@@ -68,14 +85,14 @@ def cache_alerts(user):
         .where(sdoc.user == user)
     )
     
-    now = nowdate()
     data = (
         frappe.qb.from_(doc)
         .select(
             doc.name,
             doc.alert_type,
             doc.title,
-            doc.content
+            doc.content,
+            doc.is_repeatable
         )
         .where(Criterion.any(
             Criterion.all(
@@ -92,9 +109,7 @@ def cache_alerts(user):
             IfNull(sQry, "") == "",
             doc.name.notin(sQry)
         ))
-        .where(doc.from_date.gte(now))
-        .where(doc.until_date.lt(now))
-        .where(doc.status != "Finished")
+        .where(doc.status == "Active")
         .where(doc.docstatus == 1)
         .orderby(doc.from_date, order=Order.asc))
     ).run(as_dict=True)
@@ -108,6 +123,39 @@ def cache_alerts(user):
             data[i]["type"] = types[data[i]["alert_type"]]
         
     set_cache(_DT_, user, data)
+
+
+def send_alert(data):
+    if not data or not isinstance(data, dict):
+        return 0
+    
+    if cint(data.docstatus) != 1 or data.status != "Active":
+        return 0
+    
+    user = frappe.session.user 
+    if (
+        (
+            data.for_users and
+            user not in [v.user for v in data.for_users]
+        ) or (
+            data.for_roles and
+            has_common(
+                [v.role for v in data.for_roles],
+                frappe.get_roles(user)
+            )
+        )
+    ):
+        frappe.publish_realtime(
+            event="show_alert",
+            message={
+                "name": data.name,
+                "alert_type": data.alert_type,
+                "title": data.title,
+                "content": data.content,
+                "type": get_types([data.alert_type])[data.alert_type]
+            },
+            after_commit=True
+        )
 
 
 @frappe.whitelist(methods=["POST"])
@@ -125,6 +173,11 @@ def mark_as_seen(name):
         doc.append("seen_by", {"user": user})
         doc.reached = len(doc.seen_by)
         doc.save(ignore_permissions=True)
+        frappe.publish_realtime(
+            event="alert_seen",
+            message={"user": user},
+            after_commit=True
+        )
     
     return 1
 
@@ -139,6 +192,8 @@ def get_alerts_cache(user):
         cache = []
     
     if cache:
-        clear_alerts_cache(user)
+        rep = len([v for v in cache if cint(v.is_repeatable)])
+        if len(cache) != rep:
+            clear_alerts_cache(user)
     
     return cache

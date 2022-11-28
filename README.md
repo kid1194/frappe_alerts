@@ -133,7 +133,30 @@ bench restart
 ---
 
 ### Usage
+### Alert Type
+- Go to `Alert Type` then create a new type
+- Enter the title for the type
+- To make alerts of this type close automatically:
+  - Set the `Display Timeout (Seconds)` or keep as `0` to disable the automatic close
+  - Fraction numbers can also be used, like `1.5`, to set a more specific timeout
+- To customize the alert sound:
+  - Select the `Display Sound` that you prefer
+  - Select `Custom` option to be able to upload a `Custom Display Sound`
+  - Select `Mute` to disable the `Display Sound`
+- To customize the look of the alert:
+  - Change the `Background Color`, `Border Color`, `Title Color` and `Content Color`
+  - Use the mock alert to see how the custom style will look
 
+### Alert
+- Go to `Alert` and create new entry
+- Select an `Alert Type` and change the alert `Title`, if needed
+- Set the `From Date` and `Until Date` to specify the alert duration
+- Enter and format `Content` of the alert
+- Set the `For Roles` and/or the `For Users` to specify the alert recipients
+- Check `Is Repeatable` to display the alert more than once, everytime the recipients login
+- After submitting the alert:
+  - View the number of users the alert has `Reached`
+  - The `Seen By` list will include the users the alert has reached
 
 ---
 

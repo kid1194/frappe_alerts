@@ -36,3 +36,10 @@ on_logout = ["alerts.utils.access.on_logout"]
 
 
 extend_bootinfo = "alerts.utils.boot.extend"
+
+
+scheduler_events = {
+    "daily": [
+        "alerts.utils.alert.update_alerts"
+    ]
+}

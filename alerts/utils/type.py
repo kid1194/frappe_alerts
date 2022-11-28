@@ -25,10 +25,10 @@ def get_types(types):
         frappe.qb.from_(doc)
         .select(
             doc.name,
-            doc.alert_timeout,
-            doc.alert_sound,
+            doc.display_timeout,
+            doc.display_sound,
+            doc.custom_display_sound,
             doc.background,
-            doc.border_size,
             doc.border_color,
             doc.title_color,
             doc.content_color

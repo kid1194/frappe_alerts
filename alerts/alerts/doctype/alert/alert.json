@@ -139,14 +139,14 @@
    "label": "Reached",
    "default": "0",
    "read_only": 1,
+   "depends_on": "eval:doc.docstatus",
    "in_list_view": 1
   },
   {
    "fieldname": "seen_by_section",
    "fieldtype": "Section Break",
    "label": "Seen By",
-   "depends_on": "eval:doc.docstatus",
-   "collapsible": 1
+   "depends_on": "eval:doc.docstatus"
   },
   {
    "fieldname": "seen_by_html",
@@ -166,7 +166,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Pending\nStarted\nFinished",
+   "options": "Pending\nActive\nFinished",
    "read_only": 1,
    "hidden": 1,
    "search_index": 1

@@ -18,10 +18,10 @@ from alerts.utils.files import delete_files
 
 class AlertType(Document):
     def before_validate(self):
-        if cint(self.alert_timeout) < 0:
-            self.alert_timeout = 0
+        if cint(self.display_timeout) < 0:
+            self.display_timeout = 0
         
-        if self.alert_sound != "Custom" and self.custom_alert_sound:
+        if self.display_sound != "Custom" and self.custom_display_sound:
             if not self.is_new() and not self.get_doc_before_save():
                 self.load_doc_before_save()
             
@@ -29,11 +29,8 @@ class AlertType(Document):
             if self.get_doc_before_save():
                 name = self.get_doc_before_save().name
             
-            delete_files(self.doctype, name, [self.custom_alert_sound])
-            self.custom_alert_sound = ""
-        
-        if cint(self.border_size) < 0:
-            self.border_size = 0
+            delete_files(self.doctype, name, [self.custom_display_sound])
+            self.custom_display_sound = ""
     
     
     def validate(self):

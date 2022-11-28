@@ -5,14 +5,12 @@
 
 
 from .alert import (
-    update_alerts,
     cache_alerts,
     clear_alerts_cache
 )
 
 
 def on_login(login_manager):
-    update_alerts()
     cache_alerts(login_manager.user)
 
 
