@@ -9,19 +9,19 @@
 frappe.ui.form.on('Alert Type', {
     onload: function(frm) {
         frm.A = {
-            has_mock: 0,
+            _mock: null,
             mock: function() {
-                frm.A.has_mock = 1;
-                Alerts.mock(frm.get_field('mock_html').$wrapper);
+                if (frm.A._mock) return;
+                frm.A._mock = Alerts.mock(frm.get_field('mock_html').$wrapper);
                 if (!frm.is_new()) frm.A.refresh();
             },
             refresh: function() {
-                Alerts.setType(frm.doc, 1);
+                frm.A._mock && frm.A._mock.css(frm.doc);
             }
         };
     },
     refresh: function(frm) {
-        if (!frm.A.has_mock) frm.A.mock();
+        frm.A.mock();
     },
     background: function(frm) {
         if (frm.doc.background) frm.A.refresh();
