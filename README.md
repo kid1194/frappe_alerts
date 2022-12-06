@@ -158,7 +158,7 @@ bench restart
 - Check `Is Repeatable` to display the alert more than once, everytime the recipients login
 - After submitting the alert:
   - View the number of users the alert has `Reached`
-  - The `Seen By` list will include the users the alert has reached
+  - The `Seen By` list will include all the reached users
 
 ---
 
