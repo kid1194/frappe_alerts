@@ -111,7 +111,7 @@ def cache_alerts(user):
         ))
         .where(doc.status == "Active")
         .where(doc.docstatus == 1)
-        .orderby(doc.from_date, order=Order.asc))
+        .orderby(doc.from_date, order=Order.asc)
     ).run(as_dict=True)
     
     if not data or not isinstance(data, list):
