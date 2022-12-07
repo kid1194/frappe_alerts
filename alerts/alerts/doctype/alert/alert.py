@@ -65,7 +65,7 @@ class Alert(Document):
         now = datetime.utcnow()
         if get_datetime(self.from_date) > now:
             self.status = "Pending"
-        elif get_datetime(self.until_date) =< now:
+        elif get_datetime(self.until_date) <= now:
             self.status = "Finished"
         else:
             self.status = "Active"
