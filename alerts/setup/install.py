@@ -11,6 +11,7 @@ def after_install():
     types = [
         {
             "title": "Urgent",
+            "display_priority": 10,
             "display_timeout": 5,
             "display_sound": "Alert",
             "background": "#DC3545",
@@ -20,6 +21,7 @@ def after_install():
         },
         {
             "title": "Warning",
+            "display_priority": 5,
             "display_timeout": 5,
             "display_sound": "Alert",
             "background": "#FFC107",
@@ -29,6 +31,7 @@ def after_install():
         },
         {
             "title": "Notice",
+            "display_priority": 0,
             "display_timeout": 5,
             "display_sound": "Alert",
             "background": "#17A2B8",

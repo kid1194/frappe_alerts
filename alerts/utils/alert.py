@@ -11,8 +11,11 @@ from frappe.utils import (
     cint,
     nowdate,
     get_datetime,
-    has_common
+    has_common,
+    now,
+    unique
 )
+from frappe.query_builder.functions import Count
 
 from pypika.terms import Criterion
 from pypika.functions import IfNull
@@ -20,17 +23,20 @@ from pypika.enums import Order
 
 from .common import (
     set_cache,
-    get_cache,
-    del_cache,
+    pop_cache,
     is_doc_exist,
     get_cached_doc
 )
-from .type import get_types
+from .type import join_type_to_query, get_type
 
 
 _DT_ = "Alert"
 
     
+def is_alerts_for_type_exists(alert_type):
+    return is_doc_exist(_DT_, {"alert_type": alert_type})
+
+
 def update_alerts():
     now = nowdate()
     doc = frappe.qb.DocType(_DT_)
@@ -85,13 +91,22 @@ def cache_alerts(user):
         .where(sdoc.user == user)
     )
     
-    data = (
+    scQry = (
+        frappe.qb.from_(sdoc)
+        .select(Count(sdoc.parent))
+        .where(sdoc.parenttype == _DT_)
+        .where(sdoc.parentfield == "seen_by")
+        .where(sdoc.user == user)
+        .limit(1)
+    )
+    
+    qry = (
         frappe.qb.from_(doc)
         .select(
             doc.name,
             doc.alert_type,
             doc.title,
-            doc.content,
+            doc.message,
             doc.is_repeatable
         )
         .where(Criterion.any(
@@ -105,54 +120,48 @@ def cache_alerts(user):
             )
         ))
         .where(Criterion.any(
-            doc.is_repeatable == 1,
+            Criterion.all(
+                doc.is_repeatable == 1,
+                doc.number_of_repeats.gt(IfNull(scQry, 0))
+            ),
             IfNull(sQry, "") == "",
             doc.name.notin(sQry)
         ))
         .where(doc.status == "Active")
         .where(doc.docstatus == 1)
-        .orderby(doc.from_date, order=Order.asc)
-    ).run(as_dict=True)
+    )
+    qry = join_type_to_query(qry, doc.alert_type)
+    
+    data = qry.run(as_dict=True)
     
     if not data or not isinstance(data, list):
         data = []
     
-    if data:
-        types = get_types([v["alert_type"] for v in data])
-        for i in range(len(data)):
-            data[i]["type"] = types[data[i]["alert_type"]]
-        
     set_cache(_DT_, user, data)
 
 
-def send_alert(data):
-    if not data or not isinstance(data, dict):
-        return 0
-    
-    if cint(data.docstatus) != 1 or data.status != "Active":
-        return 0
-    
-    user = frappe.session.user 
+def send_alert(name):
     if (
-        (
-            data.for_users and
-            user not in [v.user for v in data.for_users]
-        ) or (
-            data.for_roles and
-            has_common(
-                [v.role for v in data.for_roles],
-                frappe.get_roles(user)
-            )
-        )
+        not name or not isinstance(name, str) or
+        not is_doc_exist(_DT_, name)
     ):
+        return 0
+    
+    doc = get_cached_doc(_DT_, name)
+    
+    if cint(doc.docstatus) != 1 or doc.status != "Active":
+        return 0
+    
+    user = frappe.session.user
+    if is_valid_user(doc, user):
         frappe.publish_realtime(
             event="show_alert",
             message={
-                "name": data.name,
-                "alert_type": data.alert_type,
-                "title": data.title,
-                "content": data.content,
-                "type": get_types([data.alert_type])[data.alert_type]
+                "name": doc.name,
+                "alert_type": doc.alert_type,
+                "title": doc.title,
+                "message": doc.message,
+                "type": get_type(doc.alert_type),
             },
             after_commit=True
         )
@@ -169,31 +178,56 @@ def mark_as_seen(name):
     user = frappe.session.user
     doc = get_cached_doc(_DT_, name, for_update=True)
     
-    if user not in [v.user for v in doc.seen_by]:
-        doc.append("seen_by", {"user": user})
-        doc.reached = len(doc.seen_by)
+    if is_valid_user(doc, user):
+        doc.append("seen_by", {"user": user, "date_time": now()})
+        doc.reached = len(unique([v.user for v in doc.seen_by]))
         doc.save(ignore_permissions=True)
+        
         frappe.publish_realtime(
-            event="alert_seen",
-            message={"user": user},
+            event="refresh_alert_seen_by",
             after_commit=True
         )
     
     return 1
 
 
-def clear_alerts_cache(user):
-    del_cache(_DT_, user)
+def is_valid_user(doc, user):
+    score = 0
+    if (
+        doc.for_users and
+        user in [v.user for v in doc.for_users]
+    ):
+        score = 1
+    
+    if (
+        score == 0 and
+        doc.for_roles and
+        has_common(
+            [v.role for v in doc.for_roles],
+            frappe.get_roles(user)
+        )
+    ):
+        score = 1
+    
+    if score == 0:
+        return False
+    
+    total_seen = (
+        len([v.user for v in doc.seen_by if v.user == user])
+        if doc.seen_by else 0
+    )
+    if (
+        total_seen == 0 or
+        (
+            cint(doc.is_repeatable) and
+            cint(doc.number_of_repeats) > total_seen
+        )
+    ):
+        return True
+    else:
+        return False
 
 
 def get_alerts_cache(user):
-    cache = get_cache(_DT_, user)
-    if not isinstance(cache, list):
-        cache = []
-    
-    if cache:
-        rep = len([v for v in cache if cint(v.is_repeatable)])
-        if len(cache) != rep:
-            clear_alerts_cache(user)
-    
-    return cache
+    cache = pop_cache(_DT_, user)
+    return cache if cache and isinstance(cache, list) else []

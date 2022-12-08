@@ -7,32 +7,17 @@
 
 
 frappe.ui.form.on('Alert Type', {
-    onload: function(frm) {
-        frm.A = {
-            _mock: null,
-            mock: function() {
-                if (frm.A._mock) return;
-                frm.A._mock = Alerts.mock(frm.get_field('mock_html').$wrapper);
-                if (!frm.is_new()) frm.A.refresh();
-            },
-            refresh: function() {
-                frm.A._mock && frm.A._mock.css(frm.doc);
-            }
-        };
-    },
     refresh: function(frm) {
-        frm.A.mock();
+        frm.trigger('load_toolbar');
     },
-    background: function(frm) {
-        if (frm.doc.background) frm.A.refresh();
-    },
-    border_color: function(frm) {
-        if (frm.doc.border_color) frm.A.refresh();
-    },
-    title_color: function(frm) {
-        if (frm.doc.title_color) frm.A.refresh();
-    },
-    content_color: function(frm) {
-        if (frm.doc.content_color) frm.A.refresh();
+    load_toolbar: function(frm) {
+        let preview_btn = __('Preview');
+        if (!frm.custom_buttons[preview_btn]) {
+            frm.add_custom_button(preview_btn, function() {
+                if (!frm._mock) frm._mock = frappe.Alerts.mock();
+                frm._mock.build(frm.doc);
+            });
+            frm.change_custom_button_type(preview_btn, null, 'info');
+        }
     },
 });

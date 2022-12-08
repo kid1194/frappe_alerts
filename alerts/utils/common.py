@@ -29,6 +29,12 @@ def del_cache(dt, key):
     frappe.cache().hdel(dt, key)
 
 
+def pop_cache(dt, key):
+    cache = get_cache(dt, key)
+    del_cache(dt, key)
+    return cache
+
+
 def clear_cache(dt):
     frappe.cache().delete_key(dt)
 

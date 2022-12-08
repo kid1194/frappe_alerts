@@ -15,8 +15,8 @@
   "main_column",
   "from_date",
   "until_date",
-  "content_section",
-  "content",
+  "message_section",
+  "message",
   "recipients_section",
   "for_roles",
   "recipients_column",
@@ -24,10 +24,10 @@
   "control_section",
   "is_repeatable",
   "control_column",
-  "reached",
+  "number_of_repeats",
   "seen_by_section",
-  "seen_by_html",
   "seen_by",
+  "reached",
   "status"
  ],
  "fields": [
@@ -56,7 +56,8 @@
    "fetch_from": "alert_type.title",
    "in_list_view": 1,
    "in_preview": 1,
-   "translatable": 1
+   "translatable": 1,
+   "search_index": 1
   },
   {
    "fieldname": "main_column",
@@ -79,6 +80,7 @@
    "fieldname": "until_date",
    "fieldtype": "Date",
    "label": "Until Date",
+   "read_only_depends_on": "eval:!doc.from_date",
    "in_list_view": 1,
    "in_filter": 1,
    "in_standard_filter": 1,
@@ -86,25 +88,25 @@
    "search_index": 1
   },
   {
-   "fieldname": "content_section",
+   "fieldname": "message_section",
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "content",
+   "fieldname": "message",
    "fieldtype": "Text Editor",
-   "label": "Content",
+   "label": "Message",
    "reqd": 1,
    "bold": 1
   },
   {
-   "fieldname": "recipients_column",
+   "fieldname": "recipients_section",
    "fieldtype": "Section Break",
    "label": "Recipients"
   },
   {
    "fieldname": "for_roles",
    "fieldtype": "Table MultiSelect",
-   "label": "Roles",
+   "label": "Recipient Roles",
    "options": "Alert For Role"
   },
   {
@@ -114,8 +116,8 @@
   {
    "fieldname": "for_users",
    "fieldtype": "Table MultiSelect",
-   "label": "Users",
-   "description": "Selected users will receive the alert regardless of the roles.",
+   "label": "Recipient Users",
+   "description": "Selected users will receive the alert regardless of the recipient roles.",
    "options": "Alert For User"
   },
   {
@@ -126,7 +128,7 @@
    "fieldname": "is_repeatable",
    "fieldtype": "Check",
    "label": "Is Repeatable",
-   "description": "Display alert repeatedly to all recipients after evey login",
+   "description": "Display alert more than once for each recipient",
    "in_list_view": 1
   },
   {
@@ -134,33 +136,34 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "reached",
+   "fieldname": "number_of_repeats",
    "fieldtype": "Int",
-   "label": "Reached",
-   "default": "0",
-   "read_only": 1,
-   "depends_on": "eval:doc.docstatus",
-   "in_list_view": 1
+   "label": "No. of Repeats",
+   "description": "",
+   "default": "2",
+   "read_only_depends_on": "eval:!doc.is_repeatable",
+   "non_negative": 1
   },
   {
    "fieldname": "seen_by_section",
    "fieldtype": "Section Break",
-   "label": "Seen By",
    "depends_on": "eval:doc.docstatus"
   },
   {
-   "fieldname": "seen_by_html",
-   "fieldtype": "HTML",
-   "label": "Seen By",
-   "read_only": 1
-  },
-  {
    "fieldname": "seen_by",
-   "fieldtype": "Table MultiSelect",
+   "fieldtype": "Table",
    "label": "Seen By",
    "options": "Alert Seen By",
    "read_only": 1,
-   "hidden": 1
+   "depends_on": "eval:doc.docstatus"
+  },
+  {
+   "fieldname": "reached",
+   "fieldtype": "Int",
+   "label": "Reached",
+   "default": "0",
+   "hidden": 1,
+   "in_list_view": 1
   },
   {
    "fieldname": "status",

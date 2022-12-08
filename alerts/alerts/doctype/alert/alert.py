@@ -7,7 +7,7 @@
 from datetime import datetime
 
 from frappe import _
-from frappe.utils import add_to_date, get_datetime
+from frappe.utils import nowdate, add_to_date, get_datetime
 from frappe.model.document import Document
 
 from alerts.utils.common import error, clear_document_cache
@@ -22,16 +22,30 @@ class Alert(Document):
     
     def validate(self):
         if not self.alert_type:
-            error(_("Alert type is mandatory"))
+            error(_("Please provide an alert type"))
+        if not self.title:
+            error(_("Please provide a title"))
         if not self.from_date:
-            error(_("From date is mandatory"))
+            error(_("Please provide a from date"))
+        if (
+            self.is_new() and self.from_date and
+            get_datetime(self.from_date) < get_datetime(nowdate())
+        ):
+            error(_("From date should be of today or a later date"))
+        if (
+            self.is_new() and self.until_date and
+            get_datetime(self.until_date) <= get_datetime(nowdate())
+        ):
+            error(_("Until date should be later than from date"))
         if (
             self.from_date and self.until_date and
             get_datetime(self.from_date) >= get_datetime(self.until_date)
         ):
-            error(_("Until date must be of a later date"))
-        if not self.content:
-            error(_("Content is mandatory"))
+            error(_("Until should be later than from date"))
+        if not self.message:
+            error(_("Please provide a message"))
+        if not self.for_roles and not self.for_users:
+            error(_("Please provide at least one recipient role or user"))
     
     
     def before_save(self):
@@ -59,13 +73,20 @@ class Alert(Document):
         if self.alert_type and not self.title:
             self.title = get_type_title(self.alert_type)
         
-        if self.from_date and not self.until_date:
-            self.until_date = add_to_date(self.from_date, years=1, as_string=True)
+        if not self.from_date:
+            self.from_date = nowdate()
         
-        now = datetime.utcnow()
-        if get_datetime(self.from_date) > now:
+        if self.from_date and not self.until_date:
+            self.until_date = add_to_date(self.from_date, months=1, as_string=True)
+        
+        now = get_datetime(nowdate())
+        from_date = get_datetime(self.from_date)
+        until_date = get_datetime(self.until_date)
+        if from_date > now and until_date > now:
             self.status = "Pending"
-        elif get_datetime(self.until_date) <= now:
+        elif from_date <= now and until_date > now:
+            self.status = "Active"
+        elif from_date < now and until_date < now:
             self.status = "Finished"
         else:
-            self.status = "Active"
+            self.status = "Finished"

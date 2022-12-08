@@ -5,7 +5,7 @@
  "editable_grid": 1,
  "autoname": "hash",
  "creation": "2022-04-04 04:04:04.119400",
- "description": "Alert targeted users",
+ "description": "Alert recipient users",
  "doctype": "DocType",
  "document_type": "Document",
  "engine": "InnoDB",
