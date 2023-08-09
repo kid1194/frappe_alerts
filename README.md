@@ -2,8 +2,11 @@
 
 A small **Frappe** module that displays custom alerts to specific recipients after login.
 
-⚠️ **This plugin is in ALPHA stage** ⚠️
-⚠️ **Apologies, due to a push mistake, some of the files have been removed for a while and I haven't noticed that at all.** ⚠️
+⚠️ **This plugin is in BETA stage** ⚠️
+
+**Apologies, due to a push mistake, some of the files have been removed for a while and I haven't noticed that at all.**
+
+---
 
 <p align="center">
     <img src="https://github.com/kid1194/frappe_alerts/blob/main/images/notice-alert-mobile.png?raw=true" alt="Alerts"/>
