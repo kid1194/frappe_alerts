@@ -10,9 +10,12 @@ from frappe import _
 from frappe.utils import nowdate, add_to_date, get_datetime
 from frappe.model.document import Document
 
-from alerts.utils.common import error, clear_document_cache
-from alerts.utils.type import get_type_title
-from alerts.utils.alert import send_alert
+from alerts.utils import (
+    error,
+    clear_document_cache,
+    get_type_title,
+    send_alert
+)
 
 
 class Alert(Document):

@@ -8,13 +8,13 @@ from frappe import _
 from frappe.utils import cint
 from frappe.model.document import Document
 
-from alerts.utils.common import (
+from alerts.utils import (
     error,
     clear_document_cache,
-    is_doc_exist
+    is_doc_exist,
+    delete_files,
+    is_alerts_for_type_exists
 )
-from alerts.utils.files import delete_files
-from alerts.utils.alert import is_alerts_for_type_exists
 
 
 class AlertType(Document):

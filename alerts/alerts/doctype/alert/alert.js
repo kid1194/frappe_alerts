@@ -61,7 +61,7 @@ frappe.ui.form.on('Alert', {
         });
         frm.set_query('user', 'for_users', function(doc, cdt, cdn) {
             var qry = {
-                query: 'alerts.utils.query.search_users'
+                query: 'alerts.utils.search_users'
             };
             if (frm.doc.for_users.length) {
                 qry.filters = {existing: []};

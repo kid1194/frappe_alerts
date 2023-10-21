@@ -45,7 +45,7 @@ class Alerts {
             .setType(data.type)
             .onShow(function() {
                 request(
-                    'alerts.utils.alert.mark_as_seen',
+                    'mark_as_seen',
                     {name: this.getName()},
                     function(ret) {
                         if (!cint(ret)) error('Module has encountered an error.');

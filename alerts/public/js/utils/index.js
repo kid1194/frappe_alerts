@@ -152,7 +152,7 @@ function request(method, args, success, always) {
         }
     }
     if (isString(method)) {
-        data.method = 'frappe_better_attach_control.api.' + method;
+        data.method = 'alerts.utils.' + method;
     } else if (isArray(method)) {
         data.doc = method[0];
         data.method = method[1];
