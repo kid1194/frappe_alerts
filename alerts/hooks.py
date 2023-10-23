@@ -4,7 +4,7 @@
 # Licence: Please refer to LICENSE file
 
 
-from . import __frappe_version_min_14__
+from .version import __frappe_version_min_14__
 
 
 app_name = "alerts"
