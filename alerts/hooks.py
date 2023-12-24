@@ -28,7 +28,6 @@ after_install = "alerts.setup.install.after_install"
 
 
 on_login = ["alerts.utils.access.on_login"]
-on_logout = ["alerts.utils.access.on_logout"]
 
 
 extend_bootinfo = "alerts.utils.boot.extend"

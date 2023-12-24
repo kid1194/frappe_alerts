@@ -4,7 +4,7 @@ A small **Frappe** module that displays custom alerts to specific recipients aft
 
 ⚠️ **This plugin is in BETA stage** ⚠️
 
-**Apologies, due to a push mistake, some of the files have been removed for a while and I haven't noticed that at all.**
+**Apologies, for the bug that for some reason I forgot to fix 😅**
 
 ---
 

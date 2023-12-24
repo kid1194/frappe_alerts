@@ -10,7 +10,6 @@ import frappe
 from frappe.utils import (
     cint,
     nowdate,
-    get_datetime,
     has_common,
     now,
     unique
@@ -109,24 +108,24 @@ def cache_alerts(user):
             doc.message,
             doc.is_repeatable
         )
-        .where(Criterion.any(
-            Criterion.all(
+        .where(Criterion.any([
+            Criterion.all([
                 IfNull(uQry, "") != "",
                 doc.name.isin(uQry)
-            ),
-            Criterion.all(
+            ]),
+            Criterion.all([
                 IfNull(rQry, "") != "",
                 doc.name.isin(rQry)
-            )
-        ))
-        .where(Criterion.any(
-            Criterion.all(
+            ])
+        ]))
+        .where(Criterion.any([
+            Criterion.all([
                 doc.is_repeatable == 1,
                 doc.number_of_repeats.gt(IfNull(scQry, 0))
-            ),
+            ]),
             IfNull(sQry, "") == "",
             doc.name.notin(sQry)
-        ))
+        ]))
         .where(doc.status == "Active")
         .where(doc.docstatus == 1)
     )
