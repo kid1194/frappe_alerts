@@ -20,6 +20,13 @@ A small **Frappe** module that displays custom alerts to specific recipients aft
 
 ---
 
+### Special Thanks 
+**A simple display of gratitude and appreciation to those who provided helped and kind support.**
+- [avc](https://github.com/git-avc) (Testing - Debugging)
+- [lan9635](https://github.com/lan9635) (Testing - Debugging)
+
+---
+
 ### Table of Contents
 - [Requirements](#requirements)
 - [Setup](#setup)
