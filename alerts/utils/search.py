@@ -1,4 +1,4 @@
-# Alerts © 2022
+# Alerts © 2024
 # Author:  Ameen Ahmed
 # Company: Level Up Marketing & Software Development Services
 # Licence: Please refer to LICENSE file
@@ -15,40 +15,50 @@ from frappe.utils import cstr
 from frappe.query_builder.functions import Locate
 
 
+# [Internal]
+_FIELD_TYPES_ = [
+    "Data",
+    "Text",
+    "Small Text",
+    "Long Text",
+    "Link",
+    "Select",
+    "Read Only",
+    "Text Editor"
+]
+
+
+# [Query]
 def filter_search(doc, qry, doctype, search, relevance, filter_column=None):
     meta = frappe.get_meta(doctype)
     if txt:
         qry = qry.select(Locate(search, relevance).as_("_relevance"))
         qry = qry.orderby("_relevance", doc.modified, doc.idx, order=Order.desc)
         
-        translated_search_doctypes = frappe.get_hooks("translated_search_doctypes")
-        search_filters = []
-        search_fields = [filter_column] if filter_column else []
+        translated_doctypes = get_translated_doctypes()
+        filters = []
+        fields = [filter_column] if filter_column else []
         
         if meta.title_field:
-            search_fields.append(meta.title_field)
+            fields.append(meta.title_field)
         if meta.search_fields:
-            search_fields.extend(meta.get_search_fields())
+            fields.extend(meta.get_search_fields())
 
-        for f in search_fields:
+        for f in fields:
             fmeta = meta.get_field(f.strip())
             if (
-                doctype not in translated_search_doctypes and
+                doctype not in translated_doctypes and
                 (
                     f == "name" or
-                    (
-                        fmeta
-                        and fmeta.fieldtype
-                        in ["Data", "Text", "Small Text", "Long Text", "Link", "Select", "Read Only", "Text Editor"]
-                    )
+                    (fmeta and fmeta.fieldtype in _FIELD_TYPES_)
                 )
             ):
-                search_filters.append(doc.field(f.strip()).like("%" + search + "%"))
+                filters.append(doc.field(f.strip()).like("%" + search + "%"))
         
-        if len(search_filters) > 1:
-            qry = qry.where(Criterion.any(search_filters))
+        if len(filters) > 1:
+            qry = qry.where(Criterion.any(filters))
         else:
-            qry = qry.where(search_filters.pop(0))
+            qry = qry.where(filters.pop(0))
     
     if meta.get("fields", {"fieldname": "enabled", "fieldtype": "Check"}):
         qry = qry.where(doc.enabled == 1)
@@ -58,8 +68,9 @@ def filter_search(doc, qry, doctype, search, relevance, filter_column=None):
     return qry
 
 
+# [Query]
 def prepare_data(data, dt, column, txt, as_dict):
-    if txt and dt in frappe.get_hooks("translated_search_doctypes"):
+    if txt and dt in get_translated_doctypes():
         data = [
             v
             for v in data
@@ -84,3 +95,8 @@ def prepare_data(data, dt, column, txt, as_dict):
         data = [r[:-1] for r in data]
     
     return data
+
+
+# [Internal]
+def get_translated_doctypes():
+    return frappe.get_hooks("translated_search_doctypes")

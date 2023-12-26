@@ -5,7 +5,7 @@
  "editable_grid": 1,
  "autoname": "hash",
  "creation": "2022-04-04 04:04:04.119400",
- "description": "Alert seen by users",
+ "description": "Alert seen by users for Alerts",
  "doctype": "DocType",
  "document_type": "Document",
  "engine": "InnoDB",
@@ -45,8 +45,5 @@
  "name": "Alert Seen By",
  "owner": "Administrator",
  "permissions": [],
- "sort_field": "modified",
- "sort_order": "DESC",
- "states": [],
- "track_changes": 1
+ "states": []
 }

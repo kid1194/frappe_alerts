@@ -3,7 +3,7 @@ name = "alerts"
 authors = [
     {name = "Ameen Ahmed (Level Up)", email = "kid1194@gmail.com"}
 ]
-description = "Frappe module that displays custom alerts to specific recipients after login."
+description = "Frappe app that displays custom alerts to specific recipients."
 keywords = ["frappe", "alerts"]
 classifiers = [
     "Development Status :: 4 - Beta",

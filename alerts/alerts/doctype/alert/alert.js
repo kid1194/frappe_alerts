@@ -8,44 +8,56 @@
 
 frappe.ui.form.on('Alert', {
     setup: function(frm) {
-        frm.A = {
-            is_draft: cint(frm.doc.docstatus) == 0,
-            is_submitted: cint(frm.doc.docstatus) == 1,
-            is_cancelled: cint(frm.doc.docstatus) == 2,
+        frm._alert = {
+            is_new: false,
+            is_draft: false,
+            is_submitted: false,
+            is_cancelled: false,
             today: moment(),
             tomorrow: moment().add(1, 'days'),
         };
     },
     onload: function(frm) {
-        if (!frm.A.is_draft) {
+        frm._alert.is_new = frm.is_new() || !!frm.__islocal || !cstr(frm.doc.alert_type).length;
+        frm._alert.is_draft = frm._alert.is_new || cint(frm.doc.docstatus) == 0;
+        frm._alert.is_submitted = !frm._alert.is_new && cint(frm.doc.docstatus) == 1;
+        frm._alert.is_cancelled = !frm._alert.is_new && cint(frm.doc.docstatus) == 2;
+        
+        if (frm._alert.is_submitted || frm._alert.is_cancelled) {
             frm.disable_form();
             frm.set_intro(
                 __(
                     '{0} has been {1}',
                     [
                         frm.doctype,
-                        frm.A.is_submitted ? 'submitted' : 'cancelled'
+                        frm._alert.is_submitted ? 'submitted' : 'cancelled'
                     ]
                 ),
-                frm.A.is_submitted ? 'green' : 'red'
+                frm._alert.is_submitted ? 'green' : 'red'
             );
             
             frm.set_df_property('seen_by', 'cannot_add_rows', 1);
             frm.set_df_property('seen_by', 'cannot_delete_rows', 1);
+            frm.set_df_property('seen_by', 'in_place_edit', 1);
+            
             var seen_by_grid = frm.get_field('seen_by').grid;
             if (seen_by_grid.meta) seen_by_grid.meta.editable_grid = true;
+            seen_by_grid.static_rows = 1;
             seen_by_grid.only_sortable();
+            if (
+                seen_by_grid.header_row
+                && seen_by_grid.header_row.configure_columns_button
+            ) seen_by_grid.header_row.configure_columns_button.remove();
             
-            frappe.socketio.init();
-            frappe.realtime.on('refresh_alert_seen_by', function() {
-                frm.reload_doc();
+            frappe.realtime.on('refresh_alert_seen_by', function(ret) {
+                if (ret) ret = ret.message || ret;
+                if (ret && cstr(ret.alert) === cstr(frm.doc.name))
+                    frm.reload_doc();
             });
             return;
         }
         
         frm.set_query('alert_type', {filters: {disabled: 0}});
-        
-        frm.add_fetch('alert_type', 'title', 'title', frm.doctype);
         
         frm.set_query('role', 'for_roles', function(doc, cdt, cdn) {
             var qry = {
@@ -72,8 +84,8 @@ frappe.ui.form.on('Alert', {
             return qry;
         });
         
-        var today = frappe.datetime.moment_to_date_obj(frm.A.today),
-        tomorrow = frappe.datetime.moment_to_date_obj(frm.A.tomorrow);
+        var today = frappe.datetime.moment_to_date_obj(frm._alert.today),
+        tomorrow = frappe.datetime.moment_to_date_obj(frm._alert.tomorrow);
         frm.set_df_property('from_date', 'options', {
             startDate: today,
             minDate: today
@@ -90,63 +102,50 @@ frappe.ui.form.on('Alert', {
         frm.trigger('validate_until_date');
     },
     validate: function(frm) {
+        if (!cstr(frm.doc.title)) {
+            frappe.throw(__('A valid alert title is required.'));
+            return false;
+        }
+        if (!cstr(frm.doc.alert_type)) {
+            frappe.throw(__('A valid alert type is required.'));
+            return false;
+        }
         frm.trigger('validate_from_date');
         frm.trigger('validate_until_date');
-        if (!frm.doc.for_roles.length && !frm.doc.for_users.length) {
-            frappe.throw(__('Please select at least one recipient role or user'));
+        if (
+            !(frm.doc.for_roles || []).length
+            && !(frm.doc.for_users || []).length
+        ) {
+            frappe.throw(__('At least one recipient role or user is required.'));
+            return false;
         }
     },
     validate_from_date: function(frm) {
-        if (!frm.doc.from_date) return;
-        if (
-            frm.A.today.diff(moment(
-                frm.doc.from_date,
-                frappe.defaultDateFormat
-            ), 'days') > 0
-        ) {
-            frm.set_value('from_date', frm.A.today.format());
+        var from = cstr(frm.doc.from_date);
+        if (!from.length) return;
+        from = moment(from, frappe.defaultDateFormat);
+        if (frm._alert.today.diff(from, 'days') > 0) {
+            frm.set_value('from_date', frm._alert.today.format());
             return;
         }
-        if (!frm.doc.until_date) return;
-        var until_date = moment(
-            frm.doc.until_date,
-            frappe.defaultDateFormat
-        );
-        if (
-            moment(
-                frm.doc.from_date,
-                frappe.defaultDateFormat
-            ).diff(until_date, 'days') >= 0
-        ) {
-            frm.set_value('from_date', until_date.add(-1, 'days').format());
-        }
+        var until = cstr(frm.doc.until_date);
+        if (!until.length) return;
+        until = moment(until, frappe.defaultDateFormat);
+        if (from.diff(until, 'days') >= 0)
+            frm.set_value('from_date', until.add(-1, 'days').format());
     },
     validate_until_date: function(frm) {
-        if (!frm.doc.until_date) return;
-        if (
-            frm.A.tomorrow.diff(moment(
-                frm.doc.until_date,
-                frappe.defaultDateFormat
-            ), 'days') > 0
-        ) {
-            frm.set_value('until_date', frm.A.tomorrow.format());
+        var until = cstr(frm.doc.until_date);
+        if (!until.length) return;
+        until = moment(until, frappe.defaultDateFormat);
+        if (frm._alert.tomorrow.diff(until, 'days') > 0) {
+            frm.set_value('until_date', frm._alert.tomorrow.format());
             return;
         }
-        if (!frm.doc.from_date) return;
-        var from_date = moment(
-            frm.doc.from_date,
-            frappe.defaultDateFormat
-        );
-        if (
-            from_date.diff(
-                moment(
-                    frm.doc.until_date,
-                    frappe.defaultDateFormat
-                ),
-                'days'
-            ) >= 0
-        ) {
-            frm.set_value('until_date', from_date.add(1, 'days').format());
-        }
+        var from = cstr(frm.doc.from_date);
+        if (!from.length) return;
+        from = moment(from, frappe.defaultDateFormat);
+        if (from.diff(until, 'days') >= 0)
+            frm.set_value('until_date', from.add(1, 'days').format());
     },
 });

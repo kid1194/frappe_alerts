@@ -5,7 +5,7 @@
  "editable_grid": 1,
  "autoname": "hash",
  "creation": "2022-04-04 04:04:04.119400",
- "description": "Alert recipient users",
+ "description": "Alert recipient users for Alerts",
  "doctype": "DocType",
  "document_type": "Document",
  "engine": "InnoDB",
@@ -34,8 +34,5 @@
  "name": "Alert For User",
  "owner": "Administrator",
  "permissions": [],
- "sort_field": "modified",
- "sort_order": "DESC",
- "states": [],
- "track_changes": 1
+ "states": []
 }

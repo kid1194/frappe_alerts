@@ -2,16 +2,16 @@
  "actions": [],
  "allow_copy": 1,
  "allow_import": 1,
- "autoname": "format:ALRT-{YY}{MM}{DD}-{#####}",
+ "autoname": "format:ALERT-{YY}{MM}{DD}-{###}",
  "creation": "2022-04-04 04:04:04.119400",
- "description": "Alert data",
+ "description": "Alert data for Alerts",
  "doctype": "DocType",
  "document_type": "Document",
  "engine": "InnoDB",
  "field_order": [
   "main_section",
-  "alert_type",
   "title",
+  "alert_type",
   "main_column",
   "from_date",
   "until_date",
@@ -36,6 +36,17 @@
    "fieldtype": "Section Break"
   },
   {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1,
+   "bold": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "translatable": 1,
+   "search_index": 1
+  },
+  {
    "fieldname": "alert_type",
    "fieldtype": "Link",
    "label": "Alert Type",
@@ -48,16 +59,6 @@
    "in_preview": 1,
    "search_index": 1,
    "ignore_user_permissions": 1
-  },
-  {
-   "fieldname": "title",
-   "fieldtype": "Data",
-   "label": "Title",
-   "fetch_from": "alert_type.title",
-   "in_list_view": 1,
-   "in_preview": 1,
-   "translatable": 1,
-   "search_index": 1
   },
   {
    "fieldname": "main_column",
@@ -147,7 +148,7 @@
   {
    "fieldname": "seen_by_section",
    "fieldtype": "Section Break",
-   "depends_on": "eval:doc.docstatus"
+   "depends_on": "eval:doc.docstatus !== 0"
   },
   {
    "fieldname": "seen_by",
@@ -155,7 +156,7 @@
    "label": "Seen By",
    "options": "Alert Seen By",
    "read_only": 1,
-   "depends_on": "eval:doc.docstatus"
+   "allow_on_submit": 1
   },
   {
    "fieldname": "reached",
@@ -163,16 +164,19 @@
    "label": "Reached",
    "default": "0",
    "hidden": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "allow_on_submit": 1
   },
   {
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
    "options": "Pending\nActive\nFinished",
+   "default": "Pending",
    "read_only": 1,
    "hidden": 1,
-   "search_index": 1
+   "search_index": 1,
+   "allow_on_submit": 1
   }
  ],
  "icon": "fa fa-bell",
@@ -182,7 +186,7 @@
  "modified_by": "Administrator",
  "module": "Alerts",
  "name": "Alert",
- "naming_rule": "By Expression",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

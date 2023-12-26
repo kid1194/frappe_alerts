@@ -4,7 +4,7 @@
  "allow_import": 1,
  "autoname": "field:title",
  "creation": "2022-04-04 04:04:04.119400",
- "description": "Alert type",
+ "description": "Alert type for Alerts",
  "doctype": "DocType",
  "document_type": "Document",
  "engine": "InnoDB",
@@ -38,20 +38,20 @@
    "unique": 1,
    "reqd": 1,
    "bold": 1,
+   "in_list_view": 1,
    "in_preview": 1,
    "translatable": 1
   },
   {
    "fieldname": "main_column",
-   "fieldtype": "Column Break",
-   "depends_on": "eval:!doc.__islocal"
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "disabled",
    "fieldtype": "Check",
    "label": "Is Disabled",
    "default": "0",
-   "depends_on": "eval:!doc.__islocal",
+   "read_only_depends_on": "eval:doc.__islocal",
    "search_index": 1
   },
   {
@@ -65,7 +65,8 @@
    "label": "Display Priority",
    "description": "Alerts of types with higher priority gets displayed first",
    "default": "0",
-   "non_negative": 1
+   "non_negative": 1,
+   "in_list_view": 1
   },
   {
    "fieldname": "display_timeout",
@@ -73,7 +74,8 @@
    "label": "Display Timeout (Seconds)",
    "description": "Close alerts automatically after a specific time. Default: 0 - No Timeout",
    "default": "0",
-   "non_negative": 1
+   "non_negative": 1,
+   "in_list_view": 1
   },
   {
    "fieldname": "control_column",

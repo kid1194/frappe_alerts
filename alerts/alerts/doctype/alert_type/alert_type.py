@@ -1,19 +1,18 @@
-# Alerts © 2022
+# Alerts © 2024
 # Author:  Ameen Ahmed
 # Company: Level Up Marketing & Software Development Services
 # Licence: Please refer to LICENSE file
 
 
-from frappe import _
+from frappe import _, throw
 from frappe.utils import cint
 from frappe.model.document import Document
 
 from alerts.utils import (
-    error,
-    clear_document_cache,
-    is_doc_exist,
+    clear_doc_cache,
+    doc_count,
     delete_files,
-    is_alerts_for_type_exists
+    type_alerts_exists
 )
 
 
@@ -26,36 +25,63 @@ class AlertType(Document):
             self.display_timeout = 0
         
         if self.display_sound != "Custom":
-            self.custom_display_sound = ""
+            self.custom_display_sound = None
     
     
     def validate(self):
         if not self.title:
-            error(_("Please provide a valid title"))
-        if is_doc_exist(self.doctype, self.name):
-            error(_("{0} \"{1}\" already exist").format(self.doctype, self.name))
+            throw(_("A valid alert type title is required."))
+        limit = 0 if self.is_new() else 1
+        if doc_count(self.doctype, {"title": self.title}) != limit:
+            throw(_("The alert type \"{0}\" already exists.").format(self.title))
         if self.display_sound == "Custom" and not self.custom_display_sound:
-            error(_("Please provide a valid custom display sound"))
+            throw(_("A valid alert type custom display sound is required."))
     
     
     def before_save(self):
-        if not self.is_new() and not self.get_doc_before_save():
-            self.load_doc_before_save()
+        clear_doc_cache(self.doctype, self.name)
         
-        name = self.name
-        custom_display_sound = None
-        if self.get_doc_before_save():
-            name = self.get_doc_before_save().name
-            custom_display_sound = self.get_doc_before_save().custom_display_sound
-        
-        if custom_display_sound and custom_display_sound != self.custom_display_sound:
-            delete_files(self.doctype, name, [custom_display_sound])
-        
-        clear_document_cache(self.doctype, name)
+        if (old := self._get_old_doc()):
+            old_name = self._get_old_name(old)
+            if old_name:
+                clear_doc_cache(self.doctype, old_name)
+            
+            if (
+                old.custom_display_sound and
+                old.custom_display_sound != self.custom_display_sound
+            ):
+                names = [self.name]
+                if old_name:
+                    names.append(old_name)
+                
+                delete_files(self.doctype, names, [old.custom_display_sound])
     
     
     def on_trash(self):
-        if is_alerts_for_type_exists(self.name):
-            error(_("Cannot remove the alert type before removing the alerts that belongs to it."))
-        elif self.custom_display_sound:
+        if type_alerts_exists(self.name):
+            throw(_("An alert type with existing linked alerts cannot be removed."))
+        
+        if self.custom_display_sound:
             delete_files(self.doctype, self.name, [self.custom_display_sound])
+    
+    
+    def _get_old_doc(self):
+        if self.is_new():
+            return None
+        
+        doc = self.get_doc_before_save()
+        if not doc:
+            self.load_doc_before_save()
+            doc = self.get_doc_before_save()
+        
+        return doc
+    
+    
+    def _get_old_name(self, doc=None):
+        if not doc:
+            doc = self._get_old_doc()
+        
+        if doc and doc.name and doc.name != self.name:
+            return doc.name
+        
+        return None

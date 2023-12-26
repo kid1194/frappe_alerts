@@ -1,182 +1,229 @@
-# Alerts © 2022
+# Alerts © 2024
 # Author:  Ameen Ahmed
 # Company: Level Up Marketing & Software Development Services
 # Licence: Please refer to LICENSE file
 
 
-from datetime import datetime
+from pypika.terms import Criterion
+from pypika.functions import IfNull
 
 import frappe
 from frappe.utils import (
     cint,
     nowdate,
+    getdate,
     has_common,
     now,
     unique
 )
 from frappe.query_builder.functions import Count
 
-from pypika.terms import Criterion
-from pypika.functions import IfNull
-from pypika.enums import Order
-
-from .common import (
-    set_cache,
-    pop_cache,
-    is_doc_exist,
-    get_cached_doc
+from .cache import (
+    get_cached_doc,
+    set_tmp_cache,
+    get_tmp_cache
 )
-from .type import join_type_to_query, get_type
+from .common import is_doc_exists
+from .type import (
+    type_join_query,
+    get_type
+)
 
 
-_DT_ = "Alert"
-
-    
-def is_alerts_for_type_exists(alert_type):
-    return is_doc_exist(_DT_, {"alert_type": alert_type})
+# [Internal]
+_ALERT_ = "Alert"
 
 
+# [Internal]
+_ALERT_USER_ = "Alert For User"
+
+
+# [Internal]
+_ALERT_ROLE_ = "Alert For Role"
+
+
+# [Internal]
+_ALERT_SEEN_ = "Alert Seen By"
+
+
+# [Alert Type]
+def type_alerts_exists(alert_type):
+    return is_doc_exists(_ALERT_, {"alert_type": alert_type})
+
+
+# [Hooks]
 def update_alerts():
-    now = nowdate()
-    doc = frappe.qb.DocType(_DT_)
+    today = getdate()
+    doc = frappe.qb.DocType(_ALERT_)
     (
         frappe.qb.update(doc)
         .set(doc.status, "Finished")
-        .where(doc.from_date.lt(now))
-        .where(doc.until_date.lte(now))
+        .where(doc.from_date.lt(today))
+        .where(doc.until_date.lte(today))
         .where(doc.status == "Active")
         .where(doc.docstatus == 1)
     ).run()
     (
         frappe.qb.update(doc)
         .set(doc.status, "Active")
-        .where(doc.from_date.lte(now))
-        .where(doc.until_date.gt(now))
+        .where(doc.from_date.lte(today))
+        .where(doc.until_date.gt(today))
         .where(doc.status == "Pending")
         .where(doc.docstatus == 1)
     ).run()
 
 
+# [Access]
 def cache_alerts(user):
-    doc = frappe.qb.DocType(_DT_)
-    udoc = frappe.qb.DocType(_DT_ + " For User")
-    rdoc = frappe.qb.DocType(_DT_ + " For Role")
-    sdoc = frappe.qb.DocType(_DT_ + " Seen By")
+    doc = frappe.qb.DocType(_ALERT_)
+    udoc = frappe.qb.DocType(_ALERT_USER_)
+    rdoc = frappe.qb.DocType(_ALERT_ROLE_)
+    sdoc = frappe.qb.DocType(_ALERT_SEEN_)
     
-    uQry = (
+    uqry = (
         frappe.qb.from_(udoc)
         .select(udoc.parent)
         .distinct()
-        .where(udoc.parenttype == _DT_)
+        .where(udoc.parenttype == _ALERT_)
         .where(udoc.parentfield == "for_users")
         .where(udoc.user == user)
     )
     
-    rQry = (
+    rqry = (
         frappe.qb.from_(rdoc)
         .select(rdoc.parent)
         .distinct()
-        .where(udoc.parenttype == _DT_)
-        .where(udoc.parentfield == "for_roles")
+        .where(rdoc.parenttype == _ALERT_)
+        .where(rdoc.parentfield == "for_roles")
         .where(rdoc.role.isin(frappe.get_roles(user)))
     )
     
-    sQry = (
-        frappe.qb.from_(sdoc)
-        .select(sdoc.parent)
-        .distinct()
-        .where(sdoc.parenttype == _DT_)
-        .where(sdoc.parentfield == "seen_by")
-        .where(sdoc.user == user)
-    )
-    
-    scQry = (
+    scqry = (
         frappe.qb.from_(sdoc)
         .select(Count(sdoc.parent))
-        .where(sdoc.parenttype == _DT_)
+        .where(sdoc.parent == doc.name)
+        .where(sdoc.parenttype == _ALERT_)
         .where(sdoc.parentfield == "seen_by")
         .where(sdoc.user == user)
         .limit(1)
+    )
+    
+    stqry = (
+        frappe.qb.from_(sdoc)
+        .select(sdoc.parent)
+        .where(sdoc.parent == doc.name)
+        .where(sdoc.parenttype == _ALERT_)
+        .where(sdoc.parentfield == "seen_by")
+        .where(sdoc.user == user)
+        .where(sdoc.date_time.gte(nowdate()))
     )
     
     qry = (
         frappe.qb.from_(doc)
         .select(
             doc.name,
-            doc.alert_type,
             doc.title,
+            doc.alert_type,
             doc.message,
             doc.is_repeatable
         )
+        .where(doc.status == "Active")
+        .where(doc.docstatus == 1)
         .where(Criterion.any([
             Criterion.all([
-                IfNull(uQry, "") != "",
-                doc.name.isin(uQry)
+                IfNull(uqry, "") != "",
+                doc.name.isin(uqry)
             ]),
             Criterion.all([
-                IfNull(rQry, "") != "",
-                doc.name.isin(rQry)
+                IfNull(rqry, "") != "",
+                doc.name.isin(rqry)
             ])
         ]))
         .where(Criterion.any([
+            IfNull(stqry, "") == "",
+            doc.name.notin(stqry)
+        ])
+        .where(Criterion.any([
+            Criterion.all([
+                doc.is_repeatable != 1,
+                IfNull(scqry, 0) == 0
+            ]),
             Criterion.all([
                 doc.is_repeatable == 1,
-                doc.number_of_repeats.gt(IfNull(scQry, 0))
-            ]),
-            IfNull(sQry, "") == "",
-            doc.name.notin(sQry)
+                doc.number_of_repeats > 0,
+                doc.number_of_repeats.gt(IfNull(scqry, 0))
+            ])
         ]))
-        .where(doc.status == "Active")
-        .where(doc.docstatus == 1)
     )
-    qry = join_type_to_query(qry, doc.alert_type)
+    qry = type_join_query(qry, doc.alert_type)
     
     data = qry.run(as_dict=True)
     
-    if not data or not isinstance(data, list):
-        data = []
-    
-    set_cache(_DT_, user, data)
+    if data and isinstance(data, list):
+        set_tmp_cache(f"alerts-for-{user}", data, 180)
 
 
-def send_alert(name):
-    if (
-        not name or not isinstance(name, str) or
-        not is_doc_exist(_DT_, name)
-    ):
-        return 0
+# [Boot]
+def get_alerts_cache(user):
+    cache = get_tmp_cache(f"alerts-for-{user}")
+    if not cache or not isinstance(cache, list):
+        cache = []
     
-    doc = get_cached_doc(_DT_, name)
-    
-    if cint(doc.docstatus) != 1 or doc.status != "Active":
-        return 0
-    
-    user = frappe.session.user
-    if is_valid_user(doc, user):
-        frappe.publish_realtime(
-            event="show_alert",
-            message={
-                "name": doc.name,
-                "alert_type": doc.alert_type,
-                "title": doc.title,
-                "message": doc.message,
-                "type": get_type(doc.alert_type),
-            },
-            after_commit=True
-        )
+    return cache
 
 
+# [Alerts Alert]
+def send_alert(doc):
+    seen_by = {}
+    seen_today = []
+    
+    if doc.seen_by:
+        today = getdate()
+        for v in doc.seen_by:
+            if v.user not in seen_by:
+                seen_by[v.user] = 0
+            
+            seen_by[v.user] += 1
+            
+            if (
+                v.user not in seen_today and
+                getdate(v.date_time) == today
+            ):
+                seen_today.append(v.user)
+    
+    frappe.publish_realtime(
+        event="show_alert",
+        message={
+            "name": doc.name,
+            "alert_type": doc.alert_type,
+            "type": get_type(doc.alert_type),
+            "title": doc.title,
+            "message": doc.message,
+            "is_repeatable": cint(doc.is_repeatable),
+            "number_of_repeats": cint(doc.number_of_repeats),
+            "users": [v.user for v in doc.for_users],
+            "roles": [v.role for v in doc.for_roles],
+            "seen_by": seen_by,
+            "seen_today": seen_today
+        },
+        after_commit=True
+    )
+
+
+# [Alerts Js]
 @frappe.whitelist(methods=["POST"])
 def mark_as_seen(name):
     if (
         not name or not isinstance(name, str) or
-        not is_doc_exist(_DT_, name)
+        not is_doc_exists(_ALERT_, name)
     ):
         return 0
     
-    user = frappe.session.user
-    doc = get_cached_doc(_DT_, name, for_update=True)
+    doc = get_cached_doc(_ALERT_, name)
+    if not doc or cint(doc.docstatus) != 1:
+        return 0
     
+    user = frappe.session.user
     if is_valid_user(doc, user):
         doc.append("seen_by", {"user": user, "date_time": now()})
         doc.reached = len(unique([v.user for v in doc.seen_by]))
@@ -184,12 +231,14 @@ def mark_as_seen(name):
         
         frappe.publish_realtime(
             event="refresh_alert_seen_by",
+            message={"alert": doc.name},
             after_commit=True
         )
     
     return 1
 
 
+# [Internal]
 def is_valid_user(doc, user):
     score = 0
     if (
@@ -198,8 +247,7 @@ def is_valid_user(doc, user):
     ):
         score = 1
     
-    if (
-        score == 0 and
+    elif (
         doc.for_roles and
         has_common(
             [v.role for v in doc.for_roles],
@@ -211,22 +259,20 @@ def is_valid_user(doc, user):
     if score == 0:
         return False
     
-    total_seen = (
-        len([v.user for v in doc.seen_by if v.user == user])
-        if doc.seen_by else 0
-    )
-    if (
-        total_seen == 0 or
-        (
-            cint(doc.is_repeatable) and
-            cint(doc.number_of_repeats) > total_seen
-        )
-    ):
-        return True
-    else:
+    total_seen = 0
+    if doc.seen_by:
+        today = getdate()
+        for v in doc.seen_by:
+            if v.user == user:
+                total_seen += 1
+                if getdate(v.date_time) == today:
+                    return False
+    
+    if not cint(doc.is_repeatable) and total_seen:
         return False
-
-
-def get_alerts_cache(user):
-    cache = pop_cache(_DT_, user)
-    return cache if cache and isinstance(cache, list) else []
+    
+    max_repeats = cint(doc.number_of_repeats)
+    if max_repeats > 0 and total_seen >= max_repeats:
+        return False
+    
+    return True

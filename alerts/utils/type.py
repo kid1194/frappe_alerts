@@ -5,24 +5,28 @@
 
 
 import frappe
+from frappe.utils import cstr
 
 from pypika.enums import Order
 
-from .common import is_doc_exist, get_cached_doc
+from .common import (
+    is_doc_exist,
+    get_cached_doc
+)
 
 
-_DT_ = "Alert Type"
+# [Internal]
+_TYPE_ = "Alert Type"
 
 
-def get_type_title(name):
-    if is_doc_exist(_DT_, name):
-        return get_cached_doc(_DT_, name).title
-    else:
-        return ""
+# [Alert, Internal]
+def get_type(name):
+   return get_cached_doc(_TYPE_, name)
 
 
-def join_type_to_query(qry, join_column):
-    doc = frappe.qb.DocType(_DT_)
+# [Alert]
+def type_join_query(qry, join_column):
+    doc = frappe.qb.DocType(_TYPE_)
     qry = (
         qry.select(
             doc.display_priority,
@@ -42,36 +46,10 @@ def join_type_to_query(qry, join_column):
     return qry
 
 
-def get_type(name):
-    doc = frappe.qb.DocType(_DT_)
-    data = (
-        frappe.qb.from_(doc)
-        .select(
-            doc.name,
-            doc.display_timeout,
-            doc.display_sound,
-            doc.custom_display_sound,
-            doc.background,
-            doc.border_color,
-            doc.title_color,
-            doc.content_color
-        )
-        .where(doc.name == type)
-        .limit(1)
-    ).run(as_dict=True)
-    
-    if not data or not isinstance(data, list):
-        data = []
-    
-    if data:
-        data = data[0]
-    
-    return data
-
-
+# [Install]
 def add_type(data):
     try:
-        (frappe.new_doc(_DT_)
+        (frappe.new_doc(_TYPE_)
             .update(data)
             .insert(ignore_permissions=True, ignore_if_duplicate=True))
     except Exception:
