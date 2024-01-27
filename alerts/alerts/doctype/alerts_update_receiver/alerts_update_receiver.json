@@ -1,15 +1,13 @@
 {
  "allow_copy": 1,
  "allow_import": 1,
- "editable_grid": 1,
  "autoname": "hash",
- "creation": "2022-04-04 04:04:04.119400",
- "description": "Alert seen by users for Alerts",
+ "creation": "2023-04-04 04:04:04.119400",
+ "description": "Update receiver for Alerts",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "user",
-  "date_time"
+  "user"
  ],
  "fields": [
   {
@@ -21,21 +19,12 @@
    "bold": 1,
    "in_list_view": 1,
    "ignore_user_permissions": 1
-  },
-  {
-   "fieldname": "date_time",
-   "fieldtype": "Datetime",
-   "label": "Date/Time",
-   "options": "Today",
-   "reqd": 1,
-   "bold": 1,
-   "in_list_view": 1
   }
  ],
  "istable": 1,
  "modified": "2024-01-27 04:04:04.119400",
  "modified_by": "Administrator",
  "module": "Alerts",
- "name": "Alert Seen By",
+ "name": "Alerts Update Receiver",
  "owner": "Administrator"
 }

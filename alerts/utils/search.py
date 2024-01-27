@@ -4,32 +4,16 @@
 # Licence: Please refer to LICENSE file
 
 
-import re
-
-from pypika.enums import Order
-from pypika.terms import Criterion
-
 import frappe
-from frappe import _
-from frappe.utils import cstr
-from frappe.query_builder.functions import Locate
-
-
-# [Internal]
-_FIELD_TYPES_ = [
-    "Data",
-    "Text",
-    "Small Text",
-    "Long Text",
-    "Link",
-    "Select",
-    "Read Only",
-    "Text Editor"
-]
 
 
 # [Query]
 def filter_search(doc, qry, doctype, search, relevance, filter_column=None):
+    from pypika.enums import Order
+    from pypika.terms import Criterion
+    
+    from frappe.query_builder.functions import Locate
+    
     meta = frappe.get_meta(doctype)
     if txt:
         qry = qry.select(Locate(search, relevance).as_("_relevance"))
@@ -43,14 +27,25 @@ def filter_search(doc, qry, doctype, search, relevance, filter_column=None):
             fields.append(meta.title_field)
         if meta.search_fields:
             fields.extend(meta.get_search_fields())
-
+        
+        field_types = [
+            "Data",
+            "Text",
+            "Small Text",
+            "Long Text",
+            "Link",
+            "Select",
+            "Read Only",
+            "Text Editor"
+        ]
+        
         for f in fields:
             fmeta = meta.get_field(f.strip())
             if (
                 doctype not in translated_doctypes and
                 (
                     f == "name" or
-                    (fmeta and fmeta.fieldtype in _FIELD_TYPES_)
+                    (fmeta and fmeta.fieldtype in field_types)
                 )
             ):
                 filters.append(doc.field(f.strip()).like("%" + search + "%"))
@@ -70,7 +65,12 @@ def filter_search(doc, qry, doctype, search, relevance, filter_column=None):
 
 # [Query]
 def prepare_data(data, dt, column, txt, as_dict):
+    from frappe import _
+    from frappe.utils import cstr
+    
     if txt and dt in get_translated_doctypes():
+        import re
+        
         data = [
             v
             for v in data

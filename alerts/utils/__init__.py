@@ -4,11 +4,14 @@
 # Licence: Please refer to LICENSE file
 
 
-from .alert import *
+from .alert import (
+    type_alerts_exists,
+    send_alert,
+    mark_seens
+)
 from .cache import *
 from .common import *
-from .files import *
-from .query import *
+from .files import delete_files
+from .query import search_users
 from .settings import *
-from .type import *
-from .update import *
+from .update import check_for_update

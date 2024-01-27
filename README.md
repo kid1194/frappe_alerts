@@ -2,9 +2,12 @@
 
 A small **Frappe** module that displays custom alerts to specific recipients after login.
 
+![v1-Beta5](https://img.shields.io/badge/v1_Beta5-2024/01/27-blue?style=plastic)
+
 ⚠️ **This plugin is in BETA stage** ⚠️
 
-**Apologies, for the bug that for some reason I forgot to fix 😅**
+**Apologies in advance for any problem or bug you face with this module.**
+**Please report any problem or bug you face so it can be fixed.**
 
 ---
 
@@ -20,10 +23,11 @@ A small **Frappe** module that displays custom alerts to specific recipients aft
 
 ---
 
-### Special Thanks 
-**A simple display of gratitude and appreciation to those who provided helped and kind support.**
-- [avc](https://github.com/git-avc) (Testing - Debugging)
-- [lan9635](https://github.com/lan9635) (Testing - Debugging)
+### Contributors
+**The list of people who deserves more than a simple "Thank You".**
+- [![avc](https://img.shields.io/badge/avc-Debug_%7C_Test-red?style=plastic)](https://github.com/git-avc)
+- [![lan9635](https://img.shields.io/badge/lan9635-Debug_%7C_Test-blue?style=plastic)](https://github.com/lan9635)
+- [![satishkakani](https://img.shields.io/badge/satishkakani-Debug-green?style=plastic)](https://github.com/satishkakani)
 
 ---
 

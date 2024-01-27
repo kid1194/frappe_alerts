@@ -6,16 +6,13 @@
 
 import frappe
 
-from .common import parse_json
-from .search import (
-    filter_search,
-    prepare_data
-)
-
 
 # [Alerts Alert Form]
 @frappe.whitelist()
 def search_users(doctype, txt, searchfield, start, page_len, filters, as_dict=False):
+    from .common import parse_json
+    from .search import filter_search, prepare_data
+    
     dt = "User"
     doc = frappe.qb.DocType(dt)
     rdoc = frappe.qb.DocType("Role")
@@ -46,11 +43,11 @@ def search_users(doctype, txt, searchfield, start, page_len, filters, as_dict=Fa
     
     qry = filter_search(doc, qry, dt, txt, doc.name, "name")
     
-    if (existing := filters.get("existing")):
-        if isinstance(existing, str):
-            existing = parse_json(existing)
-        if existing and isinstance(existing, list):
-            qry = qry.where(doc.name.notin(existing))
+    existing = filters.get("existing")
+    if existing and isinstance(existing, str):
+        existing = parse_json(existing)
+    if existing and isinstance(existing, list):
+        qry = qry.where(doc.name.notin(existing))
     
     data = qry.run(as_dict=as_dict)
     

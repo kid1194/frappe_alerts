@@ -4,6 +4,8 @@
 # Licence: Please refer to LICENSE file
 
 
-__module__ = "Alerts"
-__version__ = "1.0.0"
-__production__ = False
+from frappe.model.document import Document
+
+
+class AlertsUpdateReceiver(Document):
+    pass

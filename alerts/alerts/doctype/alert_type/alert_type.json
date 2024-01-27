@@ -1,12 +1,10 @@
 {
- "actions": [],
  "allow_copy": 1,
  "allow_import": 1,
  "autoname": "Prompt",
  "creation": "2022-04-04 04:04:04.119400",
  "description": "Alert type for Alerts",
  "doctype": "DocType",
- "document_type": "Document",
  "engine": "InnoDB",
  "field_order": [
   "main_section",
@@ -28,14 +26,14 @@
  "fields": [
   {
    "fieldname": "main_section",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "depends_on": "eval:!doc.__islocal"
   },
   {
    "fieldname": "disabled",
    "fieldtype": "Check",
    "label": "Is Disabled",
    "default": "0",
-   "read_only_depends_on": "eval:doc.__islocal",
    "search_index": 1
   },
   {
@@ -54,7 +52,8 @@
    "description": "Alerts of types with higher priority gets displayed first",
    "default": "0",
    "non_negative": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "read_only_depends_on": "eval:doc.disabled"
   },
   {
    "fieldname": "display_timeout",
@@ -63,7 +62,8 @@
    "description": "Close alerts automatically after a specific time. Default: 0 - No Timeout",
    "default": "0",
    "non_negative": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "read_only_depends_on": "eval:doc.disabled"
   },
   {
    "fieldname": "control_column",
@@ -74,14 +74,16 @@
    "fieldtype": "Select",
    "label": "Display Sound",
    "options": "None\nAlert\nError\nClick\nCancel\nSubmit\nCustom",
-   "default": "None"
+   "default": "None",
+   "read_only_depends_on": "eval:doc.disabled"
   },
   {
    "fieldname": "custom_display_sound",
    "fieldtype": "Attach",
    "label": "Custom Display Sound",
    "depends_on": "eval:doc.display_sound === 'Custom'",
-   "mandatory_depends_on": "eval:doc.display_sound === 'Custom'"
+   "mandatory_depends_on": "eval:!doc.disabled && doc.display_sound === 'Custom'",
+   "read_only_depends_on": "eval:doc.disabled"
   },
   {
    "fieldname": "style_section",
@@ -91,12 +93,14 @@
   {
    "fieldname": "background",
    "fieldtype": "Color",
-   "label": "Background Color"
+   "label": "Background Color",
+   "read_only_depends_on": "eval:doc.disabled"
   },
   {
    "fieldname": "border_color",
    "fieldtype": "Color",
-   "label": "Border Color"
+   "label": "Border Color",
+   "read_only_depends_on": "eval:doc.disabled"
   },
   {
    "fieldname": "style_column",
@@ -105,17 +109,18 @@
   {
    "fieldname": "title_color",
    "fieldtype": "Color",
-   "label": "Title Color"
+   "label": "Title Color",
+   "read_only_depends_on": "eval:doc.disabled"
   },
   {
    "fieldname": "content_color",
    "fieldtype": "Color",
-   "label": "Content Color"
+   "label": "Content Color",
+   "read_only_depends_on": "eval:doc.disabled"
   }
  ],
  "icon": "fa fa-bell-o",
- "links": [],
- "modified": "2022-04-04 04:04:04.119400",
+ "modified": "2024-01-27 04:04:04.119400",
  "modified_by": "Administrator",
  "module": "Alerts",
  "name": "Alert Type",
@@ -163,7 +168,6 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": [],
  "translate_link_fields": 1,
  "track_changes": 1
 }

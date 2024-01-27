@@ -8,13 +8,9 @@
 
 frappe.ui.form.on('Alert Type', {
     setup: function(frm) {
-        frappe.alerts
-            .on('ready', function() {
-                this.setup_form(frm);
-            })
-            .on('change', function() {
-                this.setup_form(frm);
-            });
+        frappe.alerts.on('ready change', function() {
+            this.setup_form(frm);
+        });
     },
     refresh: function(frm) {
         frm.trigger('load_toolbar');

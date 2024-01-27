@@ -1,12 +1,10 @@
 {
- "actions": [],
  "allow_copy": 1,
  "allow_import": 1,
  "autoname": "format:ALERT-{YY}{MM}{DD}-{###}",
  "creation": "2022-04-04 04:04:04.119400",
  "description": "Alert data for Alerts",
  "doctype": "DocType",
- "document_type": "Document",
  "engine": "InnoDB",
  "field_order": [
   "main_section",
@@ -140,7 +138,6 @@
    "fieldname": "number_of_repeats",
    "fieldtype": "Int",
    "label": "No. of Repeats",
-   "description": "",
    "default": "2",
    "read_only_depends_on": "eval:!doc.is_repeatable",
    "non_negative": 1
@@ -181,8 +178,7 @@
  ],
  "icon": "fa fa-bell",
  "is_submittable": 1,
- "links": [],
- "modified": "2022-04-04 04:04:04.119400",
+ "modified": "2024-01-27 04:04:04.119400",
  "modified_by": "Administrator",
  "module": "Alerts",
  "name": "Alert",
@@ -230,7 +226,6 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": [],
  "translate_link_fields": 1,
  "track_changes": 1
 }

@@ -4,18 +4,17 @@
 # Licence: Please refer to LICENSE file
 
 
-import frappe
-from frappe import _
-
-from .alert import get_alerts_cache
-from .common import error
-
-
 # [Hooks]
 def extend(bootinfo):
+    import frappe
+    from frappe import _
+    
+    from .alert import get_alerts_cache
+    from .common import log_error
+    
     try:
         bootinfo.alerts = get_alerts_cache(frappe.session.user)
     except Exception:
-        error(_(
+        log_error(_(
             "An error has occurred while getting cached alerts on boot."
-        ), True, False)
+        ))

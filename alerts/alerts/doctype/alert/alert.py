@@ -19,6 +19,10 @@ from alerts.utils import (
 
 
 class Alert(Document):
+    def before_insert(self):
+        self._set_defaults()
+    
+    
     def before_validate(self):
         self._set_defaults()
     

@@ -1,0 +1,167 @@
+{
+ "creation": "2023-04-04 04:04:04.119400",
+ "description": "Settings for Alerts",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "general_section",
+  "is_enabled",
+  "general_column",
+  "update_section",
+  "auto_check_for_update",
+  "send_update_notification",
+  "update_notification_sender",
+  "update_notification_receivers",
+  "update_column",
+  "check_for_update",
+  "update_note",
+  "current_version",
+  "latest_version",
+  "latest_check",
+  "has_update"
+ ],
+ "fields": [
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "General Settings"
+  },
+  {
+   "fieldname": "is_enabled",
+   "fieldtype": "Check",
+   "label": "Is Enabled",
+   "default": "1"
+  },
+  {
+   "fieldname": "general_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "update_section",
+   "fieldtype": "Section Break",
+   "label": "Update Settings"
+  },
+  {
+   "fieldname": "auto_check_for_update",
+   "fieldtype": "Check",
+   "label": "Auto Check For Update",
+   "default": "1",
+   "read_only_depends_on": "eval:!doc.is_enabled"
+  },
+  {
+   "fieldname": "send_update_notification",
+   "fieldtype": "Check",
+   "label": "Send Update Notification",
+   "default": "0",
+   "read_only_depends_on": "eval:!doc.is_enabled"
+  },
+  {
+   "fieldname": "update_notification_sender",
+   "fieldtype": "Link",
+   "label": "Update Notification Sender",
+   "options": "User",
+   "read_only_depends_on": "eval:!doc.is_enabled || !doc.send_update_notification",
+   "mandatory_depends_on": "eval:doc.is_enabled && doc.send_update_notification",
+   "ignore_user_permissions": 1
+  },
+  {
+   "fieldname": "update_notification_receivers",
+   "fieldtype": "Table MultiSelect",
+   "label": "Update Notification Receivers",
+   "options": "Alerts Update Receiver",
+   "read_only_depends_on": "eval:!doc.is_enabled || !doc.send_update_notification",
+   "mandatory_depends_on": "eval:doc.is_enabled && doc.send_update_notification"
+  },
+  {
+   "fieldname": "update_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "check_for_update",
+   "fieldtype": "Button",
+   "label": "Check For Update",
+   "read_only_depends_on": "eval:!doc.is_enabled"
+  },
+  {
+   "fieldname": "update_note",
+   "fieldtype": "HTML",
+   "label": "",
+   "read_only": 1
+  },
+  {
+   "fieldname": "current_version",
+   "fieldtype": "Data",
+   "label": "Current Version",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "latest_version",
+   "fieldtype": "Data",
+   "label": "Latest Version",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "latest_check",
+   "fieldtype": "Data",
+   "label": "Latest Check",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "has_update",
+   "fieldtype": "Check",
+   "label": "Has Update",
+   "read_only": 1,
+   "hidden": 1
+  }
+ ],
+ "icon": "fa fa-cog",
+ "issingle": 1,
+ "modified": "2024-01-27 04:04:04.119400",
+ "modified_by": "Administrator",
+ "module": "Alerts",
+ "name": "Alerts Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 0,
+   "import": 1,
+   "permlevel": 0,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "set_user_permissions": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 0,
+   "import": 1,
+   "permlevel": 0,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Administrator",
+   "set_user_permissions": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ]
+}

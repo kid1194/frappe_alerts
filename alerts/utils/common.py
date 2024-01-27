@@ -12,14 +12,20 @@ from alerts import __module__
 
 
 # [Access, Boot]
-def error(msg, log=False, throw=True):
-    if not throw:
-        log = True
+def log_error(msg):
+    from alerts.version import is_version_lt
     
-    if log:
+    if is_version_lt(14):
+        frappe.log_error(msg, __module__)
+    else:
         frappe.log_error(__module__, msg)
-    
-    if throw:
+
+
+# [Boot]
+def error(msg, throw=True):
+    if not throw:
+        log_error(msg)
+    else:
         frappe.throw(msg, title=__module__)
 
 

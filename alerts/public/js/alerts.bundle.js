@@ -9,10 +9,10 @@
 frappe.provide('frappe.alerts');
 
 
-class AlertsUtils {
+class AlertsBase {
     $type(v) {
-        let t = v == null ? (v === void 0 ? 'Undefined' : 'Null')
-            : Object.prototype.toString.call(v).slice(8, -1);
+        if (v == null) return v === void 0 ? 'Undefined' : 'Null';
+        var t = Object.prototype.toString.call(v).slice(8, -1);
         return t === 'Number' && isNaN(v) ? 'NaN' : t;
     }
     $isStr(v) { return this.$type(v) === 'String'; }
@@ -21,18 +21,30 @@ class AlertsUtils {
     $isObjLike(v) { return v != null && typeof v === 'object'; }
     $isDataObj(v) { return v && $.isPlainObject(v); }
     $isEmptyObj(v) { return !v || $.isEmptyObject(v); }
+    $isArgs(v) { return this.$type(v) === 'Arguments'; }
+    $toArr(v, s, e) { return Array.prototype.slice.call(v, s, e); }
+    $fn(fn, obj) { return $.proxy(fn, obj || this); }
 }
 
 
-class Alerts extends AlertsUtils {
+class Alerts extends AlertsBase {
     constructor() {
-        this._id = frappe.utils.get_random(5);
-        this._dialog = new AlertsDialog(this._id, 'alert-dialog-' + this._id);
-        this._list = [];
-        this._mock = null;
-        this._events = jQuery({});
+        this.name = 'Alerts';
         this.is_ready = false;
         this.is_enabled = false;
+        
+        this._id = frappe.utils.get_random(5);
+        this._prefix = '[' + this.name + ']';
+        this._events = {
+            list: {},
+            real: {},
+        };
+        
+        this._dialog = null;
+        this._list = [];
+        this._seen = [];
+        this._mock = null;
+        
         this.request(
             'is_enabled',
             null,
@@ -40,48 +52,52 @@ class Alerts extends AlertsUtils {
                 this.is_ready = true;
                 this.is_enabled = !!ret;
                 this._setup();
-                this.trigger('ready');
+                this.emit('ready');
             }
         );
     }
     mock() {
-        if (!this._mock) this._mock = new AlertsMock();
+        this._mock = this._mock || new AlertsMock();
         return this._mock;
     }
     show(data) {
         if (this.$isDataObj(data) && !this.$isEmptyObj(data)) data = [data];
         if (!this.$isArr(data) || !data.length) return this;
-        Array.prototype.push.apply(this._list, data);
+        this._list.push.apply(this._list, data);
         return this._build();
     }
     path(method) {
         return 'alerts.utils.' + method;
     }
+    
     request(method, args, callback, error, _freeze) {
+        if (!this.$isStr(method) || !method.length) return this;
+        if (!this.$isFunc(callback)) callback = null;
+        if (!this.$isFunc(error)) error = null;
         if (method.indexOf('.') < 0) method = this.path(method);
-        let opts = {
+        var opts = {
             method: method,
-            freeze: _freeze != null ? _freeze : false,
-            callback: $.proxy(function(ret) {
+            freeze: !!_freeze,
+            callback: this.$fn(function(ret) {
                 if (ret) ret = ret.message || ret;
                 if (ret && !ret.error) {
                     if (callback) callback.call(this, ret);
                     return;
                 }
-                let message = ret.message || 'The request sent raised an error.';
+                var message = ret.message || 'The request sent raised an error.';
                 if (!error) this.error(message, args);
                 else error.call(this, {message: __(message, args)});
-            }, this),
-            error: $.proxy(function(ret, txt) {
-                let message = '';
+            }),
+            error: this.$fn(function(ret, txt) {
+                var message = '';
                 if (this.$isStr(ret)) message = ret;
                 else if (this.$isStr(txt)) message = txt;
                 else message = 'The request sent have failed.';
                 if (!error) this.error(message, args);
                 else error.call(this, {message: __(message, args)});
-            }, this)
+            })
         };
-        if (args) {
+        if (this.$isDataObj(args)) {
             opts.type = 'POST';
             opts.args = args;
         }
@@ -96,45 +112,31 @@ class Alerts extends AlertsUtils {
         }
         return this;
     }
+    
     _setup() {
-        this._change = $.proxy(function(ret) {
-            if (ret) ret = ret.message || ret;
+        this.on('alerts_app_status_changed', function(ret) {
             if (!ret || ret.is_enabled == null) return;
-            let old = this.is_enabled;
+            var old = this.is_enabled;
             this.is_enabled = !!ret.is_enabled;
-            if (this.is_enabled !== old) {
-                if (this.is_enabled)
-                    frappe.realtime.on('show_alert', this._realtime);
-                else frappe.realtime.off('show_alert', this._realtime);
-                this.trigger('change');
-            }
-        }, this);
-        this._realtime = $.proxy(function(ret) {
-            if (ret) ret = ret.message || ret;
-            if (this._is_valid(ret)) this.show(ret);
-        }, this);
-        frappe.realtime.on('alerts_app_status_changed', this._change);
-        if (this.is_enabled) frappe.realtime.on('show_alert', this._realtime);
+            if (this.is_enabled !== old) this.emit('change');
+        })
+        .on('alerts_show', function(ret) {
+            if (this.is_enabled && this._is_valid(ret))
+                this.show(ret);
+        });
     }
     _is_valid(data) {
         if (!data || !this.$isDataObj(data) || this.$isEmptyObj(data)) return false;
+        if (this._seen.indexOf(data.name) >= 0) return false;
         var user = frappe.session.user,
         score = 0;
-        if (
-            this.$isArr(data.users)
-            && data.users.length
-            && data.users.indexOf(user) >= 0
-        ) score++;
+        if (this.$isArr(data.users) && data.users.indexOf(user) >= 0) score++;
         else if (
-            this.$isArr(data.roles)
-            && data.roles.length
+            this.$isArr(data.roles) && data.roles.length
             && frappe.user.has_role(data.roles)
         ) score++;
         if (!score) return false;
-        if (
-            this.$isArr(data.seen_today)
-            && data.seen_today.indexOf(user) >= 0
-        ) return false;
+        if (this.$isArr(data.seen_today) && data.seen_today.indexOf(user) >= 0) return false;
         var seen_by = this.$isDataObj(data.seen_by) ? data.seen_by : {};
         if (
             cint(data.is_repeatable) < 1
@@ -150,37 +152,53 @@ class Alerts extends AlertsUtils {
         return true;
     }
     _build() {
-        if (!this._list.length) return this;
+        if (!this._list.length) {
+            if (this._seen.length) {
+                var seen = this._seen.splice(0, this._seen.length);
+                this.request(
+                    'mark_seens',
+                    {names: seen},
+                    function(ret) {
+                        if (!ret) {
+                            this._seen.push.apply(this._seen, seen);
+                            this.error('Marking alerts as seen has failed.');
+                        }
+                    },
+                    function(e) {
+                        this._seen.push.apply(this._seen, seen);
+                        this.error('Marking alerts as seen has failed.');
+                        this._error('Marking alerts as seen has failed with error.', e && e.message);
+                    }
+                );
+            }
+            return this;
+        }
         
         var data = this._list.shift();
+        this._dialog = this._dialog || new AlertsDialog(this._id, 'alert-dialog-' + this._id);
         this._dialog
             .setName(data.name)
             .setTitle(data.title)
             .setMessage(data.message)
             .setType(data.type)
-            .onShow($.proxy(function() {
-                this.request(
-                    'mark_as_seen',
-                    {name: this._dialog.getName()},
-                    function(ret) {
-                        if (!ret) this.error('An error was encountered.');
-                    }
-                );
-            }, this), 200)
-            .onHide($.proxy(function() { this._build(); }, this), 200)
+            .onShow(this.$fn(function() {
+                this._seen.push(this._dialog.name);
+            }))
+            .onHide(this.$fn(this._build), 200)
             .render()
             .show();
         return this;
     }
     destroy() {
-        frappe.realtime.off('show_alert', this._realtime);
-        frappe.realtime.off('alerts_app_status_changed', this._change);
+        for (var e in this._events.list) this._clear_event(e, 1);
         if (this._dialog) this._dialog.destroy();
         if (this._mock) this._mock.destroy();
         this.is_ready = this.is_enabled = false;
-        this._dialog = this._list = this._mock = this._change = this._realtime = null;
+        this._events = this._dialog = this._list = this._seen = this._mock = null;
+        frappe.alerts = null;
         return this;
     }
+    
     _alert(title, msg, args, def_title, indicator, fatal) {
         if (this.$isArr(msg)) {
             args = msg;
@@ -193,17 +211,17 @@ class Alerts extends AlertsUtils {
         if (msg && !this.$isStr(msg)) {
             if (this.$isArr(msg))
                 try { msg = JSON.stringify(msg); } catch(_) { msg = null; }
-            else if (this.$isObjLike(msg))
+            else if (typeof msg === 'object')
                 try { msg = msg.message; } catch(_) { msg = null; }
             else
                 try { msg = String(msg); } catch(_) { msg = null; }
         }
-        if (!this.$isStr(msg)) msg = __('Invalid message');
+        if (!msg || !this.$isStr(msg)) msg = __('Invalid message');
         else if (args) msg = __(msg, args);
         else msg = __(msg);
-        if (!this.$isStr(title)) title = def_title;
-        let data = {
-            title: '[Alerts]: ' + __(title),
+        if (!title || !this.$isStr(title)) title = def_title;
+        var data = {
+            title: this._prefix + ': ' + __(title),
             indicator: indicator,
             message: msg,
         };
@@ -223,13 +241,12 @@ class Alerts extends AlertsUtils {
     fatal(title, msg, args) {
         return this._alert(title, msg, args, 'Error', 'red', true);
     }
+    
     _console(fn, args) {
-        if (this.$type(args) === 'Arguments')
-            args = Array.prototype.slice.call(args);
+        if (this.$isArgs(args)) args = this.$toArr(args);
         if (!this.$isArr(args) || !args.length) return this;
-        let prefix = '[Alerts]';
-        if (!this.$isStr(args[0])) args.unshift(prefix);
-        else args[0] = prefix + ' ' + args[0];
+        if (!this.$isStr(args[0])) args.unshift(this._prefix);
+        else args[0] = this._prefix + ' ' + args[0];
         console[fn].apply(null, args);
         return this;
     }
@@ -239,66 +256,111 @@ class Alerts extends AlertsUtils {
     _error() {
         return this._console('error', arguments);
     }
-    trigger(evt, data) {
-        this._events.trigger(evt, data);
-        return this;
-    }
-    once(evt, handler) {
-        if (evt === 'ready' && this.is_ready)
-            handler.call(this);
-        else this._events.one(evt, $.bind(function(e, data) {
-            handler.call(this, data);
-        }, this));
-        return this;
-    }
-    on(evt, handler) {
-        if (evt === 'ready' && this.is_ready)
-            handler.call(this);
-        else this._events.bind(evt, $.bind(function(e, data) {
-            handler.call(this, data);
-        }, this));
-        return this;
-    }
-    off(evt, handler) {
-        this._events.unbind(evt, $.bind(function(e, data) {
-            handler.call(this, data);
-        }, this));
-        return this;
-    }
-    setup_form(frm) {
-        try {
-            if (!this.is_enabled) {
-                frm._app_disabled = true;
-                if (!frm._form_disabled) {
-                    this.disable_form(frm);
-                    frm.set_intro(__('Alerts app is disabled.'), 'red');
-                }
-                frm._form_disabled = true;
-            } else {
-                frm._app_disabled = false;
-                if (frm._form_disabled) {
-                    this.enable_form(frm);
-                    frm.set_intro();
-                }
-                frm._form_disabled = false;
+    
+    on(event, fn, _once) {
+        if (!this.$isStr(event) || !event.length || !this.$isFunc(fn)) return this;
+        event = event.split(' ');
+        for (var i = 0, l = event.length, e; i < l; i++) {
+            e = event[i];
+            if (e === 'ready' && this.is_ready) {
+                fn.call(this);
+                return this;
             }
-        } catch(e) {
-            this._error('Setup form', e.message, e.stack);
-        } finally {
-            this.has_error = false;
+            if (!this._events.list[e]) {
+                this._events.list[e] = [];
+                if (e.indexOf('alerts_') === 0) {
+                    this._events.real[e] = this._make_event_realtime_fn(e);
+                    frappe.realtime.on(e, this._events.real[e]);
+                }
+            }
+            this._events.list[e].push({f: fn, o: _once});
         }
         return this;
     }
-    enable_form(frm) {
+    once(event, fn) {
+        return this.on(event, fn, 1);
+    }
+    off(event, fn) {
+        if (!this.$isStr(event) || !event.length) return this;
+        if (!this.$isFunc(fn)) fn = null;
+        event.split(' ').forEach(this.$fn(function(e) {
+            if (this._events.list[e]) this._remove_event(e, fn);
+        }));
+        return this;
+    }
+    emit(event) {
+        if (!this.$isStr(event) || !event.length) return this;
+        var args = arguments;
+        if (args.length < 2) args = null;
+        else args = this.$toArr(args, 1);
+        event.split(' ').forEach(this.$fn(function(e) {
+            if (!this._events.list[e]) return;
+            this._emit_event(e, args);
+            this._clear_event(e);
+        }));
+        return this;
+    }
+    _make_event_realtime_fn(event) {
+        return this.$fn(function(ret) {
+            if (ret && this.$isDataObj(ret)) ret = ret.message || ret;
+            this.emit(event, [ret]);
+        });
+    }
+    _remove_event(event, fn) {
+        if (fn) this._events.list[event].slice().forEach(this.$fn(function(e, i) {
+            if (e.f === fn) this._events.list[event].splice(i, 1);
+        }));
+        this._clear_event(event, !fn);
+    }
+    _clear_event(event, all) {
+        if (!all && this._events.list[event].length) return;
+        if (this._events.real[event])
+            frappe.realtime.off(event, this._events.real[event]);
+        delete this._events.list[event];
+        delete this._events.real[event];
+    }
+    _emit_event(e, args) {
+        this._events.list[e].slice().forEach(this.$fn(function(ev, i) {
+            if (!args) ev.f.call(this);
+            else ev.f.apply(this, args);
+            if (ev.o) this._events.list[e].splice(i, 1);
+        }));
+    }
+    
+    setup_form(frm, workflow) {
+        if (!frm._alerts) frm._alerts = {};
+        if (!this.is_enabled) {
+            frm._alerts.app_disabled = true;
+            if (!frm._alerts.form_disabled)
+                this.disable_form(frm, 'Alerts app is disabled.', null, workflow);
+            frm._alerts.form_disabled = true;
+        } else {
+            frm._alerts.app_disabled = false;
+            if (frm._alerts.form_disabled) this.enable_form(frm, workflow);
+            frm._alerts.form_disabled = false;
+        }
+        return this;
+    }
+    enable_form(frm, workflow) {
         try {
             var fields = null;
-            if (this.$isArr(frm._disabled_fields) && frm._disabled_fields.length)
-                fields = frm._disabled_fields.splice(0, frm._disabled_fields.length);
+            if (
+                frm._alerts && frm._alerts.fields_disabled
+                && frm._alerts.fields_disabled.length
+            ) {
+                fields = frm._alerts.fields_disabled.slice();
+                frm._alerts.fields_disabled = [];
+            }
             frm.fields.forEach(function(field) {
                 if (!fields || fields.indexOf(field.df.fieldname) >= 0)
                     frm.set_df_property(field.df.fieldname, 'read_only', '0');
             });
-            frm.enable_save();
+            if (this._no_workflow(frm, workflow)) frm.enable_save();
+            else frm.page.show_actions_menu();
+            if (frm._alerts.has_intro) {
+                frm._alerts.has_intro = false;
+                frm.set_intro();
+            }
         } catch(e) {
             this._error('Enable form', e.message, e.stack);
         } finally {
@@ -306,17 +368,35 @@ class Alerts extends AlertsUtils {
         }
         return this;
     }
-    disable_form(frm, workflow) {
+    disable_form(frm, msg, args, workflow, color) {
+        if (this.$isStr(workflow)) {
+            color = workflow;
+            workflow = null;
+        }
+        if (args != null && !this.$isArr(args)) {
+            workflow = !!args;
+            args = null;
+        }
+        if (this.$isArr(msg)) {
+            args = msg;
+            msg = null;
+        }
         try {
-            if (!this.$isArr(frm._disabled_fields))
-                frm._disabled_fields = [];
+            frm._alerts.fields_disabled = [];
             frm.fields.forEach(function(field) {
                 if (!cint(field.df.read_only)) {
-                    frm._disabled_fields.push(field.df.fieldname);
+                    frm._alerts.fields_disabled.push(field.df.fieldname);
                     frm.set_df_property(field.df.fieldname, 'read_only', 1);
                 }
             });
-            frm.disable_save();
+            if (this._no_workflow(frm, workflow)) frm.disable_save();
+            else frm.page.hide_actions_menu();
+            if (this.$isStr(msg) && msg.length) {
+                if (!this.$isArr(args) || !args.length) args = null;
+                if (!this.$isStr(color) || !color.length) color = null;
+                frm._alerts.has_intro = true;
+                frm.set_intro(args ? __(msg, args) : __(msg), color || 'red');
+            }
         } catch(e) {
             this._error('Disable form', e.message, e.stack);
         } finally {
@@ -324,15 +404,47 @@ class Alerts extends AlertsUtils {
         }
         return this;
     }
+    _no_workflow(frm, workflow) {
+        return !workflow || !!frm.is_new() || (!!workflow && !frm.states.get_state());
+    }
 }
 
 
-class AlertsDialog extends AlertsUtils {
+class AlertsMock extends AlertsBase {
+    constructor() {
+        this._id = frappe.utils.get_random(5);
+    }
+    build(data) {
+        if (!this.$isDataObj(data) || this.$isEmptyObj(data)) return this;
+        this._dialog = this._dialog || new AlertsDialog(this._id, 'mock-alert-dialog-' + this._id);
+        this._dialog
+            .setTitle(data.title)
+            .setMessage('This is a mock alert message.')
+            .setType(data)
+            .render()
+            .show();
+        return this;
+    }
+    show() {
+        this._dialog && this._dialog.show();
+        return this;
+    }
+    hide() {
+        this._dialog && this._dialog.hide();
+        return this;
+    }
+    destroy() {
+        this._dialog && this._dialog.destroy();
+        this._dialog = null;
+    }
+}
+
+
+class AlertsDialog extends AlertsBase {
     constructor(id, _class) {
         this._id = id;
         this._class = _class;
-        this.resetData();
-        this._style = new AlertsStyle(this._id, this._class);
+        this._reset_data();
         this._opts = {};
         this._sound = {loaded: 0, playing: 0, timeout: null};
     }
@@ -341,9 +453,7 @@ class AlertsDialog extends AlertsUtils {
             this._name = text;
         return this;
     }
-    getName() {
-        return this._name;
-    }
+    get name() { return this._name; }
     setTitle(text, args) {
         if (this.$isStr(text) && text.length) {
             if (!this.$isArr(args)) text = __(text);
@@ -362,7 +472,8 @@ class AlertsDialog extends AlertsUtils {
     }
     setType(type) {
         if (!this.$isDataObj(type) || this.$isEmptyObj(type)) return this;
-        this._style && this._style.build(type);
+        this._style = this._style || new AlertsStyle(this._id, this._class);
+        this._style.build(type);
         this.setSize(type.size);
         this.setTimeout(type.display_timeout);
         this.setSound(type.display_sound, type.custom_display_sound);
@@ -396,31 +507,31 @@ class AlertsDialog extends AlertsUtils {
         this.$sound
             .off('canplaythrough')
             .attr('src', file)
-            .on('canplaythrough', $.proxy(function() {
+            .on('canplaythrough', this.$fn(function() {
                 this._sound.loaded = 1;
-            }, this));
+            }));
         this.$sound[0].load();
         return this;
     }
     beforeShow(fn) {
-        if (this.$isFunc(fn)) this._pre_show = $.proxy(fn, this);
+        if (this.$isFunc(fn)) this._pre_show = this.$fn(fn);
         return this;
     }
     onShow(fn, delay) {
         if (this.$isFunc(fn)) {
-            if (cint(delay) < 1) this._on_show = $.proxy(fn, this);
-            else this._on_show = $.proxy(function() {
-                window.setTimeout($.proxy(fn, this), cint(delay));
-            }, this);
+            if (cint(delay) < 1) this._on_show = this.$fn(fn);
+            else this._on_show = this.$fn(function() {
+                window.setTimeout(this.$fn(fn), cint(delay));
+            });
         }
         return this;
     }
     onHide(fn, delay) {
         if (this.$isFunc(fn)) {
-            if (cint(delay) < 1) this._on_hide = $.proxy(fn, this);
-            else this._on_hide = $.proxy(function() {
-                window.setTimeout($.proxy(fn, this), cint(delay));
-            }, this);
+            if (cint(delay) < 1) this._on_hide = this.$fn(fn);
+            else this._on_hide = this.$fn(function() {
+                window.setTimeout(this.$fn(fn), cint(delay));
+            });
         }
         return this;
     }
@@ -439,7 +550,7 @@ class AlertsDialog extends AlertsUtils {
         this.playSound();
         this._dialog.show();
         if (this._timeout)
-            window.setTimeout($.proxy(this.hide, this), this._timeout);
+            window.setTimeout(this.$fn(this.hide), this._timeout);
         return this;
     }
     hide() {
@@ -455,7 +566,7 @@ class AlertsDialog extends AlertsUtils {
             return this;
         }
         this.stopSound();
-        this._sound.timeout = window.setTimeout($.proxy(this.playSound, this), 200);
+        this._sound.timeout = window.setTimeout(this.$fn(this.playSound), 200);
         return this;
     }
     stopSound() {
@@ -476,57 +587,22 @@ class AlertsDialog extends AlertsUtils {
         this.$sound && this.$sound.off('canplaythrough');
         this._sound.loaded = this._sound.playing = 0;
     }
-    resetData() {
+    destroy() {
+        this.reset();
+        this._style && this._style.destroy();
+        this.$sound && this.$sound.remove();
+        this._reset_data();
+    }
+    _reset_data() {
         this._style = this.$sound = null;
         this._name = this._opts = this._message = null;
         this._dialog = this._timeout = this._sound = null;
         this._pre_show = this._on_show = this._on_hide = null;
     }
-    destroy() {
-        this.reset();
-        this._style && this._style.destroy();
-        this.$sound && this.$sound.remove();
-        this.resetData();
-    }
 }
 
 
-class AlertsMock {
-    constructor() {
-        this._id = frappe.utils.get_random(5);
-        this._dialog = new AlertsDialog(this._id, 'mock-alert-dialog-' + this._id);
-    }
-    build(data) {
-        if (
-            this._dialog
-            && this._dialog.$isDataObj(data)
-            && !this._dialog.$isEmptyObj(data)
-        ) {
-            this._dialog
-                .setTitle(data.title)
-                .setMessage('This is a mock alert message.')
-                .setType(data)
-                .render()
-                .show();
-        }
-        return this;
-    }
-    show() {
-        this._dialog && this._dialog.show();
-        return this;
-    }
-    hide() {
-        this._dialog && this._dialog.hide();
-        return this;
-    }
-    destroy() {
-        this._dialog && this._dialog.destroy();
-        this._dialog = null;
-    }
-}
-
-
-class AlertsStyle extends AlertsUtils {
+class AlertsStyle extends AlertsBase {
     constructor(id, _class) {
         this._id = 'style-' + id;
         this._class = _class;
@@ -578,12 +654,8 @@ class AlertsStyle extends AlertsUtils {
 $(document).ready(function() {
     frappe.alerts = new Alerts();
     frappe.after_ajax(function() {
-        if (
-            frappe.boot
-            && frappe.boot.alerts
-            && frappe.alerts.$isArr(frappe.boot.alerts)
-            && frappe.boot.alerts.length
-        ) frappe.alerts.show(frappe.boot.alerts);
+        if (frappe.boot && frappe.boot.alerts)
+            frappe.alerts.show(frappe.boot.alerts);
     });
     window.addEventListener('beforeunload', function() {
         frappe.alerts.destroy();

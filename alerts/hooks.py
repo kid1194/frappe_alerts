@@ -4,7 +4,7 @@
 # Licence: Please refer to LICENSE file
 
 
-from .version import __frappe_mv14__
+from .version import is_version_gt
 
 
 app_name = "alerts"
@@ -19,12 +19,13 @@ app_license = "MIT"
 
 app_include_js = [
     'alerts.bundle.js'
-] if __frappe_mv14__ else [
+] if is_version_gt(13) else [
     '/assets/alerts/js/alerts.js'
 ]
 
 
-after_install = "alerts.setup.install.after_install"
+after_sync = "alerts.setup.install.after_sync"
+after_migrate = "alerts.setup.migrate.after_migrate"
 
 
 on_login = ["alerts.utils.access.on_login"]

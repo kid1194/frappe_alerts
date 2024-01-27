@@ -5,28 +5,24 @@
 
 
 import frappe
-from frappe.utils import cstr
-
-from pypika.enums import Order
-
-from .common import (
-    is_doc_exist,
-    get_cached_doc
-)
 
 
 # [Internal]
-_TYPE_ = "Alert Type"
+_type_dt_ = "Alert Type"
 
 
 # [Alert, Internal]
-def get_type(name):
-   return get_cached_doc(_TYPE_, name)
+def get_type(name: str):
+    from .common import get_cached_doc
+    
+   return get_cached_doc(_type_dt_, name)
 
 
 # [Alert]
 def type_join_query(qry, join_column):
-    doc = frappe.qb.DocType(_TYPE_)
+    from pypika.enums import Order
+    
+    doc = frappe.qb.DocType(_type_dt_)
     qry = (
         qry.select(
             doc.display_priority,
@@ -47,9 +43,9 @@ def type_join_query(qry, join_column):
 
 
 # [Install]
-def add_type(data):
+def add_type(data: dict):
     try:
-        (frappe.new_doc(_TYPE_)
+        (frappe.new_doc(_type_dt_)
             .update(data)
             .insert(ignore_permissions=True, ignore_if_duplicate=True))
     except Exception:

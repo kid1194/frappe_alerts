@@ -17,15 +17,12 @@ from alerts.utils import (
 
 
 class AlertType(Document):
+    def before_insert(self):
+        self._set_defaults()
+    
+    
     def before_validate(self):
-        if cint(self.display_priority) < 0:
-            self.display_priority = 0
-        
-        if cint(self.display_timeout) < 0:
-            self.display_timeout = 0
-        
-        if self.display_sound != "Custom":
-            self.custom_display_sound = None
+        self._set_defaults()
     
     
     def validate(self):
@@ -41,7 +38,8 @@ class AlertType(Document):
     def before_save(self):
         clear_doc_cache(self.doctype, self.name)
         
-        if (old := self._get_old_doc()):
+        old = self._get_old_doc()
+        if old:
             old_name = self._get_old_name(old)
             if old_name:
                 clear_doc_cache(self.doctype, old_name)
@@ -63,6 +61,17 @@ class AlertType(Document):
         
         if self.custom_display_sound:
             delete_files(self.doctype, self.name, [self.custom_display_sound])
+    
+    
+    def _set_defaults(self):
+        if cint(self.display_priority) < 0:
+            self.display_priority = 0
+        
+        if cint(self.display_timeout) < 0:
+            self.display_timeout = 0
+        
+        if self.display_sound != "Custom":
+            self.custom_display_sound = None
     
     
     def _get_old_doc(self):

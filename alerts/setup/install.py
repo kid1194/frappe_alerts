@@ -9,11 +9,12 @@ from frappe.utils.user import get_system_managers
 
 from alerts import __version__
 
-from alerts.utils.type import add_type
-
 
 # [Hooks]
-def after_install():
+def after_sync():
+    from alerts.utils.settings import settings
+    from alerts.utils.type import add_type
+    
     types = [
         {
             "name": "Urgent",
@@ -51,8 +52,8 @@ def after_install():
     
     doc = settings()
     
-    if (managers := get_system_managers(only_name=True)):
-        doc.auto_check_for_update = 1
+    managers = get_system_managers(only_name=True)
+    if managers:
         doc.send_update_notification = 1
         
         if "Administrator" in managers:
@@ -66,16 +67,16 @@ def after_install():
             doc.update_notification_receivers.clear()
         
         for manager in managers:
-            doc.append(
-                "update_notification_receivers",
-                {"user": manager}
-            )
+            if manager != sender:
+                doc.append(
+                    "update_notification_receivers",
+                    {"user": manager}
+                )
         
         if not doc.update_notification_receivers:
             doc.send_update_notification = 0
             
     else:
-        doc.auto_check_for_update = 0
         doc.send_update_notification = 0
     
     doc.current_version = __version__

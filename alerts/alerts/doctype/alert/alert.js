@@ -8,13 +8,9 @@
 
 frappe.ui.form.on('Alert', {
     setup: function(frm) {
-        frappe.alerts
-            .on('ready', function() {
-                this.setup_form(frm);
-            })
-            .on('change', function() {
-                this.setup_form(frm);
-            });
+        frappe.alerts.on('ready change', function() {
+            this.setup_form(frm, 1);
+        });
         
         frm._alert = {
             is_draft: false,
@@ -30,17 +26,10 @@ frappe.ui.form.on('Alert', {
         frm._alert.is_cancelled = !frm.is_new() && cint(frm.doc.docstatus) == 2;
         
         if (frm._alert.is_submitted || frm._alert.is_cancelled) {
-            frm.disable_form();
-            frm.set_intro(
-                __(
-                    '{0} has been {1}',
-                    [
-                        frm.doctype,
-                        frm._alert.is_submitted ? 'submitted' : 'cancelled'
-                    ]
-                ),
-                frm._alert.is_submitted ? 'green' : 'red'
-            );
+            frappe.alerts.disable_form(frm, '{0} has been {1}.', [
+                cstr(frm.doc.doctype || frm.doctype),
+                frm._alert.is_submitted ? 'submitted' : 'cancelled'
+            ], 1, frm._alert.is_submitted ? 'green' : 'red');
             
             frm.set_df_property('seen_by', 'cannot_add_rows', 1);
             frm.set_df_property('seen_by', 'cannot_delete_rows', 1);
@@ -55,35 +44,28 @@ frappe.ui.form.on('Alert', {
                 && seen_by_grid.header_row.configure_columns_button
             ) seen_by_grid.header_row.configure_columns_button.remove();
             
-            frappe.realtime.on('refresh_alert_seen_by', function(ret) {
-                if (ret) ret = ret.message || ret;
-                if (ret && cstr(ret.alert) === cstr(frm.doc.name))
+            frappe.alerts.on('alerts_refresh_seen_by', function(ret) {
+                if (ret && cstr(ret.alert) === cstr(frm.docname || frm.doc.name))
                     frm.reload_doc();
             });
             return;
         }
         
-        frm.set_query('alert_type', {filters: {disabled: 0}});
-        
         frm.set_query('role', 'for_roles', function(doc, cdt, cdn) {
-            var qry = {
-                filters: {disabled: 0, desk_access: 1}
-            };
-            if (frm.doc.for_roles.length) {
+            var qry = {filters: {disabled: 0, desk_access: 1}};
+            if ((frm.doc.for_roles || '').length) {
                 qry.filters.name = ['notin', []];
-                $.each(frm.doc.for_roles, function(i, v) {
+                frm.doc.for_roles.forEach(function(v) {
                     qry.filters.name[1].push(v.role);
                 });
             }
             return qry;
         });
         frm.set_query('user', 'for_users', function(doc, cdt, cdn) {
-            var qry = {
-                query: 'alerts.utils.search_users'
-            };
-            if (frm.doc.for_users.length) {
+            var qry = {query: frappe.alerts.path('search_users')};
+            if ((frm.doc.for_users || '').length) {
                 qry.filters = {existing: []};
-                $.each(frm.doc.for_users, function(i, v) {
+                frm.doc.for_users.forEach(function(v) {
                     qry.filters.existing.push(v.user);
                 });
             }
@@ -119,8 +101,8 @@ frappe.ui.form.on('Alert', {
         frm.trigger('validate_from_date');
         frm.trigger('validate_until_date');
         if (
-            !(frm.doc.for_roles || []).length
-            && !(frm.doc.for_users || []).length
+            !(frm.doc.for_roles || '').length
+            && !(frm.doc.for_users || '').length
         ) {
             frappe.throw(__('At least one recipient role or user is required.'));
             return false;

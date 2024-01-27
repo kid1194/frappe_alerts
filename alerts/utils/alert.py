@@ -4,57 +4,25 @@
 # Licence: Please refer to LICENSE file
 
 
-from pypika.terms import Criterion
-from pypika.functions import IfNull
-
 import frappe
-from frappe.utils import (
-    cint,
-    nowdate,
-    getdate,
-    has_common,
-    now,
-    unique
-)
-from frappe.query_builder.functions import Count
+from frappe.utils import cint, getdate
 
-from .cache import (
-    get_cached_doc,
-    set_tmp_cache,
-    get_tmp_cache
-)
 from .common import is_doc_exists
-from .type import (
-    type_join_query,
-    get_type
-)
 
 
 # [Internal]
-_ALERT_ = "Alert"
-
-
-# [Internal]
-_ALERT_USER_ = "Alert For User"
-
-
-# [Internal]
-_ALERT_ROLE_ = "Alert For Role"
-
-
-# [Internal]
-_ALERT_SEEN_ = "Alert Seen By"
+_alert_dt_ = "Alert"
 
 
 # [Alert Type]
 def type_alerts_exists(alert_type):
-    return is_doc_exists(_ALERT_, {"alert_type": alert_type})
+    return is_doc_exists(_alert_dt_, {"alert_type": alert_type})
 
 
 # [Hooks]
 def update_alerts():
     today = getdate()
-    doc = frappe.qb.DocType(_ALERT_)
+    doc = frappe.qb.DocType(_alert_dt_)
     (
         frappe.qb.update(doc)
         .set(doc.status, "Finished")
@@ -74,17 +42,26 @@ def update_alerts():
 
 
 # [Access]
-def cache_alerts(user):
-    doc = frappe.qb.DocType(_ALERT_)
-    udoc = frappe.qb.DocType(_ALERT_USER_)
-    rdoc = frappe.qb.DocType(_ALERT_ROLE_)
-    sdoc = frappe.qb.DocType(_ALERT_SEEN_)
+def cache_alerts(user: str):
+    from pypika.functions import IfNull
+    from pypika.terms import Criterion
+    
+    from frappe.utils import nowdate
+    from frappe.query_builder.functions import Count
+    
+    from .cache import set_tmp_cache
+    from .type import type_join_query
+    
+    doc = frappe.qb.DocType(_alert_dt_)
+    udoc = frappe.qb.DocType("Alert For User")
+    rdoc = frappe.qb.DocType("Alert For Role")
+    sdoc = frappe.qb.DocType("Alert Seen By")
     
     uqry = (
         frappe.qb.from_(udoc)
         .select(udoc.parent)
         .distinct()
-        .where(udoc.parenttype == _ALERT_)
+        .where(udoc.parenttype == _alert_dt_)
         .where(udoc.parentfield == "for_users")
         .where(udoc.user == user)
     )
@@ -93,7 +70,7 @@ def cache_alerts(user):
         frappe.qb.from_(rdoc)
         .select(rdoc.parent)
         .distinct()
-        .where(rdoc.parenttype == _ALERT_)
+        .where(rdoc.parenttype == _alert_dt_)
         .where(rdoc.parentfield == "for_roles")
         .where(rdoc.role.isin(frappe.get_roles(user)))
     )
@@ -102,7 +79,7 @@ def cache_alerts(user):
         frappe.qb.from_(sdoc)
         .select(Count(sdoc.parent))
         .where(sdoc.parent == doc.name)
-        .where(sdoc.parenttype == _ALERT_)
+        .where(sdoc.parenttype == _alert_dt_)
         .where(sdoc.parentfield == "seen_by")
         .where(sdoc.user == user)
         .limit(1)
@@ -112,7 +89,7 @@ def cache_alerts(user):
         frappe.qb.from_(sdoc)
         .select(sdoc.parent)
         .where(sdoc.parent == doc.name)
-        .where(sdoc.parenttype == _ALERT_)
+        .where(sdoc.parenttype == _alert_dt_)
         .where(sdoc.parentfield == "seen_by")
         .where(sdoc.user == user)
         .where(sdoc.date_time.gte(nowdate()))
@@ -165,6 +142,8 @@ def cache_alerts(user):
 
 # [Boot]
 def get_alerts_cache(user):
+    from .cache import get_tmp_cache
+    
     cache = get_tmp_cache(f"alerts-for-{user}")
     if not cache or not isinstance(cache, list):
         cache = []
@@ -174,6 +153,8 @@ def get_alerts_cache(user):
 
 # [Alerts Alert]
 def send_alert(doc):
+    from .type import get_type
+    
     seen_by = {}
     seen_today = []
     
@@ -192,7 +173,7 @@ def send_alert(doc):
                 seen_today.append(v.user)
     
     frappe.publish_realtime(
-        event="show_alert",
+        event="alerts_show",
         message={
             "name": doc.name,
             "alert_type": doc.alert_type,
@@ -212,25 +193,46 @@ def send_alert(doc):
 
 # [Alerts Js]
 @frappe.whitelist(methods=["POST"])
-def mark_as_seen(name):
-    if (
-        not name or not isinstance(name, str) or
-        not is_doc_exists(_ALERT_, name)
-    ):
+def mark_seens(names):
+    from frappe.utils import now, unique
+    
+    from .background import enqueue_job
+    from .cache import get_cached_doc
+    
+    if not names or not isinstance(names, list):
         return 0
     
-    doc = get_cached_doc(_ALERT_, name)
+    names [v for v in names if v and isinstance(v, str)]
+    if not names:
+        return 0
+    
+    for name in names:
+        enqueue_job(
+            "alerts.utils.alert.mark_as_seen",
+            f"alert-mark-as-seen-{name}",
+            name=name
+        )
+    
+    return 1
+
+
+# [Internal]
+def mark_as_seen(name: str):
+    if not is_doc_exists(_alert_dt_, name):
+        return 0
+    
+    doc = get_cached_doc(_alert_dt_, name)
     if not doc or cint(doc.docstatus) != 1:
         return 0
     
     user = frappe.session.user
     if is_valid_user(doc, user):
         doc.append("seen_by", {"user": user, "date_time": now()})
-        doc.reached = len(unique([v.user for v in doc.seen_by]))
+        doc.reached = len(list(set([v.user for v in doc.seen_by])))
         doc.save(ignore_permissions=True)
         
         frappe.publish_realtime(
-            event="refresh_alert_seen_by",
+            event="alerts_refresh_seen_by",
             message={"alert": doc.name},
             after_commit=True
         )
@@ -240,6 +242,8 @@ def mark_as_seen(name):
 
 # [Internal]
 def is_valid_user(doc, user):
+    from frappe.utils import has_common
+    
     score = 0
     if (
         doc.for_users and

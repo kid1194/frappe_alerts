@@ -6,31 +6,49 @@
 
 import frappe
 
-from .common import parse_json
-
 
 # [Alert Type]
 def delete_files(doctype, name, files):
+    from .background import enqueue_job
+    from .common import parse_json
+    
     if not files:
         return 0
     
-    files = parse_json(files, files)
+    if files and isinstance(files, str):
+        files = parse_json(files)
     
     if not files or not isinstance(files, list):
         return 0
     
+    enqueue_job(
+        "alerts.utils.files.files_delete",
+        f"{doctype}-files-delete-{name}",
+        queue="long",
+        doctype=doctype,
+        name=name,
+        files=files
+    )
+
+
+# [Internal]
+def files_delete(doctype, name, files):
     dt = "File"
-    if (data := frappe.get_all(
+    data = frappe.get_all(
         dt,
         fields=["name", "attached_to_name"],
         filters=[
-            ["file_url", "in", files],
-            ["attached_to_doctype", "=", doctype]
+            [dt, "file_url", "in", files],
+            [dt, "attached_to_doctype", "=", doctype]
         ]
-    )):
+    )
+    if data:
         if not isinstance(name, list):
             name = [name]
         
         for v in data:
-            if not v["attached_to_name"] or v["attached_to_name"] in name:
+            if (
+                not v["attached_to_name"] or
+                v["attached_to_name"] in name
+            ):
                 frappe.get_doc(dt, v["name"]).delete(ignore_permissions=True)

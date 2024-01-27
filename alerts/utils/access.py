@@ -4,17 +4,16 @@
 # Licence: Please refer to LICENSE file
 
 
-from frappe import _
-
-from .alert import cache_alerts
-from .common import error
-
-
 # [Hooks]
 def on_login(login_manager):
+    from frappe import _
+    
+    from .alert import cache_alerts
+    from .common import log_error
+    
     try:
         cache_alerts(login_manager.user)
     except Exception:
-        error(_(
+        log_error(_(
             "An error has occurred while caching alerts on login."
-        ), True, False)
+        ))

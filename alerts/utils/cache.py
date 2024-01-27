@@ -24,14 +24,18 @@ def clear_doc_cache(dt, name=None):
 
 # [Alert, Settings, Type]
 def get_cached_doc(dt, name=None, for_update=False):
-    if name is None:
-        name = dt
-    elif isinstance(name, bool):
+    if isinstance(name, bool):
         for_update = name
+        name = None
+    
+    if name is None:
         name = dt
     
     if for_update:
-        clear_doc_cache(dt)
+        clear_doc_cache(dt, name)
+    
+    if dt != name and not frappe.db.exists(dt, name):
+        return None
     
     return frappe.get_cached_doc(dt, name, for_update=for_update)
 
