@@ -8,8 +8,15 @@
 
 frappe.ui.form.on('Alert', {
     setup: function(frm) {
+        frappe.alerts
+            .on('ready', function() {
+                this.setup_form(frm);
+            })
+            .on('change', function() {
+                this.setup_form(frm);
+            });
+        
         frm._alert = {
-            is_new: false,
             is_draft: false,
             is_submitted: false,
             is_cancelled: false,
@@ -18,10 +25,9 @@ frappe.ui.form.on('Alert', {
         };
     },
     onload: function(frm) {
-        frm._alert.is_new = frm.is_new() || !!frm.__islocal || !cstr(frm.doc.alert_type).length;
-        frm._alert.is_draft = frm._alert.is_new || cint(frm.doc.docstatus) == 0;
-        frm._alert.is_submitted = !frm._alert.is_new && cint(frm.doc.docstatus) == 1;
-        frm._alert.is_cancelled = !frm._alert.is_new && cint(frm.doc.docstatus) == 2;
+        frm._alert.is_draft = !!frm.is_new() || cint(frm.doc.docstatus) == 0;
+        frm._alert.is_submitted = !frm.is_new() && cint(frm.doc.docstatus) == 1;
+        frm._alert.is_cancelled = !frm.is_new() && cint(frm.doc.docstatus) == 2;
         
         if (frm._alert.is_submitted || frm._alert.is_cancelled) {
             frm.disable_form();

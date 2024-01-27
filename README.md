@@ -148,7 +148,7 @@ bench restart
 ### Usage
 ### Alert Type
 - Go to `Alert Type` then create a new type
-- Enter the title for the type
+- Enter the type name
 - Set the `Display Priority` if needed
 - To make alerts of this type close automatically:
   - Set the `Display Timeout (Seconds)` or keep as `0` to disable the automatic close

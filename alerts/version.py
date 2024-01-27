@@ -7,4 +7,6 @@
 from frappe import __version__
 
 
-__frappe_min_14__ = int(__version__.split(".")[0]) > 13
+__frappe_version__ = int(__version__.split(".")[0])
+__frappe_v15__ = __frappe_version__ > 14
+__frappe_mv14__ = __frappe_version__ > 13

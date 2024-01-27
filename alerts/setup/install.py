@@ -4,13 +4,19 @@
 # Licence: Please refer to LICENSE file
 
 
+from frappe.utils import now
+from frappe.utils.user import get_system_managers
+
+from alerts import __version__
+
 from alerts.utils.type import add_type
 
 
+# [Hooks]
 def after_install():
     types = [
         {
-            "title": "Urgent",
+            "name": "Urgent",
             "display_priority": 10,
             "display_timeout": 5,
             "display_sound": "Alert",
@@ -20,7 +26,7 @@ def after_install():
             "content_color": "#FFF"
         },
         {
-            "title": "Warning",
+            "name": "Warning",
             "display_priority": 5,
             "display_timeout": 5,
             "display_sound": "Alert",
@@ -30,7 +36,7 @@ def after_install():
             "content_color": "#000"
         },
         {
-            "title": "Notice",
+            "name": "Notice",
             "display_priority": 0,
             "display_timeout": 5,
             "display_sound": "Alert",
@@ -42,3 +48,39 @@ def after_install():
     ]
     for data in types:
         add_type(data)
+    
+    doc = settings()
+    
+    if (managers := get_system_managers(only_name=True)):
+        doc.auto_check_for_update = 1
+        doc.send_update_notification = 1
+        
+        if "Administrator" in managers:
+            sender = "Administrator"
+        else:
+            sender = managers[0]
+        
+        doc.update_notification_sender = sender
+        
+        if doc.update_notification_receivers:
+            doc.update_notification_receivers.clear()
+        
+        for manager in managers:
+            doc.append(
+                "update_notification_receivers",
+                {"user": manager}
+            )
+        
+        if not doc.update_notification_receivers:
+            doc.send_update_notification = 0
+            
+    else:
+        doc.auto_check_for_update = 0
+        doc.send_update_notification = 0
+    
+    doc.current_version = __version__
+    doc.latest_version = __version__
+    doc.latest_check = now()
+    doc.has_update = 0
+        
+    doc.save(ignore_permissions=True)

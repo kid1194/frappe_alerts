@@ -4,7 +4,7 @@
 # Licence: Please refer to LICENSE file
 
 
-from .version import __frappe_min_14__
+from .version import __frappe_mv14__
 
 
 app_name = "alerts"
@@ -19,7 +19,7 @@ app_license = "MIT"
 
 app_include_js = [
     'alerts.bundle.js'
-] if __frappe_min_14__ else [
+] if __frappe_mv14__ else [
     '/assets/alerts/js/alerts.js'
 ]
 
@@ -35,6 +35,7 @@ extend_bootinfo = "alerts.utils.boot.extend"
 
 scheduler_events = {
     "daily": [
-        "alerts.utils.alert.update_alerts"
+        "alerts.utils.alert.update_alerts",
+        "alerts.utils.update.auto_check_for_update"
     ]
 }

@@ -22,7 +22,7 @@ def clear_doc_cache(dt, name=None):
     clear_cache(dt)
 
 
-# [Alert, Type]
+# [Alert, Settings, Type]
 def get_cached_doc(dt, name=None, for_update=False):
     if name is None:
         name = dt

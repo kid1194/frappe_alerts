@@ -2,7 +2,7 @@
  "actions": [],
  "allow_copy": 1,
  "allow_import": 1,
- "autoname": "field:title",
+ "autoname": "Prompt",
  "creation": "2022-04-04 04:04:04.119400",
  "description": "Alert type for Alerts",
  "doctype": "DocType",
@@ -10,9 +10,8 @@
  "engine": "InnoDB",
  "field_order": [
   "main_section",
-  "title",
-  "main_column",
   "disabled",
+  "main_column",
   "control_section",
   "display_priority",
   "display_timeout",
@@ -32,27 +31,16 @@
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "title",
-   "fieldtype": "Data",
-   "label": "Title",
-   "unique": 1,
-   "reqd": 1,
-   "bold": 1,
-   "in_list_view": 1,
-   "in_preview": 1,
-   "translatable": 1
-  },
-  {
-   "fieldname": "main_column",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "disabled",
    "fieldtype": "Check",
    "label": "Is Disabled",
    "default": "0",
    "read_only_depends_on": "eval:doc.__islocal",
    "search_index": 1
+  },
+  {
+   "fieldname": "main_column",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "control_section",
@@ -131,7 +119,7 @@
  "modified_by": "Administrator",
  "module": "Alerts",
  "name": "Alert Type",
- "naming_rule": "By fieldname",
+ "naming_rule": "Set by user",
  "owner": "Administrator",
  "permissions": [
   {

@@ -9,4 +9,6 @@ from .cache import *
 from .common import *
 from .files import *
 from .query import *
+from .settings import *
 from .type import *
+from .update import *

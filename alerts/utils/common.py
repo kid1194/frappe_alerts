@@ -23,20 +23,20 @@ def error(msg, log=False, throw=True):
         frappe.throw(msg, title=__module__)
 
 
-# [Alert]
+# [Alert, Alerts Settings]
 def is_doc_exists(dt, name=None):
     if name is None:
         name = dt
     
-    return frappe.db.exists(dt, name)
+    return frappe.db.exists(dt, name) != None
 
 
-# [Alert Type]
+# [Alert Type, Alerts Settings, Update]
 def doc_count(dt, filters: dict):
     return frappe.db.count(dt, filters)
 
 
-# [Files, Query]
+# [Files, Query, Update]
 def parse_json(data, default=None):
     if not data or not isinstance(data, str):
         return default

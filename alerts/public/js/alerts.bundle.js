@@ -30,11 +30,19 @@ class Alerts extends AlertsUtils {
         this._dialog = new AlertsDialog(this._id, 'alert-dialog-' + this._id);
         this._list = [];
         this._mock = null;
-        this._realtime = $.proxy(function(ret) {
-            if (ret) ret = ret.message || ret;
-            if (this._is_valid(ret)) this.show(ret);
-        }, this);
-        frappe.realtime.on('show_alert', this._realtime);
+        this._events = jQuery({});
+        this.is_ready = false;
+        this.is_enabled = false;
+        this.request(
+            'is_enabled',
+            null,
+            function(ret) {
+                this.is_ready = true;
+                this.is_enabled = !!ret;
+                this._setup();
+                this.trigger('ready');
+            }
+        );
     }
     mock() {
         if (!this._mock) this._mock = new AlertsMock();
@@ -87,6 +95,26 @@ class Alerts extends AlertsUtils {
             this.has_error = false;
         }
         return this;
+    }
+    _setup() {
+        this._change = $.proxy(function(ret) {
+            if (ret) ret = ret.message || ret;
+            if (!ret || ret.is_enabled == null) return;
+            let old = this.is_enabled;
+            this.is_enabled = !!ret.is_enabled;
+            if (this.is_enabled !== old) {
+                if (this.is_enabled)
+                    frappe.realtime.on('show_alert', this._realtime);
+                else frappe.realtime.off('show_alert', this._realtime);
+                this.trigger('change');
+            }
+        }, this);
+        this._realtime = $.proxy(function(ret) {
+            if (ret) ret = ret.message || ret;
+            if (this._is_valid(ret)) this.show(ret);
+        }, this);
+        frappe.realtime.on('alerts_app_status_changed', this._change);
+        if (this.is_enabled) frappe.realtime.on('show_alert', this._realtime);
     }
     _is_valid(data) {
         if (!data || !this.$isDataObj(data) || this.$isEmptyObj(data)) return false;
@@ -146,9 +174,11 @@ class Alerts extends AlertsUtils {
     }
     destroy() {
         frappe.realtime.off('show_alert', this._realtime);
+        frappe.realtime.off('alerts_app_status_changed', this._change);
         if (this._dialog) this._dialog.destroy();
         if (this._mock) this._mock.destroy();
-        this._dialog = this._list = this._mock = this._realtime = null;
+        this.is_ready = this.is_enabled = false;
+        this._dialog = this._list = this._mock = this._change = this._realtime = null;
         return this;
     }
     _alert(title, msg, args, def_title, indicator, fatal) {
@@ -208,6 +238,91 @@ class Alerts extends AlertsUtils {
     }
     _error() {
         return this._console('error', arguments);
+    }
+    trigger(evt, data) {
+        this._events.trigger(evt, data);
+        return this;
+    }
+    once(evt, handler) {
+        if (evt === 'ready' && this.is_ready)
+            handler.call(this);
+        else this._events.one(evt, $.bind(function(e, data) {
+            handler.call(this, data);
+        }, this));
+        return this;
+    }
+    on(evt, handler) {
+        if (evt === 'ready' && this.is_ready)
+            handler.call(this);
+        else this._events.bind(evt, $.bind(function(e, data) {
+            handler.call(this, data);
+        }, this));
+        return this;
+    }
+    off(evt, handler) {
+        this._events.unbind(evt, $.bind(function(e, data) {
+            handler.call(this, data);
+        }, this));
+        return this;
+    }
+    setup_form(frm) {
+        try {
+            if (!this.is_enabled) {
+                frm._app_disabled = true;
+                if (!frm._form_disabled) {
+                    this.disable_form(frm);
+                    frm.set_intro(__('Alerts app is disabled.'), 'red');
+                }
+                frm._form_disabled = true;
+            } else {
+                frm._app_disabled = false;
+                if (frm._form_disabled) {
+                    this.enable_form(frm);
+                    frm.set_intro();
+                }
+                frm._form_disabled = false;
+            }
+        } catch(e) {
+            this._error('Setup form', e.message, e.stack);
+        } finally {
+            this.has_error = false;
+        }
+        return this;
+    }
+    enable_form(frm) {
+        try {
+            var fields = null;
+            if (this.$isArr(frm._disabled_fields) && frm._disabled_fields.length)
+                fields = frm._disabled_fields.splice(0, frm._disabled_fields.length);
+            frm.fields.forEach(function(field) {
+                if (!fields || fields.indexOf(field.df.fieldname) >= 0)
+                    frm.set_df_property(field.df.fieldname, 'read_only', '0');
+            });
+            frm.enable_save();
+        } catch(e) {
+            this._error('Enable form', e.message, e.stack);
+        } finally {
+            this.has_error = false;
+        }
+        return this;
+    }
+    disable_form(frm, workflow) {
+        try {
+            if (!this.$isArr(frm._disabled_fields))
+                frm._disabled_fields = [];
+            frm.fields.forEach(function(field) {
+                if (!cint(field.df.read_only)) {
+                    frm._disabled_fields.push(field.df.fieldname);
+                    frm.set_df_property(field.df.fieldname, 'read_only', 1);
+                }
+            });
+            frm.disable_save();
+        } catch(e) {
+            this._error('Disable form', e.message, e.stack);
+        } finally {
+            this.has_error = false;
+        }
+        return this;
     }
 }
 

@@ -29,11 +29,11 @@ class AlertType(Document):
     
     
     def validate(self):
-        if not self.title:
-            throw(_("A valid alert type title is required."))
+        if not self.name:
+            throw(_("A valid alert type name is required."))
         limit = 0 if self.is_new() else 1
-        if doc_count(self.doctype, {"title": self.title}) != limit:
-            throw(_("The alert type \"{0}\" already exists.").format(self.title))
+        if doc_count(self.doctype, {"name": self.name}) != limit:
+            throw(_("The alert type \"{0}\" already exists.").format(self.name))
         if self.display_sound == "Custom" and not self.custom_display_sound:
             throw(_("A valid alert type custom display sound is required."))
     

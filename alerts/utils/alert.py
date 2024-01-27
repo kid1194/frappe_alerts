@@ -142,7 +142,7 @@ def cache_alerts(user):
         .where(Criterion.any([
             IfNull(stqry, "") == "",
             doc.name.notin(stqry)
-        ])
+        ]))
         .where(Criterion.any([
             Criterion.all([
                 doc.is_repeatable != 1,
