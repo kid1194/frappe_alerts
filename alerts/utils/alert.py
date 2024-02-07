@@ -5,7 +5,7 @@
 
 
 import frappe
-from frappe.utils import cint, getdate
+from frappe.utils import cint, nowdate
 
 from .common import is_doc_exists
 
@@ -21,7 +21,7 @@ def type_alerts_exists(alert_type):
 
 # [Hooks]
 def update_alerts():
-    today = getdate()
+    today = nowdate()
     doc = frappe.qb.DocType(_alert_dt_)
     (
         frappe.qb.update(doc)
@@ -46,7 +46,6 @@ def cache_alerts(user: str):
     from pypika.functions import IfNull
     from pypika.terms import Criterion
     
-    from frappe.utils import nowdate
     from frappe.query_builder.functions import Count
     
     from .cache import set_tmp_cache
@@ -92,7 +91,7 @@ def cache_alerts(user: str):
         .where(sdoc.parenttype == _alert_dt_)
         .where(sdoc.parentfield == "seen_by")
         .where(sdoc.user == user)
-        .where(sdoc.date_time.gte(nowdate()))
+        .where(sdoc.date == nowdate())
     )
     
     qry = (
@@ -159,17 +158,14 @@ def send_alert(doc):
     seen_today = []
     
     if doc.seen_by:
-        today = getdate()
+        today = nowdate()
         for v in doc.seen_by:
             if v.user not in seen_by:
                 seen_by[v.user] = 0
             
             seen_by[v.user] += 1
             
-            if (
-                v.user not in seen_today and
-                getdate(v.date_time) == today
-            ):
+            if v.user not in seen_today and v.date == today:
                 seen_today.append(v.user)
     
     frappe.publish_realtime(
@@ -194,23 +190,21 @@ def send_alert(doc):
 # [Alerts Js]
 @frappe.whitelist(methods=["POST"])
 def mark_seens(names):
-    from frappe.utils import now, unique
-    
-    from .background import enqueue_job
-    from .cache import get_cached_doc
-    
     if not names or not isinstance(names, list):
         return 0
     
-    names [v for v in names if v and isinstance(v, str)]
-    if not names:
-        return 0
+    alerts = []
+    for v in names:
+        if v and isinstance(v, str):
+            alerts.append(v)
     
-    for name in names:
+    from .background import enqueue_job
+    
+    for alert in alerts:
         enqueue_job(
             "alerts.utils.alert.mark_as_seen",
-            f"alert-mark-as-seen-{name}",
-            name=name
+            f"alert-mark-as-seen-{alert}",
+            name=alert
         )
     
     return 1
@@ -221,14 +215,23 @@ def mark_as_seen(name: str):
     if not is_doc_exists(_alert_dt_, name):
         return 0
     
+    from .cache import get_cached_doc
+    
     doc = get_cached_doc(_alert_dt_, name)
     if not doc or cint(doc.docstatus) != 1:
         return 0
     
     user = frappe.session.user
     if is_valid_user(doc, user):
-        doc.append("seen_by", {"user": user, "date_time": now()})
-        doc.reached = len(list(set([v.user for v in doc.seen_by])))
+        from frappe.utils import nowtime
+        
+        doc.append("seen_by", {
+            "user": user,
+            "date": nowdate(),
+            "time": nowtime()
+        })
+        seen = [v.user for v in doc.seen_by]
+        doc.reached = len(list(set(seen)))
         doc.save(ignore_permissions=True)
         
         frappe.publish_realtime(
@@ -242,34 +245,29 @@ def mark_as_seen(name: str):
 
 # [Internal]
 def is_valid_user(doc, user):
-    from frappe.utils import has_common
-    
     score = 0
-    if (
-        doc.for_users and
-        user in [v.user for v in doc.for_users]
-    ):
-        score = 1
+    if doc.for_users:
+        users = [v.user for v in doc.for_users]
+        if user in users:
+            score = 1
     
-    elif (
-        doc.for_roles and
-        has_common(
-            [v.role for v in doc.for_roles],
-            frappe.get_roles(user)
-        )
-    ):
-        score = 1
+    if score == 0 and doc.for_roles:
+        from frappe.utils import has_common
+        
+        roles = [v.role for v in doc.for_roles]
+        if has_common(roles, frappe.get_roles(user)):
+            score = 1
     
     if score == 0:
         return False
     
     total_seen = 0
     if doc.seen_by:
-        today = getdate()
+        today = nowdate()
         for v in doc.seen_by:
             if v.user == user:
                 total_seen += 1
-                if getdate(v.date_time) == today:
+                if v.date == today:
                     return False
     
     if not cint(doc.is_repeatable) and total_seen:
