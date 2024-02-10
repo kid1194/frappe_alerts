@@ -33,6 +33,7 @@ frappe.ui.form.on('Alert', {
                 frm._alert.is_submitted ? 'submitted' : 'cancelled'
             ], 0, frm._alert.is_submitted ? 'green' : 'red');
             
+            frm.set_df_property('seen_by_section', 'hidden', 0);
             frm.set_df_property('seen_by', 'cannot_add_rows', 1);
             frm.set_df_property('seen_by', 'cannot_delete_rows', 1);
             frm.set_df_property('seen_by', 'in_place_edit', 1);

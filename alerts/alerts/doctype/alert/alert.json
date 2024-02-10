@@ -145,7 +145,7 @@
   {
    "fieldname": "seen_by_section",
    "fieldtype": "Section Break",
-   "depends_on": "eval:doc.docstatus !== 0"
+   "hidden": 1
   },
   {
    "fieldname": "seen_by",
