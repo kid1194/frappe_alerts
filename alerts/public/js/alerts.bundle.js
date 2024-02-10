@@ -540,6 +540,7 @@ class AlertsDialog extends AlertsBase {
     }
     render() {
         if (this._dialog) this.reset();
+        console.log('Alert dialog', this._opts, this._message);
         this._dialog = new frappe.ui.Dialog(this._opts);
         this._dialog.$wrapper.addClass(this._class);
         if (this._message) this._dialog.set_message(this._message);
@@ -565,7 +566,7 @@ class AlertsDialog extends AlertsBase {
         if (!this.$sound) return this;
         if (this._sound.loaded) {
             this._sound.playing = 1;
-            this.$sound[0].play();
+            try { this.$sound[0].play(); } catch(_) {}
             return this;
         }
         this.stopSound();
@@ -576,7 +577,7 @@ class AlertsDialog extends AlertsBase {
         if (this._sound.timeout) window.clearTimeout(this._sound.timeout);
         this._sound.timeout = null;
         if (this.$sound && this._sound.playing)
-            this.$sound[0].stop();
+            try { this.$sound[0].stop(); } catch(_) {}
         this._sound.playing = 0;
         return this;
     }
