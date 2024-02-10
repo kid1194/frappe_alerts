@@ -565,7 +565,7 @@ class AlertsDialog extends AlertsBase {
         if (!this.$sound) return this;
         if (this._sound.loaded) {
             this._sound.playing = 1;
-            this.$sound.get(0).play();
+            this.$sound[0].play();
             return this;
         }
         this.stopSound();
@@ -576,7 +576,7 @@ class AlertsDialog extends AlertsBase {
         if (this._sound.timeout) window.clearTimeout(this._sound.timeout);
         this._sound.timeout = null;
         if (this.$sound && this._sound.playing)
-            this.$sound.get(0).stop();
+            this.$sound[0].stop();
         this._sound.playing = 0;
         return this;
     }
