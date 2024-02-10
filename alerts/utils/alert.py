@@ -193,21 +193,19 @@ def mark_seens(names):
     if not names or not isinstance(names, list):
         return 0
     
-    alerts = []
-    for v in names:
-        if v and isinstance(v, str):
-            alerts.append(v)
-    
     from .background import enqueue_job
     
-    for alert in alerts:
-        enqueue_job(
-            "alerts.utils.alert.mark_as_seen",
-            f"alert-mark-as-seen-{alert}",
-            name=alert
-        )
+    count = 0
+    for v in names:
+        if v and isinstance(v, str):
+            count += 1
+            enqueue_job(
+                "alerts.utils.alert.mark_as_seen",
+                f"alert-mark-as-seen-{v}",
+                name=v
+            )
     
-    return 1
+    return 1 if count > 0 else 0
 
 
 # [Internal]
