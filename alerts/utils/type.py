@@ -15,7 +15,7 @@ _type_dt_ = "Alert Type"
 def get_type(name: str):
     from .common import get_cached_doc
     
-   return get_cached_doc(_type_dt_, name)
+    return get_cached_doc(_type_dt_, name)
 
 
 # [Alert]
