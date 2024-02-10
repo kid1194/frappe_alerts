@@ -149,10 +149,7 @@ def cache_alerts(user: str):
 # [Boot]
 def get_alerts_cache(user):
     cache = get_cached_alerts(user)
-    if cache == None:
-        cache_alerts(user)
-        cache = get_cached_alerts(user)
-    if cache == None:
+    if not cache:
         cache = []
     return cache
 
