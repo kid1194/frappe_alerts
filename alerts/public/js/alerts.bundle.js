@@ -168,6 +168,7 @@ class Alerts extends AlertsBase {
         if (!this._list.length) {
             if (this._seen.length) {
                 var seen = this._seen.splice(0, this._seen.length);
+                console.log('Alert mark as seen', seen);
                 this.request(
                     'mark_seens',
                     {names: seen},
@@ -188,7 +189,8 @@ class Alerts extends AlertsBase {
         }
         
         var data = this._list.shift();
-        this._dialog = this._dialog || new AlertsDialog(this._id, 'alerts-dialog-' + this._id);
+        if (!this._dialog) this._dialog = new AlertsDialog(this._id, 'alerts-dialog-' + this._id);
+        console.log('Alert build', data);
         this._dialog
             .setName(data.name)
             .setTitle(data.title)
@@ -196,6 +198,7 @@ class Alerts extends AlertsBase {
             .setType(data.type)
             .onShow(this.$fn(function() {
                 this._seen.push(this._dialog.name);
+                console.log('Alert show', this._seen);
             }))
             .onHide(this.$fn(this._build), 200)
             .render()
@@ -423,7 +426,10 @@ class Alerts extends AlertsBase {
         try {
             for (let i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
-                if (cint(f.df.read_only) || cint(f.df.hidden)) continue;
+                if (
+                    cint(f.df.read_only) || cint(f.df.hidden)
+                    || ['Tab Break', 'Section Break', 'Column Break'].indexOf(f.df.fieldtype) >= 0
+                ) continue;
                 frm._alerts.fields_disabled.push(f.df.fieldname);
                 if (f.df.fieldtype === 'Table')
                     this.disable_table(frm, f.df.fieldname);
@@ -457,6 +463,7 @@ class Alerts extends AlertsBase {
         let obj = frm._alerts.tables_disabled[key],
         grid = frm.get_field(key).grid;
         delete frm._alerts.tables_disabled[key];
+        if (!grid) return this;
         if (grid.meta && obj.editable_grid != null)
             grid.meta.editable_grid = obj.editable_grid;
         if (obj.static_rows != null) grid.static_rows = obj.static_rows;
@@ -471,10 +478,12 @@ class Alerts extends AlertsBase {
             && grid.header_search.wrapper
         )
             grid.header_search.wrapper.show();
-        if (obj.add_row != null) grid.wrapper.find('.grid-add-row').show();
-        if (obj.add_multi_row != null) grid.wrapper.find('.grid-add-multiple-rows').show();
-        if (obj.download != null) grid.wrapper.find('.grid-download').show();
-        if (obj.upload != null) grid.wrapper.find('.grid-upload').show();
+        if (grid.wrapper) {
+            if (obj.add_row != null) grid.wrapper.find('.grid-add-row').show();
+            if (obj.add_multi_row != null) grid.wrapper.find('.grid-add-multiple-rows').show();
+            if (obj.download != null) grid.wrapper.find('.grid-download').show();
+            if (obj.upload != null) grid.wrapper.find('.grid-upload').show();
+        }
         frm.refresh_field(key);
         return this;
     }
@@ -485,6 +494,7 @@ class Alerts extends AlertsBase {
         if (!field || !field.df || field.df.fieldtype !== 'Table') return this;
         let obj = frm._alerts.tables_disabled[key] = {},
         grid = field.grid;
+        if (!grid) return this;
         if (grid.meta) {
             obj.editable_grid = grid.meta.editable_grid;
             grid.meta.editable_grid = true;
@@ -507,25 +517,27 @@ class Alerts extends AlertsBase {
             obj.header_search = 1;
             grid.header_row.wrapper.hide();
         }
-        let $btn = grid.wrapper.find('.grid-add-row');
-        if ($btn.length && $btn.is(':visible')) {
-            obj.add_row = 1;
-            $btn.hide();
-        }
-        $btn = grid.wrapper.find('.grid-add-multiple-rows');
-        if ($btn.length && $btn.is(':visible')) {
-            obj.add_multi_row = 1;
-            $btn.hide();
-        }
-        $btn = grid.wrapper.find('.grid-download');
-        if ($btn.length && $btn.is(':visible')) {
-            obj.download = 1;
-            $btn.hide();
-        }
-        $btn = grid.wrapper.find('.grid-upload');
-        if ($btn.length && $btn.is(':visible')) {
-            obj.upload = 1;
-            $btn.hide();
+        if (grid.wrapper) {
+            let $btn = grid.wrapper.find('.grid-add-row');
+            if ($btn.length && $btn.is(':visible')) {
+                obj.add_row = 1;
+                $btn.hide();
+            }
+            $btn = grid.wrapper.find('.grid-add-multiple-rows');
+            if ($btn.length && $btn.is(':visible')) {
+                obj.add_multi_row = 1;
+                $btn.hide();
+            }
+            $btn = grid.wrapper.find('.grid-download');
+            if ($btn.length && $btn.is(':visible')) {
+                obj.download = 1;
+                $btn.hide();
+            }
+            $btn = grid.wrapper.find('.grid-upload');
+            if ($btn.length && $btn.is(':visible')) {
+                obj.upload = 1;
+                $btn.hide();
+            }
         }
         frm.refresh_field(key);
         return this;
