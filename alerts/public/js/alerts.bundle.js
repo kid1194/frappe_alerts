@@ -420,7 +420,7 @@ class AlertsMock extends AlertsBase {
         if (!this.$isDataObj(data) || this.$isEmptyObj(data)) return this;
         this._dialog = this._dialog || new AlertsDialog(this._id, 'mock-alert-dialog-' + this._id);
         this._dialog
-            .setTitle(data.title)
+            .setTitle(data.name)
             .setMessage('This is a mock alert message.')
             .setType(data)
             .render()
