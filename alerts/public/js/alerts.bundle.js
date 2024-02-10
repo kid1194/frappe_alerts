@@ -46,6 +46,11 @@ class Alerts extends AlertsBase {
         this._seen = [];
         this._mock = null;
         
+        this._on_deatroy = this.$fn(this.destroy);
+        window.addEventListener('beforeunload', this._on_deatroy);
+        $(window).on('hashchange', this._on_deatroy);
+        window.addEventListener('popstate', this._on_deatroy);
+        
         this.request(
             'is_enabled',
             null,
@@ -176,7 +181,7 @@ class Alerts extends AlertsBase {
         }
         
         var data = this._list.shift();
-        this._dialog = this._dialog || new AlertsDialog(this._id, 'alert-dialog-' + this._id);
+        this._dialog = this._dialog || new AlertsDialog(this._id, 'alerts-dialog-' + this._id);
         this._dialog
             .setName(data.name)
             .setTitle(data.title)
@@ -191,13 +196,17 @@ class Alerts extends AlertsBase {
         return this;
     }
     destroy() {
+        frappe.alerts = null;
+        window.removeEventListener('beforeunload', this._on_deatroy);
+        $(window).off('hashchange', this._on_deatroy);
+        window.removeEventListener('popstate', this._on_deatroy);
         for (var e in this._events.list) this._clear_event(e, 1);
         if (this._dialog) this._dialog.destroy();
         if (this._mock) this._mock.destroy();
-        this.is_ready = this.is_enabled = false;
-        this._events = this._dialog = this._list = this._seen = this._mock = null;
-        frappe.alerts = null;
-        return this;
+        let hasProp = Object.prototype.hasOwnProperty;
+        for (let k in this) {
+            if (hasProp.call(this, k)) delete this[k];
+        }
     }
     
     _alert(title, msg, args, def_title, indicator, fatal) {
@@ -418,7 +427,7 @@ class AlertsMock extends AlertsBase {
     }
     build(data) {
         if (!this.$isDataObj(data) || this.$isEmptyObj(data)) return this;
-        this._dialog = this._dialog || new AlertsDialog(this._id, 'mock-alert-dialog-' + this._id);
+        this._dialog = this._dialog || new AlertsDialog(this._id, 'alerts-mock-dialog-' + this._id);
         this._dialog
             .setTitle(data.name)
             .setMessage('This is a mock alert message.')
@@ -477,7 +486,7 @@ class AlertsDialog extends AlertsBase {
         if (!this.$isDataObj(type) || this.$isEmptyObj(type)) return this;
         this._style = this._style || new AlertsStyle(this._id, this._class);
         this._style.build(type);
-        this.setSize(type.size);
+        //this.setSize(type.size);
         this.setTimeout(type.display_timeout);
         this.setSound(type.display_sound, type.custom_display_sound);
         return this;
@@ -661,14 +670,5 @@ $(document).ready(function() {
     frappe.after_ajax(function() {
         if (frappe.boot && frappe.boot.alerts)
             frappe.alerts.show(frappe.boot.alerts);
-    });
-    window.addEventListener('beforeunload', function() {
-        frappe.alerts.destroy();
-    });
-    $(window).on('hashchange', function() {
-        frappe.alerts.destroy();
-    });
-    window.addEventListener('popstate', function() {
-        frappe.alerts.destroy();
     });
 });
