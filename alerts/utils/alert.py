@@ -148,10 +148,27 @@ def cache_alerts(user: str):
 def get_alerts_cache(user):
     cache = get_cached_alerts(user)
     if not isinstance(cache, list):
-        cache = cache_alerts(user)
-    if not isinstance(cache, list):
+        from .background import enqueue_job
+        
         cache = []
+        enqueue_job(
+            "alerts.utils.alert.delayed_cache_alerts",
+            f"delayed-cache-alerts-for-{user}",
+            user=user
+        )
+        
     return cache
+
+
+# [Alerts Alert]
+def delayed_cache_alerts(user: str):
+    cache = cache_alerts(user)
+    if cache:
+        frappe.publish_realtime(
+            event="alerts_show",
+            message=cache,
+            after_commit=True
+        )
 
 
 # [Alerts Alert]
