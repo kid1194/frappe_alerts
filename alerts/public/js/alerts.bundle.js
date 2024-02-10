@@ -173,15 +173,23 @@ class Alerts extends AlertsBase {
                     'mark_seens',
                     {names: seen},
                     function(ret) {
-                        if (!ret) {
+                        if (!ret || !this.$isDataObj(ret)) {
                             this._seen.push.apply(this._seen, seen);
+                            this.error('Marking alerts as seen has failed.');
+                        } else if (!!ret.error) {
+                            this._seen.push.apply(this._seen, seen);
+                            this._error('Marking alerts as seen raised error.', ret.error);
+                            this.error('Marking alerts as seen has failed.');
+                        } else if (ret.unseen && ret.unseen.length) {
+                            this._seen.push.apply(this._seen, ret.unseen);
+                            this._error('Marking some alerts as seen has failed.', ret.unseen);
                             this.error('Marking alerts as seen has failed.');
                         }
                     },
                     function(e) {
                         this._seen.push.apply(this._seen, seen);
-                        this.error('Marking alerts as seen has failed.');
                         this._error('Marking alerts as seen has failed with error.', e && e.message);
+                        this.error('Marking alerts as seen has failed.');
                     }
                 );
             }

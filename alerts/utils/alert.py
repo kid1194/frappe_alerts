@@ -191,15 +191,19 @@ def send_alert(doc):
 @frappe.whitelist(methods=["POST"])
 def mark_seens(names):
     if not names or not isinstance(names, list):
-        return 0
+        return {"error": "Invalid arguments"}
     
-    count = 0
+    unseen = []
     for v in names:
         if v and isinstance(v, str):
-            mark_as_seen(v)
-            count += 1
+            st = mark_as_seen(v)
+            if not st:
+                unseen.append(v)
     
-    return 1 if count > 0 else 0
+    if unseen:
+        return {"unseen": unseen}
+    
+    return {"success": 1}
 
 
 # [Internal]
