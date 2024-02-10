@@ -423,7 +423,7 @@ class Alerts extends AlertsBase {
         try {
             for (let i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
-                if (cint(f.df.read_only) || cint(field.df.hidden)) continue;
+                if (cint(f.df.read_only) || cint(f.df.hidden)) continue;
                 frm._alerts.fields_disabled.push(f.df.fieldname);
                 frm.set_df_property(f.df.fieldname, 'read_only', 1);
                 if (f.df.fieldtype === 'Table')
