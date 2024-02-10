@@ -24,6 +24,13 @@ class AlertsBase {
     $isArgs(v) { return this.$type(v) === 'Arguments'; }
     $toArr(v, s, e) { return Array.prototype.slice.call(v, s, e); }
     $fn(fn, obj) { return $.proxy(fn, obj || this); }
+    
+    destroy() {
+        let hasProp = Object.prototype.hasOwnProperty;
+        for (let k in this) {
+            if (hasProp.call(this, k)) delete this[k];
+        }
+    }
 }
 
 
@@ -203,10 +210,7 @@ class Alerts extends AlertsBase {
         for (var e in this._events.list) this._clear_event(e, 1);
         if (this._dialog) this._dialog.destroy();
         if (this._mock) this._mock.destroy();
-        let hasProp = Object.prototype.hasOwnProperty;
-        for (let k in this) {
-            if (hasProp.call(this, k)) delete this[k];
-        }
+        super.destroy();
     }
     
     _alert(title, msg, args, def_title, indicator, fatal) {
@@ -445,8 +449,8 @@ class AlertsMock extends AlertsBase {
         return this;
     }
     destroy() {
-        this._dialog && this._dialog.destroy();
-        this._dialog = null;
+        if (this._dialog) this._dialog.destroy();
+        super.destroy();
     }
 }
 
@@ -456,7 +460,7 @@ class AlertsDialog extends AlertsBase {
         super();
         this._id = id;
         this._class = _class;
-        this._reset_data();
+        //this._reset_data();
         this._opts = {};
         this._sound = {loaded: 0, playing: 0, timeout: null};
     }
@@ -552,7 +556,10 @@ class AlertsDialog extends AlertsBase {
         console.log('Alert dialog', this._opts, this._message);
         this._dialog = new frappe.ui.Dialog(this._opts);
         this._dialog.$wrapper.addClass(this._class);
-        if (this._message) this._dialog.set_message(this._message);
+        if (this._message) $('<div class="alerts-message">')
+            .html(this._message)
+            .appendTo(this._dialog.modal_body);
+        //this._dialog.set_message(this._message);
         if (this._on_hide) this._dialog.onhide = this._on_hide;
         if (this._on_show) this._dialog.on_page_show = this._on_show;
         return this;
@@ -602,9 +609,10 @@ class AlertsDialog extends AlertsBase {
     }
     destroy() {
         this.reset();
-        this._style && this._style.destroy();
-        this.$sound && this.$sound.remove();
-        this._reset_data();
+        if (this._style) this._style.destroy();
+        if (this.$sound) this.$sound.remove();
+        //this._reset_data();
+        super.destroy();
     }
     _reset_data() {
         this._style = this.$sound = null;
@@ -630,23 +638,23 @@ class AlertsStyle extends AlertsBase {
         var sel = '.$0>.modal-dialog>.modal-content'.replace('$0', this._class),
         css = [];
         if (this.$isStr(data.background) && data.background.length)
-            css.push('$0{background:$1}'.replace('$0', sel).replace('$1', data.background));
+            css.push('$0{background:$1!important}'.replace('$0', sel).replace('$1', data.background));
         if (this.$isStr(data.border_color) && data.border_color.length)
             css.push(
-                '$0,$0>.modal-header,$0>.modal-footer{border:1px solid $1}'
+                '$0,$0>.modal-header,$0>.modal-footer{border:1px solid $1!important}'
                 .replace(/\$0/g, sel).replace('$1', data.border_color)
             );
         if (this.$isStr(data.title_color) && data.title_color.length)
             css.push(
-                ('$0>$1>$2>.modal-title{color:$3}'
-                + '$0>$1>$2>.indicator::before{background:$3}'
-                + '$0>$1>.modal-actions>.btn{color:$3}')
+                ('$0>$1>$2>.modal-title{color:$3!important}'
+                + '$0>$1>$2>.indicator::before{background:$3!important}'
+                + '$0>$1>.modal-actions>.btn{color:$3!important}')
                 .replace(/\$0/g, sel).replace(/\$1/g, '.modal-header')
                 .replace(/\$2/g, '.title-section').replace(/\$3/g, data.title_color)
             );
         if (this.$isStr(data.content_color) && data.content_color.length)
             css.push(
-                '$0>$1,$0>$1>.modal-message{color:$2}'
+                '$0>$1,$0>$1>.alerts-message{color:$2!important}'
                 .replace(/\$0/g, sel).replace(/\$1/g, '.modal-body')
                 .replace('$2', data.content_color)
             );
@@ -658,9 +666,8 @@ class AlertsStyle extends AlertsBase {
         return this;
     }
     destroy() {
-        this._dom && this._dom.parentNode.removeChild(this._dom);
-        this._id = this._class = this._dom = null;
-        return this;
+        if (this._dom) this._dom.parentNode.removeChild(this._dom);
+        super.destroy();
     }
 }
 
