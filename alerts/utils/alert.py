@@ -47,10 +47,6 @@ def update_alerts():
 
 # [Access]
 def cache_alerts(user: str):
-    cache = get_cached_alerts(user)
-    if cache:
-        return 1
-    
     from pypika.functions import IfNull
     from pypika.terms import Criterion
     
@@ -142,14 +138,18 @@ def cache_alerts(user: str):
     
     data = qry.run(as_dict=True)
     
-    if data and isinstance(data, list):
-        set_cached_alerts(user, data)
+    if not data or not isinstance(data, list):
+        data = []
+    set_cached_alerts(user, data)
 
 
 # [Boot]
 def get_alerts_cache(user):
     cache = get_cached_alerts(user)
-    if not cache:
+    if not isinstance(cache, list):
+        cache_alerts(user)
+        cache = get_cached_alerts(user)
+    if not isinstance(cache, list):
         cache = []
     return cache
 
