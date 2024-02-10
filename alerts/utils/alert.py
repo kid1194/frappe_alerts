@@ -150,6 +150,9 @@ def cache_alerts(user: str):
 def get_alerts_cache(user):
     cache = get_cached_alerts(user)
     if cache == None:
+        cache_alerts(user)
+        cache = get_cached_alerts(user)
+    if cache == None:
         cache = []
     return cache
 
@@ -283,8 +286,7 @@ def pop_cached_alert(user, name):
             if v["name"] == name:
                 cache.pop(i)
                 break
-    if cache != None and not cache:
-        set_cached_alerts(user, None)
+        set_cached_alerts(user, cache)
 
 
 # [Internal]
