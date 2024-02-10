@@ -208,8 +208,8 @@ class Alerts extends AlertsBase {
         $(window).off('hashchange', this._on_deatroy);
         window.removeEventListener('popstate', this._on_deatroy);
         for (var e in this._events.list) this._clear_event(e, 1);
-        if (this._dialog) this._dialog.destroy();
-        if (this._mock) this._mock.destroy();
+        if (this._dialog) try { this._dialog.destroy(); } catch(_) {}
+        if (this._mock) try { this._mock.destroy(); } catch(_) {}
         super.destroy();
     }
     
@@ -341,34 +341,53 @@ class Alerts extends AlertsBase {
         }));
     }
     
-    setup_form(frm, workflow) {
+    init_form(frm) {
         if (!frm._alerts) frm._alerts = {};
-        if (!this.is_enabled) {
-            frm._alerts.app_disabled = true;
-            if (!frm._alerts.form_disabled)
-                this.disable_form(frm, 'Alerts app is disabled.', null, workflow);
-            frm._alerts.form_disabled = true;
-        } else {
+        if (frm._alerts.is_ready != null) return this;
+        if (frm._alerts.app_disabled == null)
             frm._alerts.app_disabled = false;
-            if (frm._alerts.form_disabled) this.enable_form(frm, workflow);
+        if (frm._alerts.form_disabled == null)
             frm._alerts.form_disabled = false;
+        if (frm._alerts.fields_disabled == null)
+            frm._alerts.fields_disabled = [];
+        if (frm._alerts.tables_disabled == null)
+            frm._alerts.tables_disabled = {};
+        if (frm._alerts.is_ready == null) {
+            frm._alerts.is_ready = false;
+            this.once('ready', function() {
+                if (frm) frm._alerts.is_ready = true;
+            });
+        }
+        return this;
+    }
+    setup_form(frm, workflow) {
+        this.init_form(frm);
+        if (this.is_enabled) {
+            frm._alerts.app_disabled = false;
+            if (!frm._alerts.form_disabled) this.emit('form_enabled');
+            else this.enable_form(frm, workflow);
+        } else {
+            frm._alerts.app_disabled = true;
+            if (frm._alerts.form_disabled) this.emit('form_disabled');
+            else this.disable_form(frm, this._name + ' app is disabled.', null, workflow);
         }
         return this;
     }
     enable_form(frm, workflow) {
+        this.init_form(frm);
+        if (!frm._alerts.form_disabled)
+            return this.emit('form_enabled');
         try {
-            var fields = null;
-            if (
-                frm._alerts && frm._alerts.fields_disabled
-                && frm._alerts.fields_disabled.length
-            ) {
-                fields = frm._alerts.fields_disabled.slice();
-                frm._alerts.fields_disabled = [];
+            let fields = frm._alerts.fields_disabled;
+            if (fields.length) {
+                for (let i = 0, l = frm.fields.length, f; i < l; i++) {
+                    f = frm.fields[i];
+                    if (fields.indexOf(f.df.fieldname) < 0) continue;
+                    frm.set_df_property(f.df.fieldname, 'read_only', 0);
+                    if (f.df.fieldtype === 'Table')
+                        this.enable_table(frm, f.df.fieldname);
+                }
             }
-            frm.fields.forEach(function(field) {
-                if (!fields || fields.indexOf(field.df.fieldname) >= 0)
-                    frm.set_df_property(field.df.fieldname, 'read_only', '0');
-            });
             if (this._no_workflow(frm, workflow)) frm.enable_save();
             else frm.page.show_actions_menu();
             if (frm._alerts.has_intro) {
@@ -378,48 +397,133 @@ class Alerts extends AlertsBase {
         } catch(e) {
             this._error('Enable form', e.message, e.stack);
         } finally {
-            this.has_error = false;
+            frm._alerts.form_disabled = false;
+            frm._alerts.fields_disabled = [];
+            frm._alerts.tables_disabled = {};
+            this._has_error = false;
+            this.emit('form_enabled');
         }
         return this;
     }
     disable_form(frm, msg, args, workflow, color) {
-        if (this.$isStr(workflow)) {
-            color = workflow;
+        this.init_form(frm);
+        if (frm._alerts.form_disabled)
+            return this.emit('form_disabled');
+        if (color == null && this.$isStr(workflow)) {
+            if (workflow.length) color = workflow;
             workflow = null;
         }
-        if (args != null && !this.$isArr(args)) {
-            workflow = !!args;
-            args = null;
+        if (args != null) {
+            if (!this.$isArr(args)) {
+                workflow = !!args;
+                args = null;
+            } else if (!args.length) args = null;
         }
-        if (this.$isArr(msg)) {
-            args = msg;
-            msg = null;
-        }
+        if (!this.$isStr(msg) || !msg.length) msg = null;
         try {
-            frm._alerts.fields_disabled = [];
-            frm.fields.forEach(function(field) {
-                if (!cint(field.df.read_only)) {
-                    frm._alerts.fields_disabled.push(field.df.fieldname);
-                    frm.set_df_property(field.df.fieldname, 'read_only', 1);
-                }
-            });
+            for (let i = 0, l = frm.fields.length, f; i < l; i++) {
+                f = frm.fields[i];
+                if (cint(f.df.read_only) || cint(field.df.hidden)) continue;
+                frm._alerts.fields_disabled.push(f.df.fieldname);
+                frm.set_df_property(f.df.fieldname, 'read_only', 1);
+                if (f.df.fieldtype === 'Table')
+                    this.disable_table(frm, f.df.fieldname);
+            }
             if (this._no_workflow(frm, workflow)) frm.disable_save();
             else frm.page.hide_actions_menu();
-            if (this.$isStr(msg) && msg.length) {
-                if (!this.$isArr(args) || !args.length) args = null;
-                if (!this.$isStr(color) || !color.length) color = null;
+            if (msg) {
                 frm._alerts.has_intro = true;
                 frm.set_intro(args ? __(msg, args) : __(msg), color || 'red');
             }
         } catch(e) {
             this._error('Disable form', e.message, e.stack);
         } finally {
-            this.has_error = false;
+            frm._alerts.form_disabled = true;
+            this._has_error = false;
+            this.emit('form_disabled');
         }
         return this;
     }
     _no_workflow(frm, workflow) {
         return !workflow || !!frm.is_new() || (!!workflow && !frm.states.get_state());
+    }
+    
+    enable_table(frm, key) {
+        this.init_form(frm);
+        if (!frm._alerts.tables_disabled[key]) return this;
+        let obj = frm._alerts.tables_disabled[key],
+        grid = frm.get_field(key).grid;
+        delete frm._alerts.tables_disabled[key];
+        if (grid.meta && obj.editable_grid != null)
+            grid.meta.editable_grid = obj.editable_grid;
+        if (obj.static_rows != null) grid.static_rows = obj.static_rows;
+        if (obj.sortable_status != null) grid.sortable_status = obj.sortable_status;
+        if (
+            obj.header_row != null && grid.header_row
+            && grid.header_row.configure_columns_button
+        )
+            grid.header_row.configure_columns_button.show();
+        if (
+            obj.header_search != null && grid.header_search
+            && grid.header_search.wrapper
+        )
+            grid.header_search.wrapper.show();
+        if (obj.add_row != null) grid.wrapper.find('.grid-add-row').show();
+        if (obj.add_multi_row != null) grid.wrapper.find('.grid-add-multiple-rows').show();
+        if (obj.download != null) grid.wrapper.find('.grid-download').show();
+        if (obj.upload != null) grid.wrapper.find('.grid-upload').show();
+        return this;
+    }
+    disable_table(frm, key) {
+        this.init_form(frm);
+        if (frm._alerts.tables_disabled[key]) return this;
+        let field = frm.get_field(key);
+        if (!field || !field.df || field.df.fieldtype !== 'Table') return this;
+        let obj = frm._alerts.tables_disabled[key] = {},
+        grid = field.grid;
+        if (grid.meta) {
+            obj.editable_grid = grid.meta.editable_grid;
+            grid.meta.editable_grid = true;
+        }
+        obj.static_rows = grid.static_rows;
+        grid.static_rows = 1;
+        obj.sortable_status = grid.sortable_status;
+        grid.sortable_status = 0;
+        if (
+            grid.header_row && grid.header_row.configure_columns_button
+            && grid.header_row.configure_columns_button.is(':visible')
+        ) {
+            obj.header_row = 1;
+            grid.header_row.configure_columns_button.hide();
+        }
+        if (
+            grid.header_search && grid.header_search.wrapper
+            && grid.header_search.wrapper.is(':visible')
+        ) {
+            obj.header_search = 1;
+            grid.header_row.wrapper.hide();
+        }
+        let $btn = grid.wrapper.find('.grid-add-row');
+        if ($btn.length && $btn.is(':visible')) {
+            obj.add_row = 1;
+            $btn.hide();
+        }
+        $btn = grid.wrapper.find('.grid-add-multiple-rows');
+        if ($btn.length && $btn.is(':visible')) {
+            obj.add_multi_row = 1;
+            $btn.hide();
+        }
+        $btn = grid.wrapper.find('.grid-download');
+        if ($btn.length && $btn.is(':visible')) {
+            obj.download = 1;
+            $btn.hide();
+        }
+        $btn = grid.wrapper.find('.grid-upload');
+        if ($btn.length && $btn.is(':visible')) {
+            obj.upload = 1;
+            $btn.hide();
+        }
+        return this;
     }
 }
 
@@ -460,7 +564,6 @@ class AlertsDialog extends AlertsBase {
         super();
         this._id = id;
         this._class = _class;
-        //this._reset_data();
         this._opts = {};
         this._sound = {loaded: 0, playing: 0, timeout: null};
     }
@@ -488,16 +591,10 @@ class AlertsDialog extends AlertsBase {
     }
     setType(type) {
         if (!this.$isDataObj(type) || this.$isEmptyObj(type)) return this;
-        this._style = this._style || new AlertsStyle(this._id, this._class);
+        if (!this._style) this._style = new AlertsStyle(this._id, this._class);
         this._style.build(type);
-        //this.setSize(type.size);
         this.setTimeout(type.display_timeout);
         this.setSound(type.display_sound, type.custom_display_sound);
-        return this;
-    }
-    setSize(size) {
-        if (this.$isStr(size) && size.length)
-            this._opts.size = size;
         return this;
     }
     setTimeout(sec) {
@@ -553,13 +650,11 @@ class AlertsDialog extends AlertsBase {
     }
     render() {
         if (this._dialog) this.reset();
-        console.log('Alert dialog', this._opts, this._message);
         this._dialog = new frappe.ui.Dialog(this._opts);
         this._dialog.$wrapper.addClass(this._class);
         if (this._message) $('<div class="alerts-message">')
             .html(this._message)
             .appendTo(this._dialog.modal_body);
-        //this._dialog.set_message(this._message);
         if (this._on_hide) this._dialog.onhide = this._on_hide;
         if (this._on_show) this._dialog.on_page_show = this._on_show;
         return this;
@@ -611,14 +706,7 @@ class AlertsDialog extends AlertsBase {
         this.reset();
         if (this._style) this._style.destroy();
         if (this.$sound) this.$sound.remove();
-        //this._reset_data();
         super.destroy();
-    }
-    _reset_data() {
-        this._style = this.$sound = null;
-        this._name = this._opts = this._message = null;
-        this._dialog = this._timeout = this._sound = null;
-        this._pre_show = this._on_show = this._on_hide = null;
     }
 }
 
@@ -661,7 +749,11 @@ class AlertsStyle extends AlertsBase {
         if (css.length) {
             css = css.join("\n");
             if (this._dom.styleSheet) this._dom.styleSheet.cssText = css;
-            else this._dom.appendChild(document.createTextNode(css));
+            else {
+                while (this._dom.firstChild)
+                    this._dom.removeChild(this._dom.firstChild);
+                this._dom.appendChild(document.createTextNode(css));
+            }
         }
         return this;
     }

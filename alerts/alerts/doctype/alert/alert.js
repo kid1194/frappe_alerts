@@ -8,9 +8,11 @@
 
 frappe.ui.form.on('Alert', {
     setup: function(frm) {
-        frappe.alerts.on('ready change', function() {
-            this.setup_form(frm, 1);
-        });
+        frappe.alerts
+            .init_form(frm)
+            .on('ready change', function() {
+                this.setup_form(frm);
+            });
         
         frm._alert = {
             is_draft: false,
@@ -51,6 +53,7 @@ frappe.ui.form.on('Alert', {
             return;
         }
         
+        if (frm._alerts.app_disabled) return;
         frm.set_query('role', 'for_roles', function(doc, cdt, cdn) {
             var qry = {filters: {disabled: 0, desk_access: 1}};
             if ((frm.doc.for_roles || '').length) {
