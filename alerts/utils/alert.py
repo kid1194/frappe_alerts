@@ -141,14 +141,14 @@ def cache_alerts(user: str):
     if not data or not isinstance(data, list):
         data = []
     set_cached_alerts(user, data)
+    return data
 
 
 # [Boot]
 def get_alerts_cache(user):
     cache = get_cached_alerts(user)
     if not isinstance(cache, list):
-        cache_alerts(user)
-        cache = get_cached_alerts(user)
+        cache = cache_alerts(user)
     if not isinstance(cache, list):
         cache = []
     return cache
