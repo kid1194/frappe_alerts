@@ -24,8 +24,8 @@ frappe.ui.form.on('Alert', {
     },
     onload: function(frm) {
         frm._alert.is_draft = !!frm.is_new() || cint(frm.doc.docstatus) == 0;
-        frm._alert.is_submitted = !frm.is_new() && cint(frm.doc.docstatus) == 1;
-        frm._alert.is_cancelled = !frm.is_new() && cint(frm.doc.docstatus) == 2;
+        frm._alert.is_submitted = cint(frm.doc.docstatus) == 1;
+        frm._alert.is_cancelled = cint(frm.doc.docstatus) == 2;
         
         if (frm._alert.is_submitted || frm._alert.is_cancelled) {
             frappe.alerts.disable_form(frm, '{0} has been {1}.', [
@@ -33,8 +33,7 @@ frappe.ui.form.on('Alert', {
                 frm._alert.is_submitted ? 'submitted' : 'cancelled'
             ], 0, frm._alert.is_submitted ? 'green' : 'red');
             
-            frm.set_df_property('seen_by_section', 'hidden', 0);
-            frm.set_df_property('seen_by', 'cannot_add_rows', 1);
+            /*frm.set_df_property('seen_by', 'cannot_add_rows', 1);
             frm.set_df_property('seen_by', 'cannot_delete_rows', 1);
             frm.set_df_property('seen_by', 'in_place_edit', 1);
             
@@ -47,8 +46,11 @@ frappe.ui.form.on('Alert', {
                 && seen_by_grid.header_row.configure_columns_button
             ) seen_by_grid.header_row.configure_columns_button.remove();
             
+            frm.refresh_field('seen_by');*/
+            frm.set_df_property('seen_by_section', 'hidden', 0);
+            
             frappe.alerts.on('alerts_refresh_seen_by', function(ret) {
-                if (ret && cstr(ret.alert) === cstr(frm.docname || frm.doc.name))
+                if (ret && cstr(ret.alert) === cstr(frm.docname))
                     frm.reload_doc();
             });
             return;

@@ -383,9 +383,9 @@ class Alerts extends AlertsBase {
                 for (let i = 0, l = frm.fields.length, f; i < l; i++) {
                     f = frm.fields[i];
                     if (fields.indexOf(f.df.fieldname) < 0) continue;
-                    frm.set_df_property(f.df.fieldname, 'read_only', 0);
                     if (f.df.fieldtype === 'Table')
                         this.enable_table(frm, f.df.fieldname);
+                    else frm.set_df_property(f.df.fieldname, 'read_only', 0);
                 }
             }
             if (this._no_workflow(frm, workflow)) frm.enable_save();
@@ -425,9 +425,9 @@ class Alerts extends AlertsBase {
                 f = frm.fields[i];
                 if (cint(f.df.read_only) || cint(f.df.hidden)) continue;
                 frm._alerts.fields_disabled.push(f.df.fieldname);
-                frm.set_df_property(f.df.fieldname, 'read_only', 1);
                 if (f.df.fieldtype === 'Table')
                     this.disable_table(frm, f.df.fieldname);
+                else frm.set_df_property(f.df.fieldname, 'read_only', 1);
             }
             if (this._no_workflow(frm, workflow)) frm.disable_save();
             else frm.page.hide_actions_menu();
@@ -475,6 +475,7 @@ class Alerts extends AlertsBase {
         if (obj.add_multi_row != null) grid.wrapper.find('.grid-add-multiple-rows').show();
         if (obj.download != null) grid.wrapper.find('.grid-download').show();
         if (obj.upload != null) grid.wrapper.find('.grid-upload').show();
+        frm.refresh_field(key);
         return this;
     }
     disable_table(frm, key) {
@@ -526,6 +527,7 @@ class Alerts extends AlertsBase {
             obj.upload = 1;
             $btn.hide();
         }
+        frm.refresh_field(key);
         return this;
     }
 }
