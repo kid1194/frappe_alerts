@@ -29,6 +29,7 @@ class AlertsBase {
 
 class Alerts extends AlertsBase {
     constructor() {
+        super();
         this.name = 'Alerts';
         this.is_ready = false;
         this.is_enabled = false;
@@ -412,6 +413,7 @@ class Alerts extends AlertsBase {
 
 class AlertsMock extends AlertsBase {
     constructor() {
+        super();
         this._id = frappe.utils.get_random(5);
     }
     build(data) {
@@ -442,6 +444,7 @@ class AlertsMock extends AlertsBase {
 
 class AlertsDialog extends AlertsBase {
     constructor(id, _class) {
+        super();
         this._id = id;
         this._class = _class;
         this._reset_data();
@@ -604,6 +607,7 @@ class AlertsDialog extends AlertsBase {
 
 class AlertsStyle extends AlertsBase {
     constructor(id, _class) {
+        super();
         this._id = 'style-' + id;
         this._class = _class;
         this._dom = document.createElement('style');
