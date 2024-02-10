@@ -31,7 +31,7 @@ frappe.ui.form.on('Alert', {
             frappe.alerts.disable_form(frm, '{0} has been {1}.', [
                 cstr(frm.doc.doctype || frm.doctype),
                 frm._alert.is_submitted ? 'submitted' : 'cancelled'
-            ], 1, frm._alert.is_submitted ? 'green' : 'red');
+            ], 0, frm._alert.is_submitted ? 'green' : 'red');
             
             frm.set_df_property('seen_by', 'cannot_add_rows', 1);
             frm.set_df_property('seen_by', 'cannot_delete_rows', 1);

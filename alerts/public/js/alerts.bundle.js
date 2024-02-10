@@ -445,7 +445,10 @@ class Alerts extends AlertsBase {
         return this;
     }
     _no_workflow(frm, workflow) {
-        return !workflow || !!frm.is_new() || (!!workflow && !frm.states.get_state());
+        try {
+            return !workflow || !!frm.is_new() || (!!workflow && !frm.states.get_state());
+        } catch(_) {}
+        return true;
     }
     
     enable_table(frm, key) {
