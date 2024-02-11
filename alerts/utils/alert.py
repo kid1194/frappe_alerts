@@ -76,8 +76,6 @@ def get_user_alerts(user: str):
         seen_by = get_alerts_seen_by(user, parents)
         if seen_by:
             data = filter_alerts_seen_by(data, seen_by, today)
-        from .common import log_error
-        log_error(str({"alert": data, "seen_by": seen_by}))
         return data
     
     return None
@@ -185,8 +183,7 @@ def delayed_show_alerts(user: str):
     if data:
         frappe.publish_realtime(
             event="alerts_show",
-            message=data,
-            after_commit=True
+            message={"alerts": data}
         )
 
 
@@ -293,7 +290,7 @@ def get_cached_alerts(user: str):
 
 
 # [Internal]
-def set_cached_alerts(user: str, data: list):
+def set_cached_alerts(user: str, data):
     from .cache import set_cache
     
     set_cache(_alert_dt_, user, data)

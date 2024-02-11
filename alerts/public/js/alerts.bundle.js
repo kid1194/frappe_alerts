@@ -128,11 +128,10 @@ class Alerts extends AlertsBase {
         })
         .on('alerts_show', function(ret) {
             console.log('alerts_show', ret);
-            if (this.is_enabled && (this.$isArr(ret) || this._is_valid(ret)))
-                new Promise(this.$fn(function(res, rej) {
-                    this.show(ret);
-                    res();
-                }));
+            if (this.is_enabled && this.$isDataObj(ret)) {
+                if (this.$isArr(ret.alerts)) this.show(ret.alerts);
+                else if (this._is_valid(ret)) this.show(ret);
+            }
         });
         this.emit('ready');
     }
@@ -283,9 +282,12 @@ class Alerts extends AlertsBase {
         event = event.split(' ');
         for (var i = 0, l = event.length, e; i < l; i++) {
             e = event[i];
-            if (e === 'ready' && this.is_ready) {
-                fn.call(this);
-                return this;
+            if (e === 'ready') {
+                _once = 1;
+                if (this.is_ready) {
+                    fn.call(this);
+                    return this;
+                }
             }
             if (!this._events.list[e]) {
                 this._events.list[e] = [];
@@ -324,7 +326,9 @@ class Alerts extends AlertsBase {
     _make_event_realtime_fn(event) {
         return this.$fn(function(ret) {
             if (ret && this.$isDataObj(ret)) ret = ret.message || ret;
-            this.emit(event, [ret]);
+            Promise.resolve().then(this.$fn(function() {
+                this.emit(event, [ret]);
+            }));
         });
     }
     _remove_event(event, fn) {
@@ -361,7 +365,7 @@ class Alerts extends AlertsBase {
             frm._alerts.tables_disabled = {};
         if (frm._alerts.is_ready == null) {
             frm._alerts.is_ready = false;
-            this.once('ready', function() {
+            this.on('ready', function() {
                 if (frm) frm._alerts.is_ready = true;
             });
         }
@@ -815,8 +819,16 @@ window.addEventListener('load', function() {
 });
 $(document).ready(function() {
     frappe.alerts = new Alerts();
-    frappe.after_ajax(function() {
-        if (frappe.boot && frappe.boot.alerts)
-            frappe.alerts.show(frappe.boot.alerts);
-    });
+    if (frappe.boot && frappe.boot.alerts) {
+        frappe.alerts.on('ready', function() {
+            this.show(frappe.boot.alerts);
+        });
+    } else {
+        frappe.after_ajax(function() {
+            if (frappe.boot && frappe.boot.alerts)
+                frappe.alerts.on('ready', function() {
+                    this.show(frappe.boot.alerts);
+                });
+        });
+    }
 });
