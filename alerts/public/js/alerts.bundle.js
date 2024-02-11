@@ -808,6 +808,7 @@ class AlertsStyle extends AlertsBase {
 
 
 $(document).ready(function() {
+    frappe.require('https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js');
     frappe.alerts = new Alerts();
     frappe.after_ajax(function() {
         if (frappe.boot && frappe.boot.alerts)

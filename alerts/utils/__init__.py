@@ -7,8 +7,7 @@
 from .alert import (
     type_alerts_exists,
     send_alert,
-    mark_seens,
-    get_user_alerts_list
+    mark_seens
 )
 from .cache import *
 from .common import *
