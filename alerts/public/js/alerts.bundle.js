@@ -26,8 +26,8 @@ class AlertsBase {
     $fn(fn, obj) { return $.proxy(fn, obj || this); }
     
     destroy() {
-        let hasProp = Object.prototype.hasOwnProperty;
-        for (let k in this) {
+        var hasProp = Object.prototype.hasOwnProperty;
+        for (var k in this) {
             if (hasProp.call(this, k)) delete this[k];
         }
     }
@@ -58,16 +58,10 @@ class Alerts extends AlertsBase {
         $(window).on('hashchange', this._on_deatroy);
         window.addEventListener('popstate', this._on_deatroy);
         
-        this.request(
-            'is_enabled',
-            null,
-            function(ret) {
-                this.is_ready = true;
-                this.is_enabled = !!ret;
-                this._setup();
-                this.emit('ready');
-            }
-        );
+        if ((frappe.get_route_str() || '').indexOf('Alerts Settings') >= 0)
+            this._setup(true);
+        else
+            this.request('is_enabled', null, this._setup);
     }
     mock() {
         this._mock = this._mock || new AlertsMock();
@@ -126,7 +120,9 @@ class Alerts extends AlertsBase {
         return this;
     }
     
-    _setup() {
+    _setup(ret) {
+        this.is_ready = true;
+        this.is_enabled = !!ret;
         this.on('alerts_app_status_changed', function(ret) {
             if (!ret || ret.is_enabled == null) return;
             var old = this.is_enabled;
@@ -134,65 +130,64 @@ class Alerts extends AlertsBase {
             if (this.is_enabled !== old) this.emit('change');
         })
         .on('alerts_show', function(ret) {
-            if (this.is_enabled && this._is_valid(ret))
+            if (this.is_enabled && (this.$isArr(ret) || this._is_valid(ret)))
                 this.show(ret);
         });
+        this.emit('ready');
     }
     _is_valid(data) {
         if (!data || !this.$isDataObj(data) || this.$isEmptyObj(data)) return false;
         if (this._seen.indexOf(data.name) >= 0) return false;
         var user = frappe.session.user,
         score = 0;
-        if (this.$isArr(data.users) && data.users.indexOf(user) >= 0) score++;
-        else if (
-            this.$isArr(data.roles) && data.roles.length
+        if (
+            this.$isArr(data.users) && data.users.length
+            && data.users.indexOf(user) >= 0
+        ) score++;
+        if (
+            !score
+            && this.$isArr(data.roles) && data.roles.length
             && frappe.user.has_role(data.roles)
         ) score++;
         if (!score) return false;
-        if (this.$isArr(data.seen_today) && data.seen_today.indexOf(user) >= 0) return false;
-        var seen_by = this.$isDataObj(data.seen_by) ? data.seen_by : {};
         if (
-            cint(data.is_repeatable) < 1
-            && seen_by[user] != null
-            && cint(seen_by[user]) > 0
+            this.$isArr(data.seen_today) && data.seen_today.length
+            && data.seen_today.indexOf(user) >= 0
         ) return false;
-        var max_repeats = cint(data.number_of_repeats);
-        if (
-            max_repeats > 0
-            && seen_by[user] != null
-            && cint(seen_by[user]) >= max_repeats
-        ) return false;
+        var seen_by = this.$isDataObj(data.seen_by) ? data.seen_by : {},
+        seen = seen_by[user] != null ? cint(seen_by[user]) : -1;
+        if (cint(data.is_repeatable) < 1 && seen > 0) return false;
+        if (seen >= cint(data.number_of_repeats)) return false;
         return true;
     }
     _build() {
         if (!this._list.length) {
-            if (this._seen.length) {
-                var seen = this._seen.splice(0, this._seen.length);
-                console.log('Alert mark as seen', seen);
-                this.request(
-                    'mark_seens',
-                    {names: seen},
-                    function(ret) {
-                        if (!ret || !this.$isDataObj(ret)) {
-                            this._seen.push.apply(this._seen, seen);
-                            this.error('Marking alerts as seen has failed.');
-                        } else if (!!ret.error) {
-                            this._seen.push.apply(this._seen, seen);
-                            this._error('Marking alerts as seen raised error.', ret.error);
-                            this.error('Marking alerts as seen has failed.');
-                        } else if (ret.unseen && ret.unseen.length) {
-                            this._seen.push.apply(this._seen, ret.unseen);
-                            this._error('Marking some alerts as seen has failed.', ret.unseen);
-                            this.error('Marking alerts as seen has failed.');
-                        }
-                    },
-                    function(e) {
+            if (!this._seen.length) return this;
+            var seen = this._seen.splice(0, this._seen.length);
+            console.log('Alert mark as seen', seen);
+            this.request(
+                'mark_seens',
+                {names: seen},
+                function(ret) {
+                    if (!ret || !this.$isDataObj(ret)) {
                         this._seen.push.apply(this._seen, seen);
-                        this._error('Marking alerts as seen has failed with error.', e && e.message);
+                        this.error('Marking alerts as seen has failed.');
+                    } else if (!!ret.error) {
+                        this._seen.push.apply(this._seen, seen);
+                        this._error('Marking alerts as seen raised error.', ret.error);
+                        this.error('Marking alerts as seen has failed.');
+                    } else if (ret.unseen && ret.unseen.length) {
+                        this._seen.push.apply(this._seen, ret.unseen);
+                        this._error('Marking some alerts as seen has failed.', ret.unseen);
                         this.error('Marking alerts as seen has failed.');
                     }
-                );
-            }
+                },
+                function(e) {
+                    this._seen.push.apply(this._seen, seen);
+                    this._error('Marking alerts as seen has failed with error.', e && e.message);
+                    this.error('Marking alerts as seen has failed.');
+                }
+            );
             return this;
         }
         
@@ -389,14 +384,20 @@ class Alerts extends AlertsBase {
         if (!frm._alerts.form_disabled)
             return this.emit('form_enabled');
         try {
-            let fields = frm._alerts.fields_disabled;
+            var fields = frm._alerts.fields_disabled;
             if (fields.length) {
-                for (let i = 0, l = frm.fields.length, f; i < l; i++) {
+                for (var i = 0, l = frm.fields.length, f; i < l; i++) {
                     f = frm.fields[i];
                     if (fields.indexOf(f.df.fieldname) < 0) continue;
-                    if (f.df.fieldtype === 'Table')
+                    if (f.df.fieldtype === 'Table') {
                         this.enable_table(frm, f.df.fieldname);
-                    else frm.set_df_property(f.df.fieldname, 'read_only', 0);
+                    } else {
+                        frm.set_df_property(f.df.fieldname, 'read_only', 0);
+                        if (cint(f.df.translatable) && f.$wrapper) {
+                            var $btn = f.$wrapper.find('.clearfix .btn-translation');
+                            if ($btn.length) $btn.show();
+                        }
+                    }
                 }
             }
             if (this._no_workflow(frm, workflow)) frm.enable_save();
@@ -432,16 +433,22 @@ class Alerts extends AlertsBase {
         }
         if (!this.$isStr(msg) || !msg.length) msg = null;
         try {
-            for (let i = 0, l = frm.fields.length, f; i < l; i++) {
+            for (var i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
                 if (
                     cint(f.df.read_only) || cint(f.df.hidden)
                     || ['Tab Break', 'Section Break', 'Column Break'].indexOf(f.df.fieldtype) >= 0
                 ) continue;
                 frm._alerts.fields_disabled.push(f.df.fieldname);
-                if (f.df.fieldtype === 'Table')
+                if (f.df.fieldtype === 'Table') {
                     this.disable_table(frm, f.df.fieldname);
-                else frm.set_df_property(f.df.fieldname, 'read_only', 1);
+                } else {
+                    frm.set_df_property(f.df.fieldname, 'read_only', 0);
+                    if (cint(f.df.translatable) && f.$wrapper) {
+                        var $btn = f.$wrapper.find('.clearfix .btn-translation');
+                        if ($btn.length) $btn.hide();
+                    }
+                }
             }
             if (this._no_workflow(frm, workflow)) frm.disable_save();
             else frm.page.hide_actions_menu();
@@ -468,7 +475,7 @@ class Alerts extends AlertsBase {
     enable_table(frm, key) {
         this.init_form(frm);
         if (!frm._alerts.tables_disabled[key]) return this;
-        let obj = frm._alerts.tables_disabled[key],
+        var obj = frm._alerts.tables_disabled[key],
         grid = frm.get_field(key).grid;
         delete frm._alerts.tables_disabled[key];
         if (!grid) return this;
@@ -498,9 +505,9 @@ class Alerts extends AlertsBase {
     disable_table(frm, key) {
         this.init_form(frm);
         if (frm._alerts.tables_disabled[key]) return this;
-        let field = frm.get_field(key);
+        var field = frm.get_field(key);
         if (!field || !field.df || field.df.fieldtype !== 'Table') return this;
-        let obj = frm._alerts.tables_disabled[key] = {},
+        var obj = frm._alerts.tables_disabled[key] = {},
         grid = field.grid;
         if (!grid) return this;
         if (grid.meta) {
@@ -526,7 +533,7 @@ class Alerts extends AlertsBase {
             grid.header_row.wrapper.hide();
         }
         if (grid.wrapper) {
-            let $btn = grid.wrapper.find('.grid-add-row');
+            var $btn = grid.wrapper.find('.grid-add-row');
             if ($btn.length && $btn.is(':visible')) {
                 obj.add_row = 1;
                 $btn.hide();

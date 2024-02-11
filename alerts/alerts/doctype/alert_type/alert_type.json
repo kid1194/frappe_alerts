@@ -10,10 +10,10 @@
   "main_section",
   "disabled",
   "main_column",
-  "control_section",
+  "options_section",
   "display_priority",
   "display_timeout",
-  "control_column",
+  "options_column",
   "display_sound",
   "custom_display_sound",
   "style_section",
@@ -41,9 +41,9 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "control_section",
+   "fieldname": "options_section",
    "fieldtype": "Section Break",
-   "label": "Control"
+   "label": "Options"
   },
   {
    "fieldname": "display_priority",
@@ -66,7 +66,7 @@
    "read_only_depends_on": "eval:doc.disabled"
   },
   {
-   "fieldname": "control_column",
+   "fieldname": "options_column",
    "fieldtype": "Column Break"
   },
   {
@@ -120,7 +120,7 @@
   }
  ],
  "icon": "fa fa-bell-o",
- "modified": "2024-01-27 04:04:04.119400",
+ "modified": "2024-02-11 04:04:04.119400",
  "modified_by": "Administrator",
  "module": "Alerts",
  "name": "Alert Type",

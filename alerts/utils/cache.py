@@ -7,8 +7,25 @@
 import frappe
 
 
+# [Alert]
+def get_cache(dt, key):
+    return frappe.cache().hget(dt, key)
+
+
+# [Alert]
+def set_cache(dt, key, data):
+    frappe.cache().hset(dt, key, data)
+
+
+# [Alert]
+def del_cache(dt, key):
+    frappe.cache().hdel(dt, key)
+    clear_cache(f"{dt}-{key}")
+
+
 # [Internal]
 def clear_cache(dt):
+    frappe.cache().delete_keys(dt)
     frappe.cache().delete_key(dt)
 
 
@@ -16,7 +33,6 @@ def clear_cache(dt):
 def clear_doc_cache(dt, name=None):
     if name is None:
         name = dt
-    
     frappe.clear_cache(doctype=dt)
     frappe.clear_document_cache(dt, name)
     clear_cache(dt)
@@ -31,20 +47,10 @@ def get_cached_doc(dt, name=None, for_update=False):
     if name is None:
         name = dt
     
-    if for_update:
-        clear_doc_cache(dt, name)
-    
     if dt != name and not frappe.db.exists(dt, name):
         return None
     
+    if for_update:
+        clear_doc_cache(dt, name)
+    
     return frappe.get_cached_doc(dt, name, for_update=for_update)
-
-
-# [Alert]
-def get_tmp_cache(key):
-    return frappe.cache().get_value(key, expires=True)
-
-
-# [Alert]
-def set_tmp_cache(key, data, expiry):
-    frappe.cache().set_value(key, data, expires_in_sec=expiry)

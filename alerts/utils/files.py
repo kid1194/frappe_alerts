@@ -51,4 +51,5 @@ def files_delete(doctype, name, files):
                 not v["attached_to_name"] or
                 v["attached_to_name"] in name
             ):
-                frappe.get_doc(dt, v["name"]).delete(ignore_permissions=True)
+                (frappe.get_doc(dt, v["name"])
+                    .delete(ignore_permissions=True))

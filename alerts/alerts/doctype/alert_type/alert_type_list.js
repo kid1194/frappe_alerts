@@ -24,10 +24,11 @@ frappe.listview_settings['Alert Type'] = {
         try {
             list.orig_get_args = list.get_args;
             list.get_args = function() {
-                var args = this.orig_get_args();
-                if (this.doctype === 'Alert Type') {
-                    var field = frappe.model.get_full_column_name('disabled', this.doctype);
-                    if (args.fields.indexOf(field) < 0) args.fields.push(field);
+                var args = this.orig_get_args(),
+                dt = this.doctype;
+                if (dt === 'Alert Type') {
+                    dt = frappe.model.get_full_column_name('disabled', dt);
+                    if (args.fields.indexOf(dt) < 0) args.fields.push(dt);
                 }
                 return args;
             };
@@ -39,7 +40,7 @@ frappe.listview_settings['Alert Type'] = {
     },
     get_indicator: function(doc) {
         return cint(doc.disabled) > 0
-            ? ['Disabled', 'red', 'disabled,=,1']
-            : ['Enabled', 'green', 'disabled,=,0'];
+            ? ['Disabled', 'red', 'disabled,=,1|docstatus,=,0']
+            : ['Enabled', 'green', 'disabled,=,0|docstatus,=,0'];
     },
 };

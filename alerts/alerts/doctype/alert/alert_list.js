@@ -27,11 +27,11 @@ frappe.listview_settings['Alert'] = {
             list.get_args = function() {
                 var args = this.orig_get_args(),
                 dt = this.doctype;
-                if (!args.fields) args.fields = [];
                 if (dt === 'Alert') {
-                    $.each(['reached', 'status'], function(i, k) {
-                        let field = frappe.model.get_full_column_name(k, dt);
-                        if (args.fields.indexOf(field) < 0) args.fields.push(field);
+                    if (!args.fields) args.fields = [];
+                    ['reached', 'status'].forEach(function(f) {
+                        f = frappe.model.get_full_column_name(f, dt);
+                        if (args.fields.indexOf(f) < 0) args.fields.push(f);
                     });
                 }
                 return args;
@@ -39,21 +39,20 @@ frappe.listview_settings['Alert'] = {
             list.setup_columns();
             list.refresh(true);
         } catch(e) {
-            console.error('[Alerts][Alert List]: Onload error', e.message, e.stack);
+            frappe.alerts._error('Alert List: Onload error', e.message, e.stack);
         }
     },
     get_indicator: function(doc) {
-        var docstatus = cint(doc.docstatus);
-        if (docstatus === 2)
-            return ['Cancelled', 'red', 'docstatus,=,2'];
-        
-        var status = cstr(doc.status);
+        var status = cstr(doc.status),
+        docstatus = cint(doc.docstatus);
         return [
-            status,
+            __(status),
             {
-                'pending': 'gray',
+                'draft': 'gray',
+                'pending': 'orange',
                 'active': 'green',
                 'finished': 'blue',
+                'cancelled': 'red',
             }[status.toLowerCase()],
             'status,=,\'' + status + '\'|docstatus,=,' + docstatus
         ];
@@ -63,7 +62,7 @@ frappe.listview_settings['Alert'] = {
             return __(cint(v) ? 'Yes' : 'No');
         },
         reached: function(v, df, doc) {
-            return cint(doc.docstatus) > 0 ? cint(v) || 0 : 0;
+            return cint(doc.reached);
         },
     },
 };

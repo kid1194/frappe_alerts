@@ -23,7 +23,7 @@ def type_join_query(qry, join_column):
     from pypika.enums import Order
     
     doc = frappe.qb.DocType(_type_dt_)
-    qry = (
+    return (
         qry.select(
             doc.display_priority,
             doc.display_timeout,
@@ -39,7 +39,6 @@ def type_join_query(qry, join_column):
         .where(doc.disabled == 0)
         .orderby(doc.display_priority, order=Order.desc)
     )
-    return qry
 
 
 # [Install]

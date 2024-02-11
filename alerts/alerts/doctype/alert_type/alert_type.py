@@ -10,9 +10,7 @@ from frappe.model.document import Document
 
 from alerts.utils import (
     clear_doc_cache,
-    doc_count,
-    delete_files,
-    type_alerts_exists
+    doc_count
 )
 
 
@@ -37,13 +35,11 @@ class AlertType(Document):
     
     def before_save(self):
         clear_doc_cache(self.doctype, self.name)
-        
         old = self._get_old_doc()
         if old:
             old_name = self._get_old_name(old)
             if old_name:
                 clear_doc_cache(self.doctype, old_name)
-            
             if (
                 old.custom_display_sound and
                 old.custom_display_sound != self.custom_display_sound
@@ -52,24 +48,28 @@ class AlertType(Document):
                 if old_name:
                     names.append(old_name)
                 
+                from alerts.utils import delete_files
+                
                 delete_files(self.doctype, names, [old.custom_display_sound])
     
     
     def on_trash(self):
+        from alerts.utils import type_alerts_exists
+        
         if type_alerts_exists(self.name):
             throw(_("An alert type with existing linked alerts cannot be removed."))
         
         if self.custom_display_sound:
+            from alerts.utils import delete_files
+            
             delete_files(self.doctype, self.name, [self.custom_display_sound])
     
     
     def _set_defaults(self):
         if cint(self.display_priority) < 0:
             self.display_priority = 0
-        
         if cint(self.display_timeout) < 0:
             self.display_timeout = 0
-        
         if self.display_sound != "Custom":
             self.custom_display_sound = None
     
@@ -77,20 +77,16 @@ class AlertType(Document):
     def _get_old_doc(self):
         if self.is_new():
             return None
-        
         doc = self.get_doc_before_save()
         if not doc:
             self.load_doc_before_save()
             doc = self.get_doc_before_save()
-        
         return doc
     
     
     def _get_old_name(self, doc=None):
         if not doc:
             doc = self._get_old_doc()
-        
         if doc and doc.name and doc.name != self.name:
             return doc.name
-        
         return None
