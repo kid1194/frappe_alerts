@@ -742,7 +742,9 @@ class AlertsDialog extends AlertsBase {
     reset() {
         this.hide();
         if (this._dialog) {
-            this._dialog.$wrapper.modal('destroy');
+            try {
+                this._dialog.$wrapper.modal('destroy');
+            } catch(_) {}
             this._dialog.$wrapper.remove();
         }
         this._dialog = null;
