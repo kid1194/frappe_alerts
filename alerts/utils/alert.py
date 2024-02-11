@@ -60,6 +60,7 @@ def get_user_alerts(user: str):
     udoc = frappe.qb.DocType("Alert For User")
     rdoc = frappe.qb.DocType("Alert For Role")
     sdoc = frappe.qb.DocType("Alert Seen By")
+    cdoc = frappe.qb.DocType("Alert Seen By")
     
     uqry = (
         frappe.qb.from_(udoc)
@@ -89,12 +90,12 @@ def get_user_alerts(user: str):
         .where(sdoc.date == today)
     )
     cqry = (
-        frappe.qb.from_(sdoc)
-        .select(Count(sdoc.parent))
-        .where(sdoc.parent == doc.name)
-        .where(sdoc.parenttype == _alert_dt_)
-        .where(sdoc.parentfield == "seen_by")
-        .where(sdoc.user == user)
+        frappe.qb.from_(cdoc)
+        .select(Count(cdoc.parent))
+        .where(cdoc.parent == doc.name)
+        .where(cdoc.parenttype == _alert_dt_)
+        .where(cdoc.parentfield == "seen_by")
+        .where(cdoc.user == user)
         .limit(1)
     )
     qry = (
