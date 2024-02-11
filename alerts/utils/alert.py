@@ -96,9 +96,9 @@ def get_alerts_for_user(user: str, parents: list):
         .where(doc.parenttype == _alert_dt_)
         .where(doc.parentfield == "for_users")
         .where(doc.user == user)
-    ).run(as_dict=True)
+    ).run(as_dict=False)
     if data and isinstance(data, list):
-        parents.extend(data)
+        parents.extend([v[0] for v in data])
 
 
 # [Internal]
@@ -111,9 +111,9 @@ def get_alerts_for_roles(user: str, parents: list):
         .where(doc.parenttype == _alert_dt_)
         .where(doc.parentfield == "for_roles")
         .where(doc.role.isin(frappe.get_roles(user)))
-    ).run(as_dict=True)
+    ).run(as_dict=False)
     if data and isinstance(data, list):
-        parents.extend(data)
+        parents.extend([v[0] for v in data])
 
 
 # [Internal]
