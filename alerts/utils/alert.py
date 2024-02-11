@@ -76,7 +76,8 @@ def get_user_alerts(user: str):
         seen_by = get_alerts_seen_by(user, parents)
         if seen_by:
             data = filter_alerts_seen_by(data, seen_by, today)
-        
+        from .common import log_error
+        log_error(str({"alert": data, "seen_by": seen_by}))
         return data
     
     return None
@@ -179,6 +180,8 @@ def get_alerts_cache(user):
 # [Internal]
 def delayed_show_alerts(user: str):
     data = get_user_alerts(user)
+    if not (data is None):
+        set_cached_alerts(user, data)
     if data:
         frappe.publish_realtime(
             event="alerts_show",
