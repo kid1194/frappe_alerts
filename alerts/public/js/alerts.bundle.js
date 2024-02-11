@@ -58,12 +58,10 @@ class Alerts extends AlertsBase {
         $(window).on('hashchange', this._on_deatroy);
         window.addEventListener('popstate', this._on_deatroy);
         
-        console.log('Router', frappe.get_route());
-        if (
-            !!frappe.get_route()
-            && (frappe.get_route_str() || '').indexOf('Alerts Settings') >= 0
-        ) this._setup(true);
-        else this.request('is_enabled', null, this._setup);
+        if (cstr(window.location.pathname).indexOf('Alerts%20Settings') >= 0)
+            this._setup(true);
+        else
+            this.request('is_enabled', null, this._setup);
     }
     mock() {
         this._mock = this._mock || new AlertsMock();
@@ -395,8 +393,13 @@ class Alerts extends AlertsBase {
                         this.enable_table(frm, f.df.fieldname);
                     } else {
                         frm.set_df_property(f.df.fieldname, 'read_only', 0);
-                        if (cint(f.df.translatable) && f.$wrapper) {
-                            var $btn = f.$wrapper.find('.clearfix .btn-translation');
+                        if (
+                            cint(f.df.translatable)
+                            && frm.fields_dict[f.df.fieldname]
+                            && frm.fields_dict[f.df.fieldname].$wrapper
+                        ) {
+                            var $btn = frm.fields_dict[f.df.fieldname]
+                                .$wrapper.find('.clearfix .btn-translation');
                             if ($btn.length) $btn.show();
                         }
                     }
@@ -446,8 +449,13 @@ class Alerts extends AlertsBase {
                     this.disable_table(frm, f.df.fieldname);
                 } else {
                     frm.set_df_property(f.df.fieldname, 'read_only', 0);
-                    if (cint(f.df.translatable) && f.$wrapper) {
-                        var $btn = f.$wrapper.find('.clearfix .btn-translation');
+                    if (
+                        cint(f.df.translatable)
+                        && frm.fields_dict[f.df.fieldname]
+                        && frm.fields_dict[f.df.fieldname].$wrapper
+                    ) {
+                        var $btn = frm.fields_dict[f.df.fieldname]
+                            .$wrapper.find('.clearfix .btn-translation');
                         if ($btn.length) $btn.hide();
                     }
                 }
