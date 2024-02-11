@@ -48,61 +48,14 @@ def get_user_alerts_list():
 
 # [Internal]
 def get_user_alerts(user: str):
-    from pypika.functions import IfNull
-    from pypika.terms import Criterion
-    
-    from frappe.query_builder.functions import Count
-    
-    from .type import type_join_query
+    parents = []
+    get_alerts_for_user(user, parents)
+    get_alerts_for_roles(user, parents)
+    if not parents:
+        return None
     
     today = nowdate()
     doc = frappe.qb.DocType(_alert_dt_)
-    udoc = frappe.qb.DocType("Alert For User")
-    rdoc = frappe.qb.DocType("Alert For Role")
-    sdoc = frappe.qb.DocType("Alert Seen By")
-    cdoc = frappe.qb.DocType("Alert Seen By")
-    
-    parents = []
-    u_parents = (
-        frappe.qb.from_(udoc)
-        .select(udoc.parent)
-        .distinct()
-        .where(udoc.parenttype == _alert_dt_)
-        .where(udoc.parentfield == "for_users")
-        .where(udoc.user == user)
-    ).run(as_dict=True)
-    if u_parents and isinstance(u_parents, list):
-        parents.extend(u_parents)
-    
-    r_parents = (
-        frappe.qb.from_(rdoc)
-        .select(rdoc.parent)
-        .distinct()
-        .where(rdoc.parenttype == _alert_dt_)
-        .where(rdoc.parentfield == "for_roles")
-        .where(rdoc.role.isin(frappe.get_roles(user)))
-    ).run(as_dict=True)
-    if r_parents and isinstance(r_parents, list):
-        parents.extend(r_parents)
-    
-    not_parents = (
-        frappe.qb.from_(sdoc)
-        .select(sdoc.parent)
-        .where(sdoc.parenttype == _alert_dt_)
-        .where(sdoc.parentfield == "seen_by")
-        .where(sdoc.user == user)
-        .where(sdoc.date == today)
-    ).run(as_dict=True)
-    
-    cqry = (
-        frappe.qb.from_(cdoc)
-        .select(Count(cdoc.parent))
-        .where(cdoc.parent == doc.name)
-        .where(cdoc.parenttype == _alert_dt_)
-        .where(cdoc.parentfield == "seen_by")
-        .where(cdoc.user == user)
-        .limit(1)
-    )
     qry = (
         frappe.qb.from_(doc)
         .select(
@@ -110,21 +63,96 @@ def get_user_alerts(user: str):
             doc.title,
             doc.alert_type,
             doc.message,
-            doc.is_repeatable
+            doc.is_repeatable,
+            doc.number_of_repeats
         )
+        .where(doc.name.isin(parents))
         .where(doc.status == "Active")
         .where(doc.from_date.lte(today))
         .where(doc.until_date.gte(today))
         .where(doc.docstatus == 1)
-        .where(doc.number_of_repeats.gte(IfNull(cqry, 0)))
     )
-    if parents:
-        qry = qry.where(doc.name.isin(parents))
-    if not_parents and isinstance(not_parents, list):
-        qry = qry.where(doc.name.notin(not_parents))
+    
+    from .type import type_join_query
+    
     qry = type_join_query(qry, doc.alert_type)
+    
     data = qry.run(as_dict=True)
+    if data and isinstance(data, list):
+        seen_by = get_alerts_seen_by(user, parents)
+        if seen_by:
+            data = filter_alerts_seen_by(data, seen_by, today)
+    
     return data if isinstance(data, list) else None
+
+
+# [Internal]
+def get_alerts_for_user(user: str, parents: list):
+    doc = frappe.qb.DocType("Alert For User")
+    data = (
+        frappe.qb.from_(doc)
+        .select(doc.parent)
+        .distinct()
+        .where(doc.parenttype == _alert_dt_)
+        .where(doc.parentfield == "for_users")
+        .where(doc.user == user)
+    ).run(as_dict=True)
+    if data and isinstance(data, list):
+        parents.extend(data)
+
+
+# [Internal]
+def get_alerts_for_roles(user: str, parents: list):
+    doc = frappe.qb.DocType("Alert For Role")
+    data = (
+        frappe.qb.from_(doc)
+        .select(doc.parent)
+        .distinct()
+        .where(doc.parenttype == _alert_dt_)
+        .where(doc.parentfield == "for_roles")
+        .where(doc.role.isin(frappe.get_roles(user)))
+    ).run(as_dict=True)
+    if data and isinstance(data, list):
+        parents.extend(data)
+
+
+# [Internal]
+def get_alerts_seen_by(user: str, parents: list):
+    doc = frappe.qb.DocType("Alert Seen By")
+    data = (
+        frappe.qb.from_(doc)
+        .select(doc.parent, doc.date)
+        .where(doc.parenttype == _alert_dt_)
+        .where(doc.parentfield == "seen_by")
+        .where(doc.user == user)
+        .where(doc.parent.isin(parents))
+    ).run(as_dict=True)
+    if data and isinstance(data, list):
+        return data
+    return None
+
+
+# [Internal]
+def filter_alerts_seen_by(data: list, seen_by: list, today):
+    data = {v["name"]:v for v in data}
+    totals = {}
+    for v in seen_by:
+        if v["date"] == today:
+            data.pop(v["parent"], None)
+        else:
+            if v["parent"] not in totals:
+                totals[v["parent"]] = 0
+            totals[v["parent"]] += 1
+            d = data.get(v["parent"], None)
+            if (
+                d and (
+                    not cint(d["is_repeatable"]) or
+                    cint(d["number_of_repeats"]) <= totals[v["parent"]]
+                )
+            ):
+                data.pop(v["parent"], None)
+    
+    return list(data.values())
 
 
 # [Access]
