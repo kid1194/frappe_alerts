@@ -242,7 +242,7 @@ def mark_seens(names):
         }
     
     user = frappe.session.user
-    ret = {"success": 1}
+    data = {"success": 1}
     unseen = []
     for v in names:
         if v and isinstance(v, str):
@@ -251,9 +251,9 @@ def mark_seens(names):
                 unseen.append(v)
     
     if unseen:
-        ret["unseen"] = unseen
+        data["unseen"] = unseen
     
-    return ret
+    return data
 
 
 # [Internal]
