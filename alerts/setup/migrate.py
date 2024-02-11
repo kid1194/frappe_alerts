@@ -34,11 +34,11 @@ def after_migrate():
         if doc:
             chg = 0
             for k in ("title_color", "content_color"):
-                if doc[k] == "#FFF":
-                    doc[k] = "#FFFFFF"
+                if doc.get(k) == "#FFF":
+                    doc.set(k, "#FFFFFF")
                     chg += 1
-                elif doc[k] == "#000":
-                    doc[k] = "#000000"
+                elif doc.get(k) == "#000":
+                    doc.set(k, "#000000")
                     chg += 1
             if chg:
                 doc.save(ignore_permissions=True)
