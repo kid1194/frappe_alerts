@@ -105,8 +105,8 @@ def get_user_alerts(user: str):
         .where(doc.until_date.gte(today))
         .where(doc.docstatus == 1)
         .where(Criterion.any([
-            doc.name.in(uqry),
-            doc.name.in(rqry)
+            doc.name.isin(uqry),
+            doc.name.isin(rqry)
         ]))
         .where(doc.name.notin(sqry))
         .where(Criterion.any([
