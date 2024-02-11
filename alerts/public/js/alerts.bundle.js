@@ -6,9 +6,6 @@
 */
 
 
-frappe.provide('frappe.alerts');
-
-
 class AlertsBase {
     $type(v) {
         if (v == null) return v === void 0 ? 'Undefined' : 'Null';
@@ -132,7 +129,10 @@ class Alerts extends AlertsBase {
         .on('alerts_show', function(ret) {
             console.log('alerts_show', ret);
             if (this.is_enabled && (this.$isArr(ret) || this._is_valid(ret)))
-                this.show(ret);
+                new Promise(this.$fn(function(res, rej) {
+                    this.show(ret);
+                    res();
+                }));
         });
         this.emit('ready');
     }
