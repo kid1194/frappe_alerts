@@ -67,7 +67,7 @@ class Alert(Document):
     
     def _set_defaults(self):
         if not self.from_date:
-            from frappe.utils nowdate
+            from frappe.utils import nowdate
             
             self.from_date = nowdate()
         if not self.until_date:
