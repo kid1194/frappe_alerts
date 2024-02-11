@@ -52,8 +52,8 @@ class Alerts extends AlertsBase {
         
         this._on_deatroy = this.$fn(this.destroy);
         window.addEventListener('beforeunload', this._on_deatroy);
-        $(window).on('hashchange', this._on_deatroy);
-        window.addEventListener('popstate', this._on_deatroy);
+        //$(window).on('hashchange', this._on_deatroy);
+        //window.addEventListener('popstate', this._on_deatroy);
         
         if (cstr(window.location.pathname).indexOf('Alerts%20Settings') >= 0)
             this._setup(true);
@@ -164,7 +164,6 @@ class Alerts extends AlertsBase {
         if (!this._list.length) {
             if (!this._seen.length) return this;
             var seen = this._seen.splice(0, this._seen.length);
-            console.log('Alert mark as seen', seen);
             this.request(
                 'mark_seens',
                 {names: seen},
@@ -172,13 +171,15 @@ class Alerts extends AlertsBase {
                     if (!ret || !this.$isDataObj(ret)) {
                         this._seen.push.apply(this._seen, seen);
                         this.error('Marking alerts as seen has failed.');
-                    } else if (!!ret.error) {
+                    } else if (!!ret.success) {
+                        if (ret.unseen && ret.unseen.length) {
+                            this._seen.push.apply(this._seen, ret.unseen);
+                            this._error('Marking some alerts as seen has failed.', ret.unseen);
+                            this.error('Marking alerts as seen has failed.');
+                        }
+                    } else {
                         this._seen.push.apply(this._seen, seen);
-                        this._error('Marking alerts as seen raised error.', ret.error);
-                        this.error('Marking alerts as seen has failed.');
-                    } else if (ret.unseen && ret.unseen.length) {
-                        this._seen.push.apply(this._seen, ret.unseen);
-                        this._error('Marking some alerts as seen has failed.', ret.unseen);
+                        this._error('Marking alerts as seen raised error.');
                         this.error('Marking alerts as seen has failed.');
                     }
                 },
@@ -191,14 +192,15 @@ class Alerts extends AlertsBase {
             return this;
         }
         
+        if (!this._dialog)
+            this._dialog = new AlertsDialog(this._id, 'alerts-dialog-' + this._id);
+        
         var data = this._list.shift();
-        if (!this._dialog) this._dialog = new AlertsDialog(this._id, 'alerts-dialog-' + this._id);
-        console.log('Alert build', data);
         this._dialog
             .setName(data.name)
             .setTitle(data.title)
             .setMessage(data.message)
-            .setType(data.type)
+            .setType(data)
             .onShow(this.$fn(function() {
                 this._seen.push(this._dialog.name);
                 console.log('Alert show', this._seen);
@@ -765,10 +767,13 @@ class AlertsStyle extends AlertsBase {
         super();
         this._id = 'style-' + id;
         this._class = _class;
-        this._dom = document.createElement('style');
-        this._dom.id = this._id;
-        this._dom.type = 'text/css';
-        document.getElementsByTagName('head')[0].appendChild(this._dom);
+        this._dom = document.getElementById(this._id);
+        if (!this._dom) {
+            this._dom = document.createElement('style');
+            this._dom.id = this._id;
+            this._dom.type = 'text/css';
+            document.getElementsByTagName('head')[0].appendChild(this._dom);
+        }
     }
     build(data) {
         if (!this.$isDataObj(data) || this.$isEmptyObj(data)) return this;
@@ -807,17 +812,22 @@ class AlertsStyle extends AlertsBase {
         return this;
     }
     destroy() {
-        if (this._dom) this._dom.parentNode.removeChild(this._dom);
+        if (this._dom)
+            this._dom.parentNode.removeChild(this._dom);
         super.destroy();
     }
 }
 
 
 window.addEventListener('load', function() {
-    var el = document.createElement('script');
-    el.src = 'https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js';
-    el.type = 'text/javascript';
-    document.getElementsByTagName('head')[0].appendChild(el);
+    var el = document.getElementById('promise-polyfill');
+    if (!el) {
+        el = document.createElement('script');
+        el.id = 'promise-polyfill';
+        el.src = 'https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js';
+        el.type = 'text/javascript';
+        document.getElementsByTagName('head')[0].appendChild(el);
+    }
 });
 $(document).ready(function() {
     frappe.alerts = new Alerts();

@@ -23,8 +23,8 @@ def after_sync():
             "display_sound": "Alert",
             "background": "#DC3545",
             "border_color": "#A71D2A",
-            "title_color": "#FFF",
-            "content_color": "#FFF"
+            "title_color": "#FFFFFF",
+            "content_color": "#FFFFFF"
         },
         {
             "name": "Warning",
@@ -33,8 +33,8 @@ def after_sync():
             "display_sound": "Alert",
             "background": "#FFC107",
             "border_color": "#BA8B00",
-            "title_color": "#000",
-            "content_color": "#000"
+            "title_color": "#000000",
+            "content_color": "#000000"
         },
         {
             "name": "Notice",
@@ -43,31 +43,28 @@ def after_sync():
             "display_sound": "Alert",
             "background": "#17A2B8",
             "border_color": "#0F6674",
-            "title_color": "#FFF",
-            "content_color": "#FFF"
+            "title_color": "#FFFFFF",
+            "content_color": "#FFFFFF"
         }
     ]
     for data in types:
         add_type(data)
     
     doc = settings()
-    
     managers = get_system_managers(only_name=True)
     if managers:
-        doc.send_update_notification = 1
-        
+        idx = 0
         if "Administrator" in managers:
-            sender = "Administrator"
-        else:
-            sender = managers[0]
+            idx = managers.index("Administrator")
+        sender = managers.pop(idx)
         
         doc.update_notification_sender = sender
         
         if doc.update_notification_receivers:
             doc.update_notification_receivers.clear()
         
-        for manager in managers:
-            if manager != sender:
+        if manager:
+            for manager in managers:
                 doc.append(
                     "update_notification_receivers",
                     {"user": manager}
@@ -75,6 +72,8 @@ def after_sync():
         
         if not doc.update_notification_receivers:
             doc.send_update_notification = 0
+        else:
+            doc.send_update_notification = 1
             
     else:
         doc.send_update_notification = 0

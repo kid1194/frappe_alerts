@@ -26,3 +26,19 @@ def after_migrate():
         doc.has_update = 0
         
         doc.save(ignore_permissions=True)
+    
+    from alerts.utils.type import get_type
+    
+    for v in ("Urgent", "Warning", "Notice"):
+        doc = get_type(v)
+        if doc:
+            chg = 0
+            for k in ("title_color", "content_color"):
+                if doc[k] == "#FFF":
+                    doc[k] = "#FFFFFF"
+                    chg += 1
+                elif doc[k] == "#000":
+                    doc[k] = "#000000"
+                    chg += 1
+            if chg:
+                doc.save(ignore_permissions=True)

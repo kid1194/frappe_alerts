@@ -11,11 +11,29 @@ import frappe
 _type_dt_ = "Alert Type"
 
 
-# [Alert, Internal]
+# [Internal, Migrate]
 def get_type(name: str):
-    from .common import get_cached_doc
+    from .cache import get_cached_doc
     
     return get_cached_doc(_type_dt_, name)
+
+
+# [Alert]
+def add_type_data(name: str, data: dict):
+    doc = get_type(name)
+    if doc:
+        from frappe.utils import cint, cstr
+        
+        data.update({
+            "display_priority": cint(doc.display_priority),
+            "display_timeout": cint(doc.display_timeout),
+            "display_sound": cstr(doc.display_sound),
+            "custom_display_sound": cstr(doc.custom_display_sound),
+            "background": cstr(doc.background),
+            "border_color": cstr(doc.border_color),
+            "title_color": cstr(doc.title_color),
+            "content_color": cstr(doc.content_color)
+        })
 
 
 # [Alert]

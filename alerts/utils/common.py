@@ -42,7 +42,7 @@ def doc_count(dt, filters: dict):
     return frappe.db.count(dt, filters)
 
 
-# [Files, Query, Update]
+# [Alert, Files, Query, Update]
 def parse_json(data, default=None):
     if not data or not isinstance(data, str):
         return default

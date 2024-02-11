@@ -189,7 +189,7 @@ def delayed_show_alerts(user: str):
 
 # [Alerts Alert]
 def send_alert(doc):
-    from .type import get_type
+    from .type import add_type_data
     
     user = frappe.session.user
     data = frappe._dict({
@@ -203,7 +203,7 @@ def send_alert(doc):
     if is_valid_user(doc, user):
         cache_alert(user, data)
     
-    data.type = get_type(doc.alert_type)
+    add_type_data(doc.alert_type, data)
     data.number_of_repeats = cint(doc.number_of_repeats)
     data.users = [v.user for v in doc.for_users]
     data.roles = [v.role for v in doc.for_roles]
@@ -230,8 +230,16 @@ def send_alert(doc):
 # [Alerts Js]
 @frappe.whitelist(methods=["POST"])
 def mark_seens(names):
+    if names and isinstance(names, str):
+        from .common import parse_json
+        
+        names = parse_json(names)
+    
     if not names or not isinstance(names, list):
-        return {"error": "Invalid arguments"}
+        return {
+            "error": 1,
+            "message": "Invalid arguments"
+        }
     
     user = frappe.session.user
     ret = {"success": 1}
