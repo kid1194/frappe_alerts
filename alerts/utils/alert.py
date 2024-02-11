@@ -247,7 +247,7 @@ def mark_seens(names):
     for v in names:
         if v and isinstance(v, str):
             ret = mark_as_seen(v, user)
-            if not st:
+            if not ret:
                 unseen.append(v)
     
     if unseen:

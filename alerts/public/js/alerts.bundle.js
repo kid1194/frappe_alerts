@@ -665,6 +665,9 @@ class AlertsDialog extends AlertsBase {
                 preload: 'auto',
             });
             $('body').append(this.$sound);
+            this.$sound.click(function(e) {
+                try { $(e.target).play(); } catch(_) {}
+            });
         }
         this.$sound
             .off('canplaythrough')
@@ -726,7 +729,7 @@ class AlertsDialog extends AlertsBase {
         if (!this.$sound) return this;
         if (this._sound.loaded) {
             this._sound.playing = 1;
-            try { this.$sound[0].play(); } catch(_) {}
+            this.$sound.click();
             return this;
         }
         this.stopSound();
