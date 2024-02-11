@@ -48,6 +48,7 @@ class Alerts extends AlertsBase {
         this._dialog = null;
         this._list = [];
         this._seen = [];
+        this._seen_retry = 0;
         this._mock = null;
         
         this._on_deatroy = this.$fn(this.destroy);
@@ -127,7 +128,6 @@ class Alerts extends AlertsBase {
             if (this.is_enabled !== old) this.emit('change');
         })
         .on('alerts_show', function(ret) {
-            console.log('alerts_show', ret);
             if (this.is_enabled && this.$isDataObj(ret)) {
                 if (this.$isArr(ret.alerts)) this.show(ret.alerts);
                 else if (this._is_valid(ret)) this.show(ret);
@@ -170,23 +170,24 @@ class Alerts extends AlertsBase {
                 function(ret) {
                     if (!ret || !this.$isDataObj(ret)) {
                         this._seen.push.apply(this._seen, seen);
-                        this.error('Marking alerts as seen has failed.');
+                        this._error('Marking alerts as seen error.', ret, seen);
+                        this._build_retry();
                     } else if (!!ret.success) {
                         if (ret.unseen && ret.unseen.length) {
                             this._seen.push.apply(this._seen, ret.unseen);
-                            this._error('Marking some alerts as seen has failed.', ret.unseen);
-                            this.error('Marking alerts as seen has failed.');
+                            this._error('Marking alerts as seen error.', ret, seen);
+                            this._build_retry();
                         }
                     } else {
                         this._seen.push.apply(this._seen, seen);
-                        this._error('Marking alerts as seen raised error.');
-                        this.error('Marking alerts as seen has failed.');
+                        this._error('Marking alerts as seen error.', ret, seen);
+                        this._build_retry();
                     }
                 },
                 function(e) {
                     this._seen.push.apply(this._seen, seen);
-                    this._error('Marking alerts as seen has failed with error.', e && e.message);
-                    this.error('Marking alerts as seen has failed.');
+                    this._error('Marking alerts as seen error.', seen, e && e.message);
+                    this._build_retry();
                 }
             );
             return this;
@@ -200,15 +201,33 @@ class Alerts extends AlertsBase {
             .setName(data.name)
             .setTitle(data.title)
             .setMessage(data.message)
-            .setType(data)
+            .setStyle(
+                data.background,
+                dota.border_color,
+                data.title_color,
+                data.content_color
+            )
+            .setTimeout(data.display_timeout)
+            .setSound(
+                data.display_sound,
+                data.custom_display_sound
+            )
             .onShow(this.$fn(function() {
                 this._seen.push(this._dialog.name);
-                console.log('Alert show', this._seen);
             }))
             .onHide(this.$fn(this._build), 200)
             .render()
             .show();
         return this;
+    }
+    _build_retry() {
+        if (!this._seen_retry) {
+            this._seen_retry++;
+            window.setTimeout(this.$fn(this._build), 2000);
+        } else {
+            this._seen_retry = 0;
+            this.error('Alerts app is currently facing a problem.');
+        }
     }
     destroy() {
         frappe.alerts = null;
@@ -588,7 +607,17 @@ class AlertsMock extends AlertsBase {
         this._dialog
             .setTitle(data.name)
             .setMessage('This is a mock alert message.')
-            .setType(data)
+            .setStyle(
+                data.background,
+                dota.border_color,
+                data.title_color,
+                data.content_color
+            )
+            .setTimeout(data.display_timeout)
+            .setSound(
+                data.display_sound,
+                data.custom_display_sound
+            )
             .render()
             .show();
         return this;
@@ -644,6 +673,11 @@ class AlertsDialog extends AlertsBase {
         this._style.build(type);
         this.setTimeout(type.display_timeout);
         this.setSound(type.display_sound, type.custom_display_sound);
+        return this;
+    }
+    setStyle(background, border, title, content) {
+        if (!this._style) this._style = new AlertsStyle(this._id, this._class);
+        this._style.build(background, border, title, content);
         return this;
     }
     setTimeout(sec) {
@@ -778,30 +812,29 @@ class AlertsStyle extends AlertsBase {
             document.getElementsByTagName('head')[0].appendChild(this._dom);
         }
     }
-    build(data) {
-        if (!this.$isDataObj(data) || this.$isEmptyObj(data)) return this;
+    build(background, border, title, content) {
         var sel = '.$0>.modal-dialog>.modal-content'.replace('$0', this._class),
         css = [];
-        if (this.$isStr(data.background) && data.background.length)
-            css.push('$0{background:$1!important}'.replace('$0', sel).replace('$1', data.background));
-        if (this.$isStr(data.border_color) && data.border_color.length)
+        if (this.$isStr(background) && background.length)
+            css.push('$0{background:$1!important}'.replace('$0', sel).replace('$1', background));
+        if (this.$isStr(border) && border.length)
             css.push(
                 '$0,$0>.modal-header,$0>.modal-footer{border:1px solid $1!important}'
-                .replace(/\$0/g, sel).replace('$1', data.border_color)
+                .replace(/\$0/g, sel).replace('$1', border)
             );
-        if (this.$isStr(data.title_color) && data.title_color.length)
+        if (this.$isStr(title) && title.length)
             css.push(
                 ('$0>$1>$2>.modal-title{color:$3!important}'
                 + '$0>$1>$2>.indicator::before{background:$3!important}'
                 + '$0>$1>.modal-actions>.btn{color:$3!important}')
                 .replace(/\$0/g, sel).replace(/\$1/g, '.modal-header')
-                .replace(/\$2/g, '.title-section').replace(/\$3/g, data.title_color)
+                .replace(/\$2/g, '.title-section').replace(/\$3/g, title)
             );
-        if (this.$isStr(data.content_color) && data.content_color.length)
+        if (this.$isStr(content) && content.length)
             css.push(
                 '$0>$1,$0>$1>.alerts-message{color:$2!important}'
                 .replace(/\$0/g, sel).replace(/\$1/g, '.modal-body')
-                .replace('$2', data.content_color)
+                .replace('$2', content)
             );
         if (css.length) {
             css = css.join("\n");
