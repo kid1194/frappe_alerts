@@ -62,24 +62,29 @@ def get_user_alerts(user: str):
     sdoc = frappe.qb.DocType("Alert Seen By")
     cdoc = frappe.qb.DocType("Alert Seen By")
     
-    uqry = (
+    parents = []
+    u_parents = (
         frappe.qb.from_(udoc)
         .select(udoc.parent)
         .distinct()
-        .where(sdoc.parent == doc.name)
         .where(udoc.parenttype == _alert_dt_)
         .where(udoc.parentfield == "for_users")
         .where(udoc.user == user)
-    )
-    rqry = (
+    ).run(as_dict=True)
+    if u_parents and isinstance(u_parents, list):
+        parents.extend(u_parents)
+    
+    r_parents = (
         frappe.qb.from_(rdoc)
         .select(rdoc.parent)
         .distinct()
-        .where(rdoc.parent == doc.name)
         .where(rdoc.parenttype == _alert_dt_)
         .where(rdoc.parentfield == "for_roles")
         .where(rdoc.role.isin(frappe.get_roles(user)))
-    )
+    ).run(as_dict=True)
+    if r_parents and isinstance(r_parents, list):
+        parents.extend(r_parents)
+    
     sqry = (
         frappe.qb.from_(sdoc)
         .select(sdoc.parent)
@@ -92,7 +97,6 @@ def get_user_alerts(user: str):
     cqry = (
         frappe.qb.from_(cdoc)
         .select(Count(cdoc.parent))
-        .where(cdoc.parent == doc.name)
         .where(cdoc.parenttype == _alert_dt_)
         .where(cdoc.parentfield == "seen_by")
         .where(cdoc.user == user)
@@ -111,16 +115,11 @@ def get_user_alerts(user: str):
         .where(doc.from_date.lte(today))
         .where(doc.until_date.gte(today))
         .where(doc.docstatus == 1)
-        .where(Criterion.any([
-            doc.name.isin(uqry),
-            doc.name.isin(rqry)
-        ]))
         .where(doc.name.notin(sqry))
-        .where(Criterion.any([
-            doc.is_repeatable == 0,
-            doc.number_of_repeats.gt(IfNull(cqry, 0))
-        ]))
+        .where(doc.number_of_repeats.gte(IfNull(cqry, 0)))
     )
+    if parents:
+        qry = qry.where(doc.name.isin(parents))
     qry = type_join_query(qry, doc.alert_type)
     data = qry.run(as_dict=True)
     return data if isinstance(data, list) else None
