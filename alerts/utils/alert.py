@@ -85,18 +85,19 @@ def get_user_alerts(user: str):
     if r_parents and isinstance(r_parents, list):
         parents.extend(r_parents)
     
-    sqry = (
+    not_parents = (
         frappe.qb.from_(sdoc)
         .select(sdoc.parent)
-        .where(sdoc.parent == doc.name)
         .where(sdoc.parenttype == _alert_dt_)
         .where(sdoc.parentfield == "seen_by")
         .where(sdoc.user == user)
         .where(sdoc.date == today)
-    )
+    ).run(as_dict=True)
+    
     cqry = (
         frappe.qb.from_(cdoc)
         .select(Count(cdoc.parent))
+        .where(cdoc.parent == doc.name)
         .where(cdoc.parenttype == _alert_dt_)
         .where(cdoc.parentfield == "seen_by")
         .where(cdoc.user == user)
@@ -115,11 +116,12 @@ def get_user_alerts(user: str):
         .where(doc.from_date.lte(today))
         .where(doc.until_date.gte(today))
         .where(doc.docstatus == 1)
-        .where(doc.name.notin(sqry))
         .where(doc.number_of_repeats.gte(IfNull(cqry, 0)))
     )
     if parents:
         qry = qry.where(doc.name.isin(parents))
+    if not_parents and isinstance(not_parents, list):
+        qry = qry.where(doc.name.notin(not_parents))
     qry = type_join_query(qry, doc.alert_type)
     data = qry.run(as_dict=True)
     return data if isinstance(data, list) else None
