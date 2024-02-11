@@ -58,10 +58,12 @@ class Alerts extends AlertsBase {
         $(window).on('hashchange', this._on_deatroy);
         window.addEventListener('popstate', this._on_deatroy);
         
-        if ((frappe.get_route_str() || '').indexOf('Alerts Settings') >= 0)
-            this._setup(true);
-        else
-            this.request('is_enabled', null, this._setup);
+        console.log('Router', frappe.get_route());
+        if (
+            !!frappe.get_route()
+            && (frappe.get_route_str() || '').indexOf('Alerts Settings') >= 0
+        ) this._setup(true);
+        else this.request('is_enabled', null, this._setup);
     }
     mock() {
         this._mock = this._mock || new AlertsMock();
