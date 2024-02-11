@@ -2,9 +2,7 @@
 
 A small **Frappe** module that displays custom alerts to specific recipients after login.
 
-![v1-Beta5](https://img.shields.io/badge/v1_Beta5-2024/01/27-blue?style=plastic)
-
-⚠️ **This plugin is in BETA stage** ⚠️
+![v1](https://img.shields.io/badge/v1-2024/02/12-green?style=plastic)
 
 **Apologies in advance for any problem or bug you face with this module.**
 **Please report any problem or bug you face so it can be fixed.**
