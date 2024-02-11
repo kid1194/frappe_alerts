@@ -54,6 +54,9 @@ def get_user_alerts(user: str):
     if not parents:
         return None
     
+    from .common import log_error
+    log_error(str({"parents": parents}))
+    
     today = nowdate()
     doc = frappe.qb.DocType(_alert_dt_)
     qry = (
@@ -79,6 +82,7 @@ def get_user_alerts(user: str):
     
     data = qry.run(as_dict=True)
     if data and isinstance(data, list):
+        log_error(str({"alerts": data}))
         seen_by = get_alerts_seen_by(user, parents)
         if seen_by:
             data = filter_alerts_seen_by(data, seen_by, today)
@@ -96,9 +100,9 @@ def get_alerts_for_user(user: str, parents: list):
         .where(doc.parenttype == _alert_dt_)
         .where(doc.parentfield == "for_users")
         .where(doc.user == user)
-    ).run(as_dict=False)
+    ).run(as_dict=True)
     if data and isinstance(data, list):
-        parents.extend([v[0] for v in data])
+        parents.extend([v["parent"] for v in data])
 
 
 # [Internal]
@@ -111,9 +115,9 @@ def get_alerts_for_roles(user: str, parents: list):
         .where(doc.parenttype == _alert_dt_)
         .where(doc.parentfield == "for_roles")
         .where(doc.role.isin(frappe.get_roles(user)))
-    ).run(as_dict=False)
+    ).run(as_dict=True)
     if data and isinstance(data, list):
-        parents.extend([v[0] for v in data])
+        parents.extend([v["parent"] for v in data])
 
 
 # [Internal]
@@ -128,6 +132,9 @@ def get_alerts_seen_by(user: str, parents: list):
         .where(doc.parent.isin(parents))
     ).run(as_dict=True)
     if data and isinstance(data, list):
+        from .common import log_error
+        log_error(str({"seen_by": data}))
+        
         return data
     return None
 

@@ -130,20 +130,11 @@ class Alerts extends AlertsBase {
             if (this.is_enabled !== old) this.emit('change');
         })
         .on('alerts_show', function(ret) {
+            console.log('alerts_show', ret);
             if (this.is_enabled && (this.$isArr(ret) || this._is_valid(ret)))
                 this.show(ret);
         });
         this.emit('ready');
-        this.request(
-            'get_user_alerts_list',
-            null,
-            function(ret) {
-                this._log('Alerts list', ret);
-            },
-            function(e) {
-                this._error('Alerts list', e && e.message);
-            }
-        );
     }
     _is_valid(data) {
         if (!data || !this.$isDataObj(data) || this.$isEmptyObj(data)) return false;
