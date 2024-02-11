@@ -40,6 +40,12 @@ def update_alerts():
     ).run()
 
 
+# [Alerts Js]
+@frappe.whitelist()
+def get_user_alerts_list():
+    return get_user_alerts(frappe.session.user)
+
+
 # [Internal]
 def get_user_alerts(user: str):
     from pypika.functions import IfNull

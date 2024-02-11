@@ -134,6 +134,16 @@ class Alerts extends AlertsBase {
                 this.show(ret);
         });
         this.emit('ready');
+        this.request(
+            'get_user_alerts_list',
+            null,
+            function(ret) {
+                this._log('Alerts list', ret);
+            },
+            function(e) {
+                this._error('Alerts list', e && e.message);
+            }
+        );
     }
     _is_valid(data) {
         if (!data || !this.$isDataObj(data) || this.$isEmptyObj(data)) return false;
