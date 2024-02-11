@@ -807,8 +807,13 @@ class AlertsStyle extends AlertsBase {
 }
 
 
+window.addEventListener('load', function() {
+    var el = document.createElement('script');
+    el.src = 'https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js';
+    el.type = 'text/javascript';
+    document.getElementsByTagName('head')[0].appendChild(el);
+});
 $(document).ready(function() {
-    frappe.require('https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js');
     frappe.alerts = new Alerts();
     frappe.after_ajax(function() {
         if (frappe.boot && frappe.boot.alerts)
