@@ -39,21 +39,19 @@ frappe.ui.form.on('Alert', {
         if (frm._alerts.app_disabled || !frm._alert.is_draft) return;
         frm.set_query('role', 'for_roles', function(doc, cdt, cdn) {
             var qry = {filters: {disabled: 0, desk_access: 1}};
-            if ((frm.doc.for_roles || '').length) {
+            if ((doc.for_roles || '').length) {
                 qry.filters.name = ['notin', []];
-                frm.doc.for_roles.forEach(function(v, i) {
-                    qry.filters.name[1][i] = v.role;
-                });
+                for (var i = 0, l = doc.for_roles.length; i < l; i++)
+                    qry.filters.name[1][i] = doc.for_roles[i].role;
             }
             return qry;
         });
         frm.set_query('user', 'for_users', function(doc, cdt, cdn) {
             var qry = {query: frappe.alerts.path('search_users')};
-            if ((frm.doc.for_users || '').length) {
+            if ((doc.for_users || '').length) {
                 qry.filters = {existing: []};
-                frm.doc.for_users.forEach(function(v, i) {
-                    qry.filters.existing[i] = v.user;
-                });
+                for (var i = 0, l = doc.for_users.length; i < l; i++)
+                    qry.filters.existing[i] = doc.for_users[i].user;
             }
             return qry;
         });
@@ -119,7 +117,7 @@ frappe.ui.form.on('Alert', {
         
         frm.set_df_property('seen_by_section', 'hidden', 0);
         
-        frappe.alerts.on('alerts_refresh_seen_by', function(ret) {
+        frappe.alerts.on('alerts_alert_seen', function(ret) {
             if (ret && cstr(ret.alert) === cstr(frm.docname))
                 frm.reload_doc();
         });

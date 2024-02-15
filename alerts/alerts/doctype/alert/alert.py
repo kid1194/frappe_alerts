@@ -5,7 +5,10 @@
 
 
 from frappe import _, throw
-from frappe.utils import cint, getdate
+from frappe.utils import (
+    cint,
+    getdate
+)
 from frappe.model.document import Document
 
 from alerts.utils import clear_doc_cache
@@ -41,23 +44,38 @@ class Alert(Document):
     
     def before_save(self):
         clear_doc_cache(self.doctype, self.name)
-        self._check_status()
+        self.status = "Draft"
     
     
     def before_submit(self):
         clear_doc_cache(self.doctype, self.name)
-        self.status = "Active"
+        if getdate(self.from_date) > getdate():
+            self.status = "Pending"
+        else:
+            self.status = "Active"
+            self.flags.send_alert = True
     
     
-    def after_submit(self):
-        from alerts.utils import send_alert
-        
-        send_alert(self)
+    def on_update(self):
+        self._send_alert()
     
     
     def before_update_after_submit(self):
         clear_doc_cache(self.doctype, self.name)
-        self._check_status()
+        if (
+            self.has_value_changed("status") and
+            self.status in ("Active", "Finished")
+        ):
+            from alerts.utils import clear_alert_cache
+            
+            if self.status == "Active":
+                self.flags.send_alert = True
+            
+            clear_alert_cache()
+    
+    
+    def on_update_after_submit(self):
+        self._send_alert()
     
     
     def before_cancel(self):
@@ -79,19 +97,9 @@ class Alert(Document):
             self.number_of_repeats = 1
     
     
-    def _check_status(self):
-        if self.docstatus.is_draft() and self.status != "Draft":
-            self.status = "Draft"
-        elif self.docstatus.is_cancelled() and self.status != "Cancelled":
-            self.status = "Cancelled"
-        elif (
-            self.docstatus.is_submitted() and
-            self.status not in ("Pending", "Active", "Finished")
-        ):
-            today = getdate()
-            if getdate(self.from_date) > today:
-                self.status = "Pending"
-            elif getdate(self.until_date) < today:
-                self.status = "Finished"
-            else:
-                self.status = "Active"
+    def _send_alert(self):
+        if self.flags.get("send_alert", False):
+            from alerts.utils import send_alert
+            
+            self.flags.pop("send_alert")
+            send_alert(self)

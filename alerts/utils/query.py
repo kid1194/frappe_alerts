@@ -10,7 +10,6 @@ import frappe
 # [Alerts Alert Form]
 @frappe.whitelist()
 def search_users(doctype, txt, searchfield, start, page_len, filters, as_dict=False):
-    from .common import parse_json
     from .search import filter_search, prepare_data
     
     dt = "User"
@@ -45,6 +44,8 @@ def search_users(doctype, txt, searchfield, start, page_len, filters, as_dict=Fa
     
     existing = filters.get("existing")
     if existing and isinstance(existing, str):
+        from .common import parse_json
+        
         existing = parse_json(existing)
     if existing and isinstance(existing, list):
         qry = qry.where(doc.name.notin(existing))

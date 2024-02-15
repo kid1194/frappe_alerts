@@ -12,13 +12,18 @@ class AlertsBase {
         var t = Object.prototype.toString.call(v).slice(8, -1);
         return t === 'Number' && isNaN(v) ? 'NaN' : t;
     }
-    $isStr(v) { return this.$type(v) === 'String'; }
-    $isFunc(v) { return typeof v === 'function' || /(Function|^Proxy)$/.test(this.$type(v)); }
-    $isArr(v) { return v && $.isArray(v); }
+    $isStr(v) { return v != null && this.$type(v) === 'String'; }
+    $isValidStr(v) { return this.$isStr(v) && v.length; }
+    $isFunc(v) {
+        return v != null && (typeof v === 'function' || /(Function|^Proxy)$/.test(this.$type(v)));
+    }
+    $isArr(v) { return v != null && $.isArray(v); }
+    $isValidArr(v) { return this.$isArr(v) && v.length; }
     $isObjLike(v) { return v != null && typeof v === 'object'; }
-    $isDataObj(v) { return v && $.isPlainObject(v); }
-    $isEmptyObj(v) { return !v || $.isEmptyObject(v); }
-    $isArgs(v) { return this.$type(v) === 'Arguments'; }
+    $isDataObj(v) { return v != null && $.isPlainObject(v); }
+    $isValidDataObj(v) { return this.$isDataObj(v) && !$.isEmptyObject(v); }
+    $isEmptyObj(v) { return v == null || $.isEmptyObject(v); }
+    $isArgs(v) { return v != null && this.$type(v) === 'Arguments'; }
     $toArr(v, s, e) { return Array.prototype.slice.call(v, s, e); }
     $fn(fn, obj) { return $.proxy(fn, obj || this); }
     
@@ -66,8 +71,8 @@ class Alerts extends AlertsBase {
         return this._mock;
     }
     show(data) {
-        if (this.$isDataObj(data) && !this.$isEmptyObj(data)) data = [data];
-        if (!this.$isArr(data) || !data.length) return this;
+        if (this.$isValidDataObj(data)) data = [data];
+        if (!this.$isValidArr(data)) return this;
         this._list.push.apply(this._list, data);
         return this._build();
     }
@@ -76,7 +81,7 @@ class Alerts extends AlertsBase {
     }
     
     request(method, args, callback, error, _freeze) {
-        if (!this.$isStr(method) || !method.length) return this;
+        if (!this.$isValidStr(method)) return this;
         if (!this.$isFunc(callback)) callback = null;
         if (!this.$isFunc(error)) error = null;
         if (method.indexOf('.') < 0) method = this.path(method);
@@ -102,7 +107,7 @@ class Alerts extends AlertsBase {
                 else error.call(this, {message: __(message, args)});
             })
         };
-        if (this.$isDataObj(args)) {
+        if (this.$isValidDataObj(args)) {
             opts.type = 'POST';
             opts.args = args;
         }
@@ -128,30 +133,38 @@ class Alerts extends AlertsBase {
             if (this.is_enabled !== old) this.emit('change');
         })
         .on('alerts_show', function(ret) {
-            if (this.is_enabled && this.$isDataObj(ret)) {
-                if (this.$isArr(ret.alerts)) this.show(ret.alerts);
-                else if (this._is_valid(ret)) this.show(ret);
-            }
+            if (
+                this.is_enabled
+                && this.$isValidDataObj(ret)
+                && this.$isValidArr(ret.alerts)
+            ) this.show(ret.alerts);
+        })
+        .on('alerts_show_alert', function(ret) {
+            if (
+                this.is_enabled
+                && this.$isValidDataObj(ret)
+                && this._is_valid(ret)
+            ) this.show(ret);
         });
         this.emit('ready');
     }
     _is_valid(data) {
-        if (!data || !this.$isDataObj(data) || this.$isEmptyObj(data)) return false;
+        if (!this.$isValidDataObj(data)) return false;
         if (this._seen.indexOf(data.name) >= 0) return false;
         var user = frappe.session.user,
         score = 0;
         if (
-            this.$isArr(data.users) && data.users.length
+            this.$isValidArr(data.users)
             && data.users.indexOf(user) >= 0
         ) score++;
         if (
             !score
-            && this.$isArr(data.roles) && data.roles.length
+            && this.$isValidArr(data.roles)
             && frappe.user.has_role(data.roles)
         ) score++;
         if (!score) return false;
         if (
-            this.$isArr(data.seen_today) && data.seen_today.length
+            this.$isValidArr(data.seen_today)
             && data.seen_today.indexOf(user) >= 0
         ) return false;
         var seen_by = this.$isDataObj(data.seen_by) ? data.seen_by : {},
@@ -168,17 +181,11 @@ class Alerts extends AlertsBase {
                 'mark_seens',
                 {names: seen},
                 function(ret) {
-                    if (!ret || !this.$isDataObj(ret)) {
+                    if (!this.$isValidDataObj(ret)) {
                         this._seen.push.apply(this._seen, seen);
                         this._error('Marking alerts as seen error.', ret, seen);
                         this._build_retry();
-                    } else if (!!ret.success) {
-                        if (ret.unseen && ret.unseen.length) {
-                            this._seen.push.apply(this._seen, ret.unseen);
-                            this._error('Marking alerts as seen error.', ret, seen);
-                            this._build_retry();
-                        }
-                    } else {
+                    } else if (!!ret.error) {
                         this._seen.push.apply(this._seen, seen);
                         this._error('Marking alerts as seen error.', ret, seen);
                         this._build_retry();
@@ -285,7 +292,7 @@ class Alerts extends AlertsBase {
     
     _console(fn, args) {
         if (this.$isArgs(args)) args = this.$toArr(args);
-        if (!this.$isArr(args) || !args.length) return this;
+        if (!this.$isValidArr(args)) return this;
         if (!this.$isStr(args[0])) args.unshift(this._prefix);
         else args[0] = this._prefix + ' ' + args[0];
         console[fn].apply(null, args);
@@ -299,7 +306,7 @@ class Alerts extends AlertsBase {
     }
     
     on(event, fn, _once) {
-        if (!this.$isStr(event) || !event.length || !this.$isFunc(fn)) return this;
+        if (!this.$isValidStr(event) || !this.$isFunc(fn)) return this;
         event = event.split(' ');
         for (var i = 0, l = event.length, e; i < l; i++) {
             e = event[i];
@@ -325,37 +332,57 @@ class Alerts extends AlertsBase {
         return this.on(event, fn, 1);
     }
     off(event, fn) {
-        if (!this.$isStr(event) || !event.length) return this;
+        if (!this.$isValidStr(event)) return this;
         if (!this.$isFunc(fn)) fn = null;
-        event.split(' ').forEach(this.$fn(function(e) {
+        event = event.split(' ');
+        for (var i = 0, l = event.length, e; i < l; i++) {
+            e = event[i];
             if (this._events.list[e]) this._remove_event(e, fn);
-        }));
+        }
         return this;
     }
     emit(event) {
-        if (!this.$isStr(event) || !event.length) return this;
+        if (!this.$isValidStr(event)) return this;
         var args = arguments;
         if (args.length < 2) args = null;
         else args = this.$toArr(args, 1);
-        event.split(' ').forEach(this.$fn(function(e) {
-            if (!this._events.list[e]) return;
+        event = event.split(' ');
+        for (var i = 0, l = event.length, e; i < l; i++) {
+            e = event[i];
+            if (!this._events.list[e]) continue;
             this._emit_event(e, args);
             this._clear_event(e);
-        }));
+        }
         return this;
     }
-    _make_event_realtime_fn(event) {
+    _make_event_realtime_fn(e) {
         return this.$fn(function(ret) {
-            if (ret && this.$isDataObj(ret)) ret = ret.message || ret;
-            Promise.resolve().then(this.$fn(function() {
-                this.emit(event, [ret]);
+            var promise = new Promise(this.$fn(function(res, rej) {
+                if (ret && this.$isDataObj(ret)) ret = ret.message || ret;
+                if (!this.$isDataObj(ret) || !ret.delay) res(ret);
+                else {
+                    if (this._events.real[e]._to)
+                        window.clearTimeout(this._events.real[e]._to);
+                    this._events.real[e]._to = window.setTimeout(this.$fn(function() {
+                        this._events.real[e]._to = null;
+                        res(ret);
+                    }), 700);
+                }
+            }));
+            promise.then(this.$fn(function(ret) {
+                this._emit_event(e, [ret]);
+                this._clear_event(e);
             }));
         });
     }
     _remove_event(event, fn) {
-        if (fn) this._events.list[event].slice().forEach(this.$fn(function(e, i) {
-            if (e.f === fn) this._events.list[event].splice(i, 1);
-        }));
+        if (fn) {
+            var events = this._events.list[event].slice();
+            for (var i = 0, l = events.length, e; i < l; i++) {
+                e = events[i];
+                if (e.f === fn) this._events.list[event].splice(i, 1);
+            }
+        }
         this._clear_event(event, !fn);
     }
     _clear_event(event, all) {
@@ -366,11 +393,13 @@ class Alerts extends AlertsBase {
         delete this._events.real[event];
     }
     _emit_event(e, args) {
-        this._events.list[e].slice().forEach(this.$fn(function(ev, i) {
+        var events = this._events.list[e].slice();
+        for (var i = 0, l = events.length, ev; i < l; i++) {
+            ev = events[i];
             if (!args) ev.f.call(this);
             else ev.f.apply(this, args);
             if (ev.o) this._events.list[e].splice(i, 1);
-        }));
+        }
     }
     
     init_form(frm) {
@@ -462,7 +491,7 @@ class Alerts extends AlertsBase {
                 args = null;
             } else if (!args.length) args = null;
         }
-        if (!this.$isStr(msg) || !msg.length) msg = null;
+        if (!this.$isValidStr(msg)) msg = null;
         try {
             for (var i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
@@ -602,7 +631,7 @@ class AlertsMock extends AlertsBase {
         this._id = frappe.utils.get_random(5);
     }
     build(data) {
-        if (!this.$isDataObj(data) || this.$isEmptyObj(data)) return this;
+        if (!this.$isValidDataObj(data)) return this;
         this._dialog = this._dialog || new AlertsDialog(this._id, 'alerts-mock-dialog-' + this._id);
         this._dialog
             .setTitle(data.name)
@@ -646,13 +675,12 @@ class AlertsDialog extends AlertsBase {
         this._sound = {loaded: 0, playing: 0, timeout: null};
     }
     setName(text) {
-        if (this.$isStr(text) && text.length)
-            this._name = text;
+        if (this.$isValidStr(text)) this._name = text;
         return this;
     }
     get name() { return this._name; }
     setTitle(text, args) {
-        if (this.$isStr(text) && text.length) {
+        if (this.$isValidStr(text)) {
             if (!this.$isArr(args)) text = __(text);
             else text = __(text, args);
             this._opts.title = text;
@@ -660,7 +688,7 @@ class AlertsDialog extends AlertsBase {
         return this;
     }
     setMessage(text, args) {
-        if (this.$isStr(text) && text.length) {
+        if (this.$isValidStr(text)) {
             if (!this.$isArr(args)) text = __(text);
             else text = __(text, args);
             this._message = text;
@@ -668,7 +696,7 @@ class AlertsDialog extends AlertsBase {
         return this;
     }
     setType(type) {
-        if (!this.$isDataObj(type) || this.$isEmptyObj(type)) return this;
+        if (!this.$isValidDataObj(type)) return this;
         if (!this._style) this._style = new AlertsStyle(this._id, this._class);
         this._style.build(type);
         this.setTimeout(type.display_timeout);
@@ -688,10 +716,10 @@ class AlertsDialog extends AlertsBase {
     setSound(file, fallback) {
         this.stopSound();
         this._sound.loaded = 0;
-        if (!this.$isStr(file) || !file.length || file === 'None') return this;
+        if (!this.$isValidStr(file) || file === 'None') return this;
         if (file === 'Custom') file = fallback;
         else file = '/assets/frappe/sounds/' + file.toLowerCase() + '.mp3';
-        if (!this.$isStr(file) || !file.length) return this;
+        if (!this.$isValidStr(file)) return this;
         if (!this.$sound) {
             this.$sound = $('<audio>').attr({
                 id: 'sound-' + this._id,
@@ -815,14 +843,14 @@ class AlertsStyle extends AlertsBase {
     build(background, border, title, content) {
         var sel = '.$0>.modal-dialog>.modal-content'.replace('$0', this._class),
         css = [];
-        if (this.$isStr(background) && background.length)
+        if (this.$isValidStr(background))
             css.push('$0{background:$1!important}'.replace('$0', sel).replace('$1', background));
-        if (this.$isStr(border) && border.length)
+        if (this.$isValidStr(border))
             css.push(
                 '$0,$0>.modal-header,$0>.modal-footer{border:1px solid $1!important}'
                 .replace(/\$0/g, sel).replace('$1', border)
             );
-        if (this.$isStr(title) && title.length)
+        if (this.$isValidStr(title))
             css.push(
                 ('$0>$1>$2>.modal-title{color:$3!important}'
                 + '$0>$1>$2>.indicator::before{background:$3!important}'
@@ -830,7 +858,7 @@ class AlertsStyle extends AlertsBase {
                 .replace(/\$0/g, sel).replace(/\$1/g, '.modal-header')
                 .replace(/\$2/g, '.title-section').replace(/\$3/g, title)
             );
-        if (this.$isStr(content) && content.length)
+        if (this.$isValidStr(content))
             css.push(
                 '$0>$1,$0>$1>.alerts-message{color:$2!important}'
                 .replace(/\$0/g, sel).replace(/\$1/g, '.modal-body')
@@ -867,16 +895,11 @@ window.addEventListener('load', function() {
 });
 $(document).ready(function() {
     frappe.alerts = new Alerts();
-    if (frappe.boot && frappe.boot.alerts) {
+    function show_alerts() {
         frappe.alerts.on('ready', function() {
             this.show(frappe.boot.alerts);
         });
-    } else {
-        frappe.after_ajax(function() {
-            if (frappe.boot && frappe.boot.alerts)
-                frappe.alerts.on('ready', function() {
-                    this.show(frappe.boot.alerts);
-                });
-        });
     }
+    if (frappe.boot && frappe.boot.alerts) show_alerts();
+    else frappe.after_ajax(show_alerts);
 });

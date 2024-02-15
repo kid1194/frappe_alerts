@@ -7,14 +7,20 @@
 # [Hooks]
 def extend(bootinfo):
     import frappe
-    from frappe import _
     
-    from .alert import get_alerts_cache
-    from .common import log_error
-    
+    user = frappe.session.user
     try:
-        bootinfo.alerts = get_alerts_cache(frappe.session.user)
+        from .alert import get_alerts_cache
+        
+        alerts = get_alerts_cache(user)
+        if alerts:
+            bootinfo.alerts = alerts
     except Exception:
+        from frappe import _
+        
+        from .common import log_error
+        
         log_error(_(
-            "An error has occurred while getting cached alerts on boot."
-        ))
+            "An error has occurred while getting "
+            + "cached alerts on boot of user \"{0}\"."
+        ).format(user))

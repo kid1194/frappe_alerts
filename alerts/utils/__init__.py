@@ -13,5 +13,6 @@ from .cache import *
 from .common import *
 from .files import delete_files
 from .query import search_users
+from .realtime import emit_app_status_changed
 from .settings import *
 from .update import check_for_update

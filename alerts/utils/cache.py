@@ -8,34 +8,47 @@ import frappe
 
 
 # [Alert]
-def get_cache(dt, key):
-    return frappe.cache().hget(dt, key)
+def uuid_key(args):
+    import hashlib
+    import uuid
+    
+    from frappe.utils import cstr
+    
+    from .common import to_json
+    
+    return cstr(uuid.UUID(hashlib.sha256(
+        to_json(args, "").encode("utf-8")
+    ).hexdigest()[::2]))
 
 
 # [Alert]
-def set_cache(dt, key, data):
-    frappe.cache().hset(dt, key, data)
+def get_cache(dt, key, expires: bool=False):
+    return frappe.cache().get_value(f"{dt}-{key}", expires=expires)
 
 
 # [Alert]
-def del_cache(dt, key):
-    frappe.cache().hdel(dt, key)
-    clear_cache(f"{dt}-{key}")
+def set_cache(dt, key, data, expiry: int=0):
+    if expiry < 1:
+        frappe.cache().set_value(f"{dt}-{key}", data)
+    else:
+        frappe.cache().set_value(f"{dt}-{key}", data, expires_in_sec=expiry)
 
 
-# [Internal]
-def clear_cache(dt):
-    frappe.cache().delete_keys(dt)
-    frappe.cache().delete_key(dt)
+# [Alert, Internal]
+def del_cache(dt, key=None):
+    if key:
+        frappe.cache().delete_key(f"{dt}-{key}")
+    else:
+        frappe.cache().delete_keys(dt)
 
 
-# [Alert Type, Internal]
+# [Alerts Alert, Alert Type, Alert, Internal]
 def clear_doc_cache(dt, name=None):
+    del_cache(dt)
+    frappe.clear_cache(doctype=dt)
     if name is None:
         name = dt
-    frappe.clear_cache(doctype=dt)
     frappe.clear_document_cache(dt, name)
-    clear_cache(dt)
 
 
 # [Alert, Settings, Type]

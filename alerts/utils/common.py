@@ -11,7 +11,7 @@ import frappe
 from alerts import __module__
 
 
-# [Access, Boot]
+# [Access, Alert, Boot]
 def log_error(msg):
     from alerts.version import is_version_lt
     
@@ -33,7 +33,6 @@ def error(msg, throw=True):
 def is_doc_exists(dt, name=None):
     if name is None:
         name = dt
-    
     return frappe.db.exists(dt, name) != None
 
 
@@ -44,10 +43,19 @@ def doc_count(dt, filters: dict):
 
 # [Alert, Files, Query, Update]
 def parse_json(data, default=None):
-    if not data or not isinstance(data, str):
-        return default
-    
+    if not isinstance(data, str):
+        return data
     try:
         return json.loads(data)
+    except Exception:
+        return default
+
+
+# [Cache]
+def to_json(data, default=None):
+    if isinstance(data, str):
+        return data
+    try:
+        return json.dumps(data)
     except Exception:
         return default

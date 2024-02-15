@@ -6,14 +6,15 @@
 
 # [Hooks]
 def on_login(login_manager):
-    from frappe import _
-    
-    from .alert import cache_alerts
-    from .common import log_error
-    
     try:
+        from .alert import cache_alerts
+        
         cache_alerts(login_manager.user)
     except Exception:
+        from frappe import _
+        
+        from .common import log_error
+        
         log_error(_(
-            "An error has occurred while caching alerts on login."
-        ))
+            "An error has occurred while caching alerts on the login of user \"{0}\"."
+        ).format(login_manager.user))

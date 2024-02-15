@@ -7,9 +7,70 @@
 import frappe
 from frappe.utils import cint, nowdate
 
+from .cache import (
+    get_cache,
+    set_cache,
+    del_cache
+)
+
 
 # [Internal]
 _alert_dt_ = "Alert"
+
+
+# [Hooks]
+def update_alerts():
+    from pypika.terms import Criterion
+    
+    today = nowdate()
+    doc = frappe.qb.DocType(_alert_dt_)
+    data = (
+        frappe.qb.from_(doc)
+        .select(doc.name)
+        .where(doc.docstatus == 1)
+        .where(Criterion.any([
+            Criterion.all([
+                doc.until_date.lt(today),
+                doc.status == "Active"
+            ]),
+            Criterion.all([
+                doc.from_date.lte(today),
+                doc.until_date.gte(today),
+                doc.status == "Pending"
+            ])
+        ]))
+    ).run(as_dict=True)
+    if data and isinstance(data, list):
+        (
+            frappe.qb.update(doc)
+            .set(doc.status, "Finished")
+            .where(doc.until_date.lt(today))
+            .where(doc.status == "Active")
+            .where(doc.docstatus == 1)
+        ).run()
+        
+        (
+            frappe.qb.update(doc)
+            .set(doc.status, "Active")
+            .where(doc.from_date.lte(today))
+            .where(doc.until_date.gte(today))
+            .where(doc.status == "Pending")
+            .where(doc.docstatus == 1)
+        ).run()
+        
+        from .cache import clear_doc_cache
+        
+        for v in data:
+            clear_doc_cache(_alert_dt_, v["name"])
+        
+        clear_alert_cache()
+
+
+# [Alerts Alert, Internal]
+def clear_alert_cache():
+    del_cache(f"{_alert_dt_} For User")
+    del_cache(f"{_alert_dt_} For Role")
+    del_cache(f"{_alert_dt_} Seen By")
 
 
 # [Alert Type]
@@ -19,36 +80,20 @@ def type_alerts_exists(alert_type):
     return is_doc_exists(_alert_dt_, {"alert_type": alert_type})
 
 
-# [Hooks]
-def update_alerts():
-    today = nowdate()
-    doc = frappe.qb.DocType(_alert_dt_)
-    (
-        frappe.qb.update(doc)
-        .set(doc.status, "Finished")
-        .where(doc.until_date.lt(today))
-        .where(doc.status == "Active")
-        .where(doc.docstatus == 1)
-    ).run()
-    (
-        frappe.qb.update(doc)
-        .set(doc.status, "Active")
-        .where(doc.from_date.lte(today))
-        .where(doc.until_date.gte(today))
-        .where(doc.status == "Pending")
-        .where(doc.docstatus == 1)
-    ).run()
-
-
 # [Internal]
 def get_user_alerts(user: str):
+    today = nowdate()
+    expiry = seconds_left_for_day()
+    alerts = get_daily_alerts(today, expiry)
+    if not alerts:
+        return None
+    
     parents = []
-    get_alerts_for_user(user, parents)
-    get_alerts_for_roles(user, parents)
+    get_alerts_for_user(user, alerts, parents, expiry)
+    get_alerts_for_roles(user, alerts, parents, expiry)
     if not parents:
         return None
     
-    today = nowdate()
     doc = frappe.qb.DocType(_alert_dt_)
     qry = (
         frappe.qb.from_(doc)
@@ -61,10 +106,6 @@ def get_user_alerts(user: str):
             doc.number_of_repeats
         )
         .where(doc.name.isin(parents))
-        .where(doc.status == "Active")
-        .where(doc.from_date.lte(today))
-        .where(doc.until_date.gte(today))
-        .where(doc.docstatus == 1)
     )
     
     from .type import type_join_query
@@ -72,63 +113,132 @@ def get_user_alerts(user: str):
     qry = type_join_query(qry, doc.alert_type)
     
     data = qry.run(as_dict=True)
-    if data and isinstance(data, list):
-        seen_by = get_alerts_seen_by(user, parents)
-        if seen_by:
-            data = filter_alerts_seen_by(data, seen_by, today)
+    if not data or not isinstance(data, list):
+        return None
+    
+    data = filter_seen_alerts(data, user, parents, today, expiry)
+    if not data:
+        return None
+    
+    return data
+
+
+# [Internal]
+def get_daily_alerts(date: str, expiry: int):
+    data = get_cache(_alert_dt_, date, True)
+    if isinstance(data, list):
         return data
     
-    return None
+    data = frappe.get_all(
+        _alert_dt_,
+        fields=["name"],
+        filters=[
+            [_alert_dt_, "from_date", "<=", date],
+            [_alert_dt_, "until_date", ">=", date],
+            [_alert_dt_, "status", "=", "Active"],
+            [_alert_dt_, "docstatus", "=", 1]
+        ],
+        pluck="name",
+        ignore_permissions=True,
+        strict=False
+    )
+    if not isinstance(data, list):
+        return None
+    
+    set_cache(_alert_dt_, date, data, expiry)
+    return data
 
 
 # [Internal]
-def get_alerts_for_user(user: str, parents: list):
-    doc = frappe.qb.DocType("Alert For User")
-    data = (
-        frappe.qb.from_(doc)
-        .select(doc.parent)
-        .distinct()
-        .where(doc.parenttype == _alert_dt_)
-        .where(doc.parentfield == "for_users")
-        .where(doc.user == user)
-    ).run(as_dict=True)
-    if data and isinstance(data, list):
-        parents.extend([v["parent"] for v in data])
+def get_alerts_for_user(user: str, alerts: list, parents: list, expiry: int):
+    dt = f"{_alert_dt_} For User"
+    data = get_cache(dt, user, True)
+    if isinstance(data, list):
+        if data:
+            parents.extend(data)
+    
+    else:
+        doc = frappe.qb.DocType(dt)
+        data = (
+            frappe.qb.from_(doc)
+            .select(doc.parent)
+            .where(doc.parenttype == _alert_dt_)
+            .where(doc.parentfield == "for_users")
+            .where(doc.parent.isin(alerts))
+            .where(doc.user == user)
+        ).run(as_dict=True)
+        if isinstance(data, list):
+            if data:
+                data = list(set([
+                    v["parent"] for v in data
+                    if v["parent"] not in parents
+                ]))
+                parents.extend(data)
+            
+            set_cache(dt, user, data, expiry)
 
 
 # [Internal]
-def get_alerts_for_roles(user: str, parents: list):
-    doc = frappe.qb.DocType("Alert For Role")
-    data = (
-        frappe.qb.from_(doc)
-        .select(doc.parent)
-        .distinct()
-        .where(doc.parenttype == _alert_dt_)
-        .where(doc.parentfield == "for_roles")
-        .where(doc.role.isin(frappe.get_roles(user)))
-    ).run(as_dict=True)
-    if data and isinstance(data, list):
-        parents.extend([v["parent"] for v in data])
+def get_alerts_for_roles(user: str, alerts: list, parents: list, expiry: int):
+    dt = f"{_alert_dt_} For Role"
+    data = get_cache(dt, user, True)
+    if isinstance(data, list):
+        if data:
+            parents.extend(data)
+    
+    else:
+        doc = frappe.qb.DocType(dt)
+        data = (
+            frappe.qb.from_(doc)
+            .select(doc.parent)
+            .where(doc.parenttype == _alert_dt_)
+            .where(doc.parentfield == "for_roles")
+            .where(doc.parent.isin(alerts))
+            .where(doc.role.isin(frappe.get_roles(user)))
+        ).run(as_dict=True)
+        if isinstance(data, list):
+            if data:
+                data = list(set([
+                    v["parent"] for v in data
+                    if v["parent"] not in parents
+                ]))
+                parents.extend(data)
+            
+            set_cache(dt, user, data, expiry)
 
 
 # [Internal]
-def get_alerts_seen_by(user: str, parents: list):
-    doc = frappe.qb.DocType("Alert Seen By")
+def get_alerts_seen_by(user: str, alerts: list, expiry: int):
+    from .cache import uuid_key
+    
+    dt = f"{_alert_dt_} Seen By"
+    key = uuid_key([user, alerts])
+    data = get_cache(dt, key, True)
+    if isinstance(data, list):
+        return data
+    
+    doc = frappe.qb.DocType(dt)
     data = (
         frappe.qb.from_(doc)
         .select(doc.parent, doc.date)
         .where(doc.parenttype == _alert_dt_)
         .where(doc.parentfield == "seen_by")
+        .where(doc.parent.isin(alerts))
         .where(doc.user == user)
-        .where(doc.parent.isin(parents))
     ).run(as_dict=True)
-    if data and isinstance(data, list):
-        return data
-    return None
+    if not isinstance(data, list):
+        return None
+    
+    set_cache(dt, key, data, expiry)
+    return data
 
 
 # [Internal]
-def filter_alerts_seen_by(data: list, seen_by: list, today):
+def filter_seen_alerts(data: list, user: str, alerts: list, today: str, expiry: int):
+    seen_by = get_alerts_seen_by(user, alerts, expiry)
+    if not seen_by:
+        return data
+    
     data = {v["name"]:v for v in data}
     totals = {}
     for v in seen_by:
@@ -152,43 +262,53 @@ def filter_alerts_seen_by(data: list, seen_by: list, today):
 
 # [Access]
 def cache_alerts(user: str):
+    set_cache(_alert_dt_, f"{user}-access", 1, 30)
     data = get_user_alerts(user)
-    if not (data is None):
-        set_cached_alerts(user, data)
+    if not data:
+        data = []
+    expiry = seconds_left_for_day()
+    set_cache(_alert_dt_, user, data, expiry)
 
 
 # [Boot]
-def get_alerts_cache(user):
-    cache = get_cached_alerts(user)
-    if not (cache is None):
-        clear_cached_alerts(user)
-    else:
+def get_alerts_cache(user: str):
+    access = get_cache(_alert_dt_, f"{user}-access", True)
+    if access:
+        del_cache(_alert_dt_, f"{user}-access")
+        cache = get_cache(_alert_dt_, user, True)
+        if isinstance(cache, list):
+            del_cache(_alert_dt_, user)
+            if not cache:
+                return None
+            
+            return cache
+        
         from .background import enqueue_job
         
-        cache = []
         enqueue_job(
-            "alerts.utils.alert.delayed_show_alerts",
-            f"delayed-show-alerts-for-{user}",
+            "alerts.utils.alert.show_user_alerts",
+            f"show-user-alerts-for-{user}",
             user=user
         )
     
-    return cache
+    return None
 
 
 # [Internal]
-def delayed_show_alerts(user: str):
-    data = get_user_alerts(user)
-    if not (data is None):
-        set_cached_alerts(user, data)
+def show_user_alerts(user: str):
+    data = get_cache(_alert_dt_, user, True)
+    del_cache(_alert_dt_, user)
+    if not isinstance(data, list):
+        data = get_user_alerts(user)
     if data:
-        frappe.publish_realtime(
-            event="alerts_show",
-            message={"alerts": data}
-        )
+        from .realtime import emit_show_alerts
+        
+        emit_show_alerts({"alerts": data}, False)
 
 
 # [Alerts Alert]
 def send_alert(doc):
+    from .realtime import emit_show_alert
     from .type import add_type_data
     
     user = frappe.session.user
@@ -199,10 +319,6 @@ def send_alert(doc):
         "message": doc.message,
         "is_repeatable": cint(doc.is_repeatable)
     })
-    
-    if is_valid_user(doc, user):
-        cache_alert(user, data)
-    
     add_type_data(doc.alert_type, data)
     data.number_of_repeats = cint(doc.number_of_repeats)
     data.users = [v.user for v in doc.for_users]
@@ -220,11 +336,7 @@ def send_alert(doc):
             if v.user not in data.seen_today and v.date == today:
                 data.seen_today.append(v.user)
     
-    frappe.publish_realtime(
-        event="alerts_show",
-        message=data,
-        after_commit=True
-    )
+    emit_show_alert(data)
 
 
 # [Alerts Js]
@@ -242,18 +354,11 @@ def mark_seens(names):
         }
     
     user = frappe.session.user
-    data = {"success": 1}
-    unseen = []
     for v in names:
         if v and isinstance(v, str):
-            ret = mark_as_seen(v, user)
-            if not ret:
-                unseen.append(v)
+            mark_as_seen(v, user)
     
-    if unseen:
-        data["unseen"] = unseen
-    
-    return data
+    return {"success": 1}
 
 
 # [Internal]
@@ -261,81 +366,45 @@ def mark_as_seen(name: str, user: str):
     from .cache import get_cached_doc
     
     doc = get_cached_doc(_alert_dt_, name)
-    if not doc or cint(doc.docstatus) != 1:
+    if (
+        not doc or cint(doc.docstatus) != 1 or
+        doc.status != "Active"
+    ):
+        from frappe import _
+        
+        from .common import log_error
+        
+        log_error(_(
+            "The seen alert lert \"{0}\" "
+            + "doesn't exist, is draft, "
+            + "is cancelled or isn't active."
+        ).format(name))
         return 0
     
-    if not is_valid_user(doc, user):
-        return 1
-    
-    from frappe.utils import nowtime
-    
-    doc.append("seen_by", {
-        "user": user,
-        "date": nowdate(),
-        "time": nowtime()
-    })
-    seen = [v.user for v in doc.seen_by]
-    doc.reached = len(list(set(seen)))
-    doc.save(ignore_permissions=True)
-    
-    pop_cached_alert(user, name)
-    
-    frappe.publish_realtime(
-        event="alerts_refresh_seen_by",
-        message={"alert": doc.name},
-        after_commit=True
-    )
+    today = nowdate()
+    if is_valid_user(doc, user, today):
+        from frappe.utils import nowtime
+        
+        from .realtime import emit_alert_seen
+        
+        doc.append("seen_by", {
+            "user": user,
+            "date": today,
+            "time": nowtime()
+        })
+        seen = list(set([v.user for v in doc.seen_by]))
+        doc.reached = len(seen)
+        doc.save(ignore_permissions=True)
+        emit_alert_seen({
+            "alert": doc.name,
+            "delay": 1
+        })
     
     return 1
 
 
 # [Internal]
-def get_cached_alerts(user: str):
-    from .cache import get_cache
-    
-    cache = get_cache(_alert_dt_, user)
-    return cache if isinstance(cache, list) else None
-
-
-# [Internal]
-def set_cached_alerts(user: str, data):
-    from .cache import set_cache
-    
-    set_cache(_alert_dt_, user, data)
-
-
-# [Internal]
-def clear_cached_alerts(user: str):
-    from .cache import del_cache
-    
-    del_cache(_alert_dt_, user)
-
-
-# [Internal]
-def cache_alert(user: str, data):
-    cache = get_cached_alerts(user)
-    if cache is None:
-        cache = []
-    if isinstance(data, list):
-        cache.extend(data)
-    else:
-        cache.append(data)
-    set_cached_alerts(user, cache)
-
-
-# [Internal]
-def pop_cached_alert(user: str, name: str):
-    cache = get_cached_alerts(user)
-    if cache:
-        for i,v in enumerate(cache):
-            if v["name"] == name:
-                cache.pop(i)
-                break
-        set_cached_alerts(user, cache)
-
-
-# [Internal]
-def is_valid_user(doc, user):
+def is_valid_user(doc, user, today):
     valid = 0
     if doc.for_users:
         for v in doc.for_users:
@@ -355,14 +424,25 @@ def is_valid_user(doc, user):
     
     seen = 0
     if doc.seen_by:
-        today = nowdate()
         for v in doc.seen_by:
             if v.user == user:
-                seen += 1
                 if v.date == today:
                     return False
+                
+                seen += 1
     
     if not cint(doc.is_repeatable):
         return seen < 1
     
     return cint(doc.number_of_repeats) > seen
+
+
+# [Internal]
+def seconds_left_for_day():
+    from frappe.utils import now_datetime
+    
+    dt = now_datetime()
+    sec = (24 - dt.hour - 1) * 60 * 60
+    sec = sec + ((60 - dt.minute - 1) * 60)
+    sec = sec + (60 - dt.second)
+    return sec

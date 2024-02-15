@@ -4,19 +4,11 @@
 # Licence: Please refer to LICENSE file
 
 
-from frappe import (
-    _,
-    throw,
-    publish_realtime
-)
+from frappe import _, throw
 from frappe.utils import cint
 from frappe.model.document import Document
 
-from alerts.utils import (
-    clear_doc_cache,
-    is_doc_exists,
-    doc_count
-)
+from alerts.utils import clear_doc_cache
 
 
 class AlertsSettings(Document):
@@ -48,16 +40,18 @@ class AlertsSettings(Document):
     
     def after_save(self):
         if self.has_value_changed("is_enabled"):
-            publish_realtime(
-                event="alerts_app_status_changed",
-                message={"is_enabled": cint(self.is_enabled)},
-                after_commit=True
-            )
+            from alerts.utils import emit_app_status_changed
+            
+            emit_app_status_changed({
+                "is_enabled": cint(self.is_enabled)
+            })
     
     
     def _check_sender(self):
         if not self.update_notification_sender:
             throw(_("A valid update notification sender is required."))
+        
+        from alerts.utils import is_doc_exists
         
         if not is_doc_exists("User", self.update_notification_sender):
             throw(_("The update notification sender selected does not exist."))
@@ -66,6 +60,8 @@ class AlertsSettings(Document):
     def _check_receivers(self):
         if not self.update_notification_receivers:
             throw(_("At least one enabled update notification receiver is required."))
+        
+        from alerts.utils import doc_count
         
         users = [v.user for v in self.update_notification_receivers]
         total = len(users)
