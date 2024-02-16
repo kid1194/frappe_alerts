@@ -296,25 +296,29 @@ class LevelUp extends LevelUpBase {
     _make_realtime_fn(e) {
         this._debug('Register realtime event:', e);
         return this.$fn(function(ret) {
-            if (!this._events.queue) this._events.queue = Promise.resolve();
-            this._events.queue.then(this.$fn(function() {
+            this._debug('Triggered realtime event:', e);
+            let promise = new Promise(this.$fn(function(res) {
+                this._debug('Resolving realtime event:', e);
                 let obj = this.$isDataObjVal(ret);
                 if (obj) {
                     ret = ret.message || ret;
                     obj = this.$isDataObjVal(ret);
                 }
-                if (!obj || !this.$isVal(ret.delay))
-                    return new Promise(this.$fn(function(res) {
-                        this._emit_event(e, [ret]);
-                        res();
-                    }));
-                return new Promise(this.$fn(function(res) {
+                if (!obj || !this.$isVal(ret.delay)) {
+                    this._emit_event(e, [ret]);
+                    res();
+                } else {
                     window.setTimeout(this.$fn(function() {
                         this._emit_event(e, [ret]);
                         res();
                     }), 700);
-                }));
+                }
             }));
+            if (!this._events.queue) this._events.queue = promise;
+            else this._events.queue = Promise.all([
+                this._events.queue,
+                promise
+            ]);
         });
     }
     _remove_event(e, fn) {
