@@ -87,7 +87,7 @@ def get_user_alerts(user: str):
     key = f"{user}-alerts"
     data = get_cache(_alert_dt_, key, True)
     if isinstance(data, list):
-        log_error("Cached alerts: " + str(alerts))
+        log_error("Cached alerts: " + str(data))
         return data
     
     tmp = []
