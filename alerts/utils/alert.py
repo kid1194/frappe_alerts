@@ -88,9 +88,13 @@ def get_user_alerts(user: str):
     if not alerts:
         return None
     
+    from .common import log_error
+    
+    log_error("Daily alerts: " + str(alerts))
     parents = []
     get_alerts_for_user(user, alerts, parents, expiry)
     get_alerts_for_roles(user, alerts, parents, expiry)
+    log_error("Filtered alerts: " + str(parents))
     if not parents:
         return None
     
@@ -113,10 +117,12 @@ def get_user_alerts(user: str):
     qry = type_join_query(qry, doc.alert_type)
     
     data = qry.run(as_dict=True)
+    log_error("Listed alerts: " + str(data))
     if not data or not isinstance(data, list):
         return None
     
     data = filter_seen_alerts(data, user, parents, today, expiry)
+    log_error("Filtered unseen alerts: " + str(data))
     if not data:
         return None
     
