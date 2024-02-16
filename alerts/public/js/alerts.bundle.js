@@ -147,6 +147,7 @@ class LevelUp extends LevelUpBase {
     
     options(opts) { return this.$extend(this, opts); }
     destroy() {
+        this._debug('Destroying LevelUp class');
         window.removeEventListener('beforeunload', this._on_unload);
         this.emit('destroy');
         for (let e in this._events.list) this._clear_events(e);

@@ -28,7 +28,7 @@ after_sync = "alerts.setup.install.after_sync"
 after_migrate = "alerts.setup.migrate.after_migrate"
 
 
-on_login = ["alerts.utils.access.on_login"]
+#on_login = ["alerts.utils.access.on_login"]
 
 
 extend_bootinfo = "alerts.utils.boot.extend"

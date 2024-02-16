@@ -82,21 +82,29 @@ def type_alerts_exists(alert_type):
 
 # [Internal]
 def get_user_alerts(user: str):
-    today = nowdate()
+    key = f"{user}-alerts"
+    data = get_cache(_alert_dt_, key, True)
+    if isinstance(data, list):
+        return data
+    
+    tmp = []
     expiry = seconds_left_for_day()
-    alerts = get_daily_alerts(today, expiry)
+    today = nowdate()
+    alerts = get_daily_alerts(today)
     if not alerts:
-        return None
+        set_cache(_alert_dt_, key, tmp, expiry)
+        return tmp
     
     from .common import log_error
     
     log_error("Daily alerts: " + str(alerts))
     parents = []
-    get_alerts_for_user(user, alerts, parents, expiry)
-    get_alerts_for_roles(user, alerts, parents, expiry)
+    get_alerts_for_user(user, alerts, parents)
+    get_alerts_for_roles(user, alerts, parents)
     log_error("Filtered alerts: " + str(parents))
     if not parents:
-        return None
+        set_cache(_alert_dt_, key, tmp, expiry)
+        return tmp
     
     doc = frappe.qb.DocType(_alert_dt_)
     qry = (
@@ -119,23 +127,21 @@ def get_user_alerts(user: str):
     data = qry.run(as_dict=True)
     log_error("Listed alerts: " + str(data))
     if not data or not isinstance(data, list):
-        return None
+        set_cache(_alert_dt_, key, tmp, expiry)
+        return tmp
     
-    data = filter_seen_alerts(data, user, parents, today, expiry)
+    data = filter_seen_alerts(data, user, parents, today)
     log_error("Filtered unseen alerts: " + str(data))
     if not data:
-        return None
+        data = tmp
     
+    set_cache(_alert_dt_, key, data, expiry)
     return data
 
 
 # [Internal]
-def get_daily_alerts(date: str, expiry: int):
-    data = get_cache(_alert_dt_, date, True)
-    if isinstance(data, list):
-        return data
-    
-    data = frappe.get_all(
+def get_daily_alerts(date: str):
+    return frappe.get_all(
         _alert_dt_,
         fields=["name"],
         filters=[
@@ -148,81 +154,51 @@ def get_daily_alerts(date: str, expiry: int):
         ignore_permissions=True,
         strict=False
     )
-    if not isinstance(data, list):
-        return None
-    
-    set_cache(_alert_dt_, date, data, expiry)
-    return data
 
 
 # [Internal]
-def get_alerts_for_user(user: str, alerts: list, parents: list, expiry: int):
+def get_alerts_for_user(user: str, alerts: list, parents: list):
     dt = f"{_alert_dt_} For User"
-    data = get_cache(dt, user, True)
+    doc = frappe.qb.DocType(dt)
+    data = (
+        frappe.qb.from_(doc)
+        .select(doc.parent)
+        .where(doc.parenttype == _alert_dt_)
+        .where(doc.parentfield == "for_users")
+        .where(doc.parent.isin(alerts))
+        .where(doc.user == user)
+    ).run(as_dict=True)
     if data and isinstance(data, list):
-        if data:
-            parents.extend(data)
-    
-    else:
-        doc = frappe.qb.DocType(dt)
-        data = (
-            frappe.qb.from_(doc)
-            .select(doc.parent)
-            .where(doc.parenttype == _alert_dt_)
-            .where(doc.parentfield == "for_users")
-            .where(doc.parent.isin(alerts))
-            .where(doc.user == user)
-        ).run(as_dict=True)
-        if isinstance(data, list):
-            if data:
-                data = list(set([
-                    v["parent"] for v in data
-                    if v["parent"] not in parents
-                ]))
-                parents.extend(data)
-            
-            set_cache(dt, user, data, expiry)
+        data = list(set([
+            v["parent"] for v in data
+            if v["parent"] not in parents
+        ]))
+        parents.extend(data)
 
 
 # [Internal]
-def get_alerts_for_roles(user: str, alerts: list, parents: list, expiry: int):
+def get_alerts_for_roles(user: str, alerts: list, parents: list):
     dt = f"{_alert_dt_} For Role"
-    data = get_cache(dt, user, True)
+    doc = frappe.qb.DocType(dt)
+    data = (
+        frappe.qb.from_(doc)
+        .select(doc.parent)
+        .where(doc.parenttype == _alert_dt_)
+        .where(doc.parentfield == "for_roles")
+        .where(doc.parent.isin(alerts))
+        .where(doc.role.isin(frappe.get_roles(user)))
+    ).run(as_dict=True)
     if data and isinstance(data, list):
-        if data:
-            parents.extend(data)
-    
-    else:
-        doc = frappe.qb.DocType(dt)
-        data = (
-            frappe.qb.from_(doc)
-            .select(doc.parent)
-            .where(doc.parenttype == _alert_dt_)
-            .where(doc.parentfield == "for_roles")
-            .where(doc.parent.isin(alerts))
-            .where(doc.role.isin(frappe.get_roles(user)))
-        ).run(as_dict=True)
-        if isinstance(data, list):
-            if data:
-                data = list(set([
-                    v["parent"] for v in data
-                    if v["parent"] not in parents
-                ]))
-                parents.extend(data)
-            
-            set_cache(dt, user, data, expiry)
+        data = list(set([
+            v["parent"] for v in data
+            if v["parent"] not in parents
+        ]))
+        parents.extend(data)
 
 
 # [Internal]
-def get_alerts_seen_by(user: str, alerts: list, expiry: int):
-    from .cache import uuid_key
-    
+def get_alerts_seen_by(user: str, alerts: list):
     dt = f"{_alert_dt_} Seen By"
-    key = uuid_key([user, alerts])
-    data = get_cache(dt, key, True)
-    if isinstance(data, list):
-        return data
-    
     doc = frappe.qb.DocType(dt)
     data = (
         frappe.qb.from_(doc)
@@ -235,13 +211,12 @@ def get_alerts_seen_by(user: str, alerts: list, expiry: int):
     if not isinstance(data, list):
         return None
     
-    set_cache(dt, key, data, expiry)
     return data
 
 
 # [Internal]
-def filter_seen_alerts(data: list, user: str, alerts: list, today: str, expiry: int):
-    seen_by = get_alerts_seen_by(user, alerts, expiry)
+def filter_seen_alerts(data: list, user: str, alerts: list, today: str):
+    seen_by = get_alerts_seen_by(user, alerts)
     if not seen_by:
         return data
     
@@ -280,47 +255,28 @@ def cache_alerts(user: str):
 
 
 # [Boot]
-def get_alerts_cache(user: str):
-    from .common import log_error
+def enqueue_alerts(user: str):
+    from .background import enqueue_job
     
-    access = get_cache(_alert_dt_, f"{user}-access", True)
-    log_error("Boot alerts access check: " + str(access))
-    if not access:
-        access = 1
-    if access:
-        del_cache(_alert_dt_, f"{user}-access")
-        cache = get_cache(_alert_dt_, user, True)
-        if not (cache is None):
-            del_cache(_alert_dt_, user)
-        if isinstance(cache, list):
-            return cache if cache else None
-        
-        from .background import enqueue_job
-        
-        log_error("Boot alerts enqueued")
-        enqueue_job(
-            "alerts.utils.alert.show_user_alerts",
-            f"show-user-alerts-for-{user}",
-            user=user
-        )
-    
-    return None
+    enqueue_job(
+        "alerts.utils.alert.show_user_alerts",
+        f"show-user-alerts-for-{user}",
+        queue="long",
+        user=user
+    )
 
 
 # [Internal]
 def show_user_alerts(user: str):
-    data = get_cache(_alert_dt_, user, True)
-    if not (data is None):
-        del_cache(_alert_dt_, user)
-    if not data or not isinstance(data, list):
-        data = get_user_alerts(user)
-    from .common import log_error
-    log_error("Alerts enqueued: " + str(data))
+    data = get_user_alerts(user)
     if data:
+        from .common import log_error
         from .realtime import emit_show_alerts
         
+        log_error("Alerts enqueued: " + str(data))
         for alert in data:
-            emit_show_alerts({"alerts": [alert]}, False)
+            alert["delay"] = 1
+            emit_show_alerts({"alerts": [alert]})
 
 
 # [Alerts Alert]

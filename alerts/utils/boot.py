@@ -10,9 +10,9 @@ def extend(bootinfo):
     
     user = frappe.session.user
     try:
-        from .alert import get_alerts_cache
+        from .alert import enqueue_alerts
         
-        bootinfo.alerts = get_alerts_cache(user)
+        enqueue_alerts(user)
     except Exception as exc:
         from frappe import _
         
