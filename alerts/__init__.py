@@ -6,4 +6,4 @@
 
 __module__ = "Alerts"
 __version__ = "1.0.2"
-__production__ = False
+__production__ = True

@@ -48,13 +48,16 @@ def update_check(doc):
         )
         status_code = request.status_code
         data = request.json()
-    except Exception:
+    except Exception as exc:
+        from .common import log_error
+        
+        log_error(str(exc))
         return 0
     
     if status_code != 200 and status_code != 201:
         return 0
     
-    from .common import parse_json
+    from .common import log_error, parse_json
     
     data = parse_json(data)
     
@@ -78,7 +81,7 @@ def update_check(doc):
     
     latest_version = latest_version.pop()
     has_update = compare_versions(latest_version, __version__) > 0
-    
+    log_error("Latest version: " + latest_version)
     doc.latest_check = now()
     if has_update:
         doc.latest_version = latest_version

@@ -56,14 +56,13 @@ def after_sync():
         idx = 0
         if "Administrator" in managers:
             idx = managers.index("Administrator")
-        sender = managers.pop(idx)
         
-        doc.update_notification_sender = sender
+        doc.update_notification_sender = managers.pop(idx)
         
         if doc.update_notification_receivers:
             doc.update_notification_receivers.clear()
         
-        if manager:
+        if managers:
             for manager in managers:
                 doc.append(
                     "update_notification_receivers",
