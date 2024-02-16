@@ -19,9 +19,12 @@ def settings(for_update=False):
     return get_cached_doc(settings_dt(), None, for_update)
 
 
-# [JS]
+# [Alerts JS]
 @frappe.whitelist()
 def is_enabled():
     from frappe.utils import cint
     
+    from .alert import enqueue_alerts
+    
+    enqueue_alerts()
     return cint(settings().is_enabled) == 1

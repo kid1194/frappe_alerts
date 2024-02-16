@@ -228,10 +228,12 @@ def filter_seen_alerts(data: list, user: str, alerts: list, today: str):
     return list(data.values())
 
 
-# [Boot]
-def enqueue_alerts(user: str):
+# [Alerts Js]
+@frappe.whitelist(methods=["POST"])
+def enqueue_alerts():
     from .background import enqueue_job
     
+    user = frappe.session.user
     try:
         enqueue_job(
             "alerts.utils.alert.show_user_alerts",

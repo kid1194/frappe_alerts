@@ -636,7 +636,7 @@ class Alerts extends LevelUp {
         this._mock = null;
         
         if (cstr(window.location.pathname).indexOf('Alerts%20Settings') >= 0)
-            this._setup(true);
+            this._setup(1, 1);
         else
             this.request('is_enabled', null, this._setup);
     }
@@ -650,11 +650,12 @@ class Alerts extends LevelUp {
         this._list.push.apply(this._list, data);
         return this._build();
     }
-    _setup(ret) {
+    _setup(ret, enq) {
         this._is_ready = true;
         this._is_enabled = !!ret;
         if (!frappe.socketio.socket)
             frappe.socketio.init();
+        this._debug('Socket init', !!frappe.socketio.socket);
         this.on('alerts_app_status_changed', function(ret) {
             if (!ret || ret.is_enabled == null) return;
             var old = this._is_enabled;
@@ -677,6 +678,7 @@ class Alerts extends LevelUp {
                 && this._is_valid(ret)
             ) this.show(ret);
         });
+        if (enq) this.request('enqueue_alerts');
         this.emit('ready');
     }
     _is_valid(data) {
