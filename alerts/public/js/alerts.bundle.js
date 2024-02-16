@@ -13,16 +13,16 @@ if (typeof String.prototype.trim !== 'function')
     }());
 (function() {
     window.addEventListener('load', function() {
-        let imports = {
+        var imports = {
             promise_polyfill: [
                 typeof window.Promise !== 'function',
                 'https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js',
             ],
         },
         $head = document.getElementsByTagName('head')[0];
-        for (let k in imports) {
+        for (var k in imports) {
             if (!imports[k][0]) continue;
-            let $el = document.getElementById(k);
+            var $el = document.getElementById(k);
             if (!!$el) continue;
             $el = document.createElement('script');
             $el.id = k;
@@ -41,12 +41,12 @@ if (typeof String.prototype.trim !== 'function')
 
 class LevelUpBase {
     destroy() {
-        for (let k in this) { if (this.$hasProp(k)) delete this[k]; }
+        for (var k in this) { if (this.$hasProp(k)) delete this[k]; }
     }
     $void() { return void 0; }
     $type(v) {
         if (!this.$isVal(v)) return this.$isVoid(v) ? 'Undefined' : 'Null';
-        let t = Object.prototype.toString.call(v).slice(8, -1);
+        var t = Object.prototype.toString.call(v).slice(8, -1);
         return t === 'Number' && isNaN(v) ? 'NaN' : t;
     }
     $isVal(v) { return v != null; }
@@ -77,9 +77,9 @@ class LevelUpBase {
     $def(o, p, s) { return this.$extend(o, p).$extend(o, s, 1); }
     $extend(o, v, i) {
         if (v && this.$isDataObjVal(v)) {
-            let s = this.$isBoolLike(i);
+            var s = this.$isBoolLike(i);
             if (!s && !this.$isArrVal(i)) i = null;
-            for (let k in v) {
+            for (var k in v) {
                 if (!s && !this.$isVoid(o[k])) o['_' + k] = v[k];
                 else this.$getter(k, v[k], o, s || (i && i.indexOf(k) < 0));
             }
@@ -133,12 +133,11 @@ class LevelUp extends LevelUpBase {
             _realtime: key + '_',
             _prefix: '[' + name + ']',
             _namespace: namespace || '',
-            _debug: !!debug
+            _testing: !!debug
         });
         this._events = {
             list: {},
             real: {},
-            delay: {},
             queue: null
         };
         this._on_unload = this.$fn(this.destroy);
@@ -147,10 +146,9 @@ class LevelUp extends LevelUpBase {
     
     options(opts) { return this.$extend(this, opts); }
     destroy() {
-        this._debug('Destroying LevelUp class');
         window.removeEventListener('beforeunload', this._on_unload);
         this.emit('destroy');
-        for (let e in this._events.list) this._clear_events(e);
+        for (var e in this._events.list) this._clear_events(e);
         super.destroy();
     }
     
@@ -163,7 +161,7 @@ class LevelUp extends LevelUpBase {
             m = t;
             t = null;
         }
-        let o = {
+        var o = {
             title: this._prefix + ': ' + __(this.$isStrVal(t) ? t : d),
             indicator: i,
             message: __('' + m, a),
@@ -176,11 +174,11 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     debug(t, m, a) {
-        if (!this._debug) return this;
+        if (!this._testing) return this;
         return this.$alert(t, m, a, 'Debug', 'gray');
     }
     log(t, m, a) {
-        if (!this._debug) return this;
+        if (!this._testing) return this;
         return this.$alert(t, m, a, 'Log', 'cyan');
     }
     info(t, m, a) { return this.$alert(t, m, a, 'Info', 'light-blue'); }
@@ -189,7 +187,7 @@ class LevelUp extends LevelUpBase {
     fatal(t, m, a) { return this.$alert(t, m, a, 'Error', 'red', 1); }
     
     $console(fn, args) {
-        if (!this._debug) return this;
+        if (!this._testing) return this;
         if (!this.$isStr(args[0]))
             Array.prototype.unshift.call(args, this._prefix);
         else args[0] = (this._prefix + ' ' + args[0]).trim();
@@ -207,7 +205,7 @@ class LevelUp extends LevelUpBase {
         if (method.indexOf('.') < 0) method = this.method(method);
         if (!this.$isFunc(callback)) callback = null;
         if (!this.$isFunc(error)) error = null;
-        let opts = {
+        var opts = {
             method: method,
             freeze: this.$isVal(_freeze),
             callback: this.$fn(function(ret) {
@@ -217,7 +215,7 @@ class LevelUp extends LevelUpBase {
                     if (callback) callback.call(this, ret);
                     return;
                 }
-                let err;
+                var err;
                 if (this.$isStrVal(ret)) err = ret;
                 else if (this.$isDataObjVal(ret)) {
                     if (this.$isStrVal(ret.message)) err = ret.message;
@@ -228,7 +226,7 @@ class LevelUp extends LevelUpBase {
                 else error.call(this, {message: __(message, args)});
             }),
             error: this.$fn(function(ret, txt) {
-                let err;
+                var err;
                 if (this.$isStrVal(ret)) err = ret;
                 else if (this.$isStrVal(txt)) err = txt;
                 else err = 'The request sent raised an error.';
@@ -254,7 +252,7 @@ class LevelUp extends LevelUpBase {
     on(event, fn, _once) {
         if (!this.$isStrVal(event) || !this.$isFunc(fn)) return this;
         event = event.split(' ');
-        for (let i = 0, l = event.length, e; i < l; i++) {
+        for (var i = 0, l = event.length, e; i < l; i++) {
             e = event[i];
             if (e === 'ready' && this.is_ready) {
                 fn.call(this);
@@ -264,10 +262,9 @@ class LevelUp extends LevelUpBase {
             if (!this._events.list[e]) {
                 this._events.list[e] = [];
                 if (e.indexOf(this._realtime) === 0) {
-                    let rfn = this._make_realtime_fn(e);
-                    frappe.realtime.on(e, rfn);
-                    this._debug('Register realtime event:', e, this.$isFunc(rfn));
-                    this._events.real[e] = rfn;
+                    this._events.real[e] = this._make_realtime_fn(e);
+                    frappe.realtime.on(e, this._events.real[e]);
+                    this._debug('Register realtime event:', e, !!frappe.socketio.socket);
                 }
             }
             this._events.list[e].push({f: fn, o: _once});
@@ -279,7 +276,7 @@ class LevelUp extends LevelUpBase {
         if (!this.$isStrVal(event)) return this;
         if (!this.$isFunc(fn)) fn = null;
         event = event.split(' ');
-        for (let i = 0, l = event.length, e; i < l; i++) {
+        for (var i = 0, l = event.length, e; i < l; i++) {
             e = event[i];
             if (this._events.list[e]) this._remove_event(e, fn);
         }
@@ -287,10 +284,10 @@ class LevelUp extends LevelUpBase {
     }
     emit(event) {
         if (!this.$isStrVal(event)) return this;
-        let args = this.$toArr(arguments, 1);
+        var args = this.$toArr(arguments, 1);
         if (args.length < 1) args = null;
         event = event.split(' ');
-        for (let i = 0, l = event.length, e; i < l; i++) {
+        for (var i = 0, l = event.length, e; i < l; i++) {
             e = event[i];
             if (this._events.list[e]) this._emit_event(e, args);
         }
@@ -299,36 +296,36 @@ class LevelUp extends LevelUpBase {
     _make_realtime_fn(e) {
         return this.$fn(function(ret) {
             this._debug('Triggered realtime event:', e, ret);
-            /*//let promise = new Promise(this.$fn(function(res) {
+            var promise = new Promise(this.$fn(function(res) {
                 this._debug('Resolving realtime event:', e);
-                let obj = this.$isDataObjVal(ret);
+                var obj = this.$isDataObjVal(ret);
                 if (obj) {
                     ret = ret.message || ret;
                     obj = this.$isDataObjVal(ret);
                 }
                 if (!obj || !this.$isVal(ret.delay)) {
                     this._emit_event(e, [ret]);
-                    //res();
+                    res();
                 } else {
                     window.setTimeout(this.$fn(function() {
                         this._emit_event(e, [ret]);
                         res();
                     }), 700);
                 }
-            /*}));
+            }));
             if (!this._events.queue) this._events.queue = promise;
             else this._events.queue = Promise.all([
                 this._events.queue,
                 promise
-            ]);*/
+            ]);
         });
     }
     _remove_event(e, fn) {
         if (!fn) this._clear_events(e);
         else {
-            let evs = this._events.list[e].slice(),
+            var evs = this._events.list[e].slice(),
             ret = [];
-            for (let i = 0, x = 0, l = evs.length; i < l; i++) {
+            for (var i = 0, x = 0, l = evs.length; i < l; i++) {
                 if (evs[i].f !== fn) ret[x++] = evs[i];
             }
             if (!ret.length) this._clear_events(e);
@@ -342,9 +339,9 @@ class LevelUp extends LevelUpBase {
         delete this._events.real[e];
     }
     _emit_event(e, args) {
-        let evs = this._events.list[e].slice(),
+        var evs = this._events.list[e].slice(),
         ret = [];
-        for (let i = 0, x = 0, l = evs.length, ev; i < l; i++) {
+        for (var i = 0, x = 0, l = evs.length, ev; i < l; i++) {
             ev = evs[i];
             if (!args) ev.f.call(this);
             else ev.f.apply(this, args);
@@ -379,10 +376,10 @@ class LevelUp extends LevelUpBase {
     enable_form(frm, workflow) {
         this.init_form(frm);
         if (!frm[this._key].form_disabled) return this.emit('form_enabled');
-        let fields = frm[this._key].fields_disabled;
+        var fields = frm[this._key].fields_disabled;
         if (!fields.length) return this;
         try {
-            for (let i = 0, l = frm.fields.length, f; i < l; i++) {
+            for (var i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
                 if (f && fields.indexOf(f.df.fieldname) < 0) continue;
                 if (f.df.fieldtype === 'Table') this.enable_table(frm, f.df.fieldname);
@@ -422,7 +419,7 @@ class LevelUp extends LevelUpBase {
             args = null;
         }
         try {
-            for (let i = 0, l = frm.fields.length, f; i < l; i++) {
+            for (var i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
                 if (f.df.fieldtype === 'Table') this.disable_table(frm, f.df.fieldname);
                 else this.disable_field(frm, f.df.fieldname);
@@ -453,7 +450,7 @@ class LevelUp extends LevelUpBase {
     enable_field(frm, key) {
         this.init_form(frm);
         if (!!frm[this._key].tables_disabled[key]) return this;
-        let field = frm.get_field(key);
+        var field = frm.get_field(key);
         if (
             !field || !field.df || !field.df.fieldtype
             || !this._is_field(field.df.fieldtype)
@@ -464,7 +461,7 @@ class LevelUp extends LevelUpBase {
             );
         frm.set_df_property(key, 'read_only', 0);
         if (cint(field.df.translatable) && field.$wrapper) {
-            let $btn = field.$wrapper.find('.clearfix .btn-translation');
+            var $btn = field.$wrapper.find('.clearfix .btn-translation');
             if ($btn.length) $btn.show();
         }
         return this;
@@ -475,7 +472,7 @@ class LevelUp extends LevelUpBase {
             frm[this._key].fields_disabled.indexOf(key) >= 0
             || !!frm[this._key].tables_disabled[key]
         ) return this;
-        let field = frm.get_field(key);
+        var field = frm.get_field(key);
         if (
             !field || !field.df || !field.df.fieldtype
             || !this._is_field(field.df.fieldtype)
@@ -483,7 +480,7 @@ class LevelUp extends LevelUpBase {
         frm[this._key].fields_disabled.push(key);
         frm.set_df_property(key, 'read_only', 1);
         if (cint(field.df.translatable) && field.$wrapper) {
-            let $btn = field.$wrapper.find('.clearfix .btn-translation');
+            var $btn = field.$wrapper.find('.clearfix .btn-translation');
             if ($btn.length) $btn.hide();
         }
         return this;
@@ -495,7 +492,7 @@ class LevelUp extends LevelUpBase {
     enable_table(frm, key) {
         this.init_form(frm);
         if (!frm[this._key].tables_disabled[key]) return this;
-        let obj = frm[this._key].tables_disabled[key],
+        var obj = frm[this._key].tables_disabled[key],
         grid = frm.get_field(key).grid;
         delete frm[this._key].tables_disabled[key];
         frm[this._key].fields_disabled.splice(
@@ -517,12 +514,12 @@ class LevelUp extends LevelUpBase {
     disable_table(frm, key) {
         this.init_form(frm);
         if (frm[this._key].tables_disabled[key]) return this;
-        let field = frm.get_field(key);
+        var field = frm.get_field(key);
         if (!field || !field.df || !field.df.fieldtype || field.df.fieldtype !== 'Table') return this;
-        let grid = field.grid;
+        var grid = field.grid;
         if (!grid) return this;
         frm[this._key].fields_disabled.push(key);
-        let obj = frm[this._key].tables_disabled[key] = {};
+        var obj = frm[this._key].tables_disabled[key] = {};
         if (grid.meta) {
             obj.editable_grid = grid.meta.editable_grid;
             grid.meta.editable_grid = true;
@@ -551,14 +548,14 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     _toggle_buttons(grid, obj, show) {
-        let btns = {
+        var btns = {
             add_row: '.grid-add-row',
             add_multi_row: '.grid-add-multiple-rows',
             download: '.grid-download',
             upload: '.grid-upload',
         },
         $btn;
-        for (let k in btns) {
+        for (var k in btns) {
             if (show && !this.$isVal(obj[k])) continue;
             $btn = grid.find(btns[k]);
             if ($btn.length && $btn.is(':visible') != show) {
@@ -572,9 +569,9 @@ class LevelUp extends LevelUpBase {
     }
     
     invalid_field(frm, key, error, args) {
-        let field = frm.get_field(key);
+        var field = frm.get_field(key);
         if (!field) return this;
-        let change = 0;
+        var change = 0;
         if (field.df && !field.df.invalid) {
             field.df.invalid = 1;
             if (this.$isFunc(field.set_invalid))
@@ -596,9 +593,9 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     valid_field(frm, key) {
-        let field = frm.get_field(key);
+        var field = frm.get_field(key);
         if (!field) return this;
-        let change = 0;
+        var change = 0;
         if (field.df && field.df.invalid) {
             field.df.invalid = 0;
             if (this.$isFunc(field.set_invalid))
@@ -656,6 +653,8 @@ class Alerts extends LevelUp {
     _setup(ret) {
         this._is_ready = true;
         this._is_enabled = !!ret;
+        if (!frappe.socketio.socket)
+            frappe.socketio.init();
         this.on('alerts_app_status_changed', function(ret) {
             if (!ret || ret.is_enabled == null) return;
             var old = this._is_enabled;
@@ -663,6 +662,7 @@ class Alerts extends LevelUp {
             if (this._is_enabled !== old) this.emit('change');
         })
         .on('alerts_show', function(ret) {
+            this._debug('alerts_show', ret);
             if (
                 this._is_enabled
                 && this.$isDataObjVal(ret)

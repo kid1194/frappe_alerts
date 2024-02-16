@@ -39,19 +39,17 @@ def search_users(doctype, txt, searchfield, start, page_len, filters, as_dict=Fa
         .where(doc.name.isin(hqry))
         .where(doc.enabled == 1)
     )
-    
     qry = filter_search(doc, qry, dt, txt, doc.name, "name")
     
-    existing = filters.get("existing")
+    existing = filters.get("existing", "")
     if existing and isinstance(existing, str):
         from .common import parse_json
         
         existing = parse_json(existing)
+    
     if existing and isinstance(existing, list):
         qry = qry.where(doc.name.notin(existing))
     
     data = qry.run(as_dict=as_dict)
-    
     data = prepare_data(data, dt, "name", txt, as_dict)
-    
     return data

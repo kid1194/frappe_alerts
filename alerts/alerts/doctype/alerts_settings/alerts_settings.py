@@ -13,10 +13,7 @@ from alerts.utils import clear_doc_cache
 
 class AlertsSettings(Document):
     def before_validate(self):
-        if (
-            cint(self.is_enabled) and
-            self.update_notification_receivers
-        ):
+        if self.update_notification_receivers:
             existing = []
             for v in self.update_notification_receivers:
                 if v.user in existing:
@@ -26,10 +23,7 @@ class AlertsSettings(Document):
     
     
     def validate(self):
-        if (
-            cint(self.is_enabled) and
-            cint(self.send_update_notification)
-        ):
+        if cint(self.send_update_notification):
             self._check_sender()
             self._check_receivers()
     

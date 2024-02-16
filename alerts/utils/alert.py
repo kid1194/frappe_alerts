@@ -7,12 +7,6 @@
 import frappe
 from frappe.utils import cint, nowdate
 
-from .cache import (
-    get_cache,
-    set_cache,
-    del_cache
-)
-
 
 # [Internal]
 _alert_dt_ = "Alert"
@@ -62,15 +56,6 @@ def update_alerts():
         
         for v in data:
             clear_doc_cache(_alert_dt_, v["name"])
-        
-        clear_alert_cache()
-
-
-# [Alerts Alert, Internal]
-def clear_alert_cache():
-    del_cache(f"{_alert_dt_} For User")
-    del_cache(f"{_alert_dt_} For Role")
-    del_cache(f"{_alert_dt_} Seen By")
 
 
 # [Alert Type]
@@ -82,6 +67,7 @@ def type_alerts_exists(alert_type):
 
 # [Internal]
 def get_user_alerts(user: str):
+    from .cache import get_cache, set_cache
     from .common import log_error
     
     key = f"{user}-alerts"
@@ -240,19 +226,6 @@ def filter_seen_alerts(data: list, user: str, alerts: list, today: str):
                 data.pop(v["parent"], None)
     
     return list(data.values())
-
-
-# [Access]
-def cache_alerts(user: str):
-    from .common import log_error
-    
-    set_cache(_alert_dt_, f"{user}-access", 1, 120)
-    data = get_user_alerts(user)
-    log_error("Access alerts list: " + str(data))
-    if not data:
-        data = []
-    expiry = seconds_left_for_day()
-    set_cache(_alert_dt_, user, data, expiry)
 
 
 # [Boot]

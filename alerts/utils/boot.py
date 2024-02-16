@@ -8,11 +8,10 @@
 def extend(bootinfo):
     import frappe
     
-    user = frappe.session.user
     try:
         from .alert import enqueue_alerts
         
-        enqueue_alerts(user)
+        enqueue_alerts(frappe.session.user)
     except Exception as exc:
         from frappe import _
         
@@ -22,4 +21,4 @@ def extend(bootinfo):
         log_error(_(
             "An error has occurred while getting "
             + "cached alerts on boot of user \"{0}\"."
-        ).format(user))
+        ).format(frappe.session.user))

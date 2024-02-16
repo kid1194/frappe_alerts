@@ -26,6 +26,7 @@ app_include_js = [
 
 after_sync = "alerts.setup.install.after_sync"
 after_migrate = "alerts.setup.migrate.after_migrate"
+after_uninstall = "alerts.setup.uninstall.after_uninstall"
 
 
 extend_bootinfo = "alerts.utils.boot.extend"

@@ -7,37 +7,33 @@
 import frappe
 from frappe.utils import cint
 
-from alerts import __production__
-
 from .settings import settings
 
 
 ## [Hooks]
 def auto_check_for_update():
-    if __production__:
-        doc = settings()
-        if cint(doc.is_enabled) and cint(doc.auto_check_for_update):
-            update_check(doc)
+    doc = settings()
+    if cint(doc.is_enabled) and cint(doc.auto_check_for_update):
+        update_check(doc)
 
 
 # [Alerts Settings Form]
 @frappe.whitelist()
 def check_for_update():
-    if __production__:
-        doc = settings()
-        if cint(doc.is_enabled):
-            return update_check(doc)
+    doc = settings()
+    if cint(doc.is_enabled):
+        from frappe.utils import get_datetime
+        
+        if cint((get_datetime() - get_datetime(doc.latest_check)).minutes) < 5:
+            return 0
+        
+        return update_check(doc)
     
     return 0
 
 
 # [Internal]
 def update_check(doc):
-    # from frappe.utils import get_datetime
-    
-    # if cint((get_datetime() - get_datetime(doc.latest_check)).days) < 1:
-    #     return 0
-    
     from frappe.utils import get_request_session
     
     try:
@@ -57,7 +53,7 @@ def update_check(doc):
     if status_code != 200 and status_code != 201:
         return 0
     
-    from .common import log_error, parse_json
+    from .common import parse_json
     
     data = parse_json(data)
     
@@ -81,7 +77,6 @@ def update_check(doc):
     
     latest_version = latest_version.pop()
     has_update = compare_versions(latest_version, __version__) > 0
-    log_error("Latest version: " + latest_version)
     doc.latest_check = now()
     if has_update:
         doc.latest_version = latest_version

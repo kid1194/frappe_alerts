@@ -11,7 +11,7 @@ import frappe
 from alerts import __module__
 
 
-# [Access, Alert, Boot, Update]
+# [Alert, Boot, Update]
 def log_error(msg):
     from alerts.version import is_version_lt
     

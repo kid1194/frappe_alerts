@@ -8,20 +8,6 @@ import frappe
 
 
 # [Alert]
-def uuid_key(args):
-    import hashlib
-    import uuid
-    
-    from frappe.utils import cstr
-    
-    from .common import to_json
-    
-    return cstr(uuid.UUID(hashlib.sha256(
-        to_json(args, "").encode("utf-8")
-    ).hexdigest()[::2]))
-
-
-# [Alert]
 def get_cache(dt, key, expires: bool=False):
     return frappe.cache().get_value(f"{dt}-{key}", expires=expires)
 
@@ -34,7 +20,7 @@ def set_cache(dt, key, data, expiry: int=0):
         frappe.cache().set_value(f"{dt}-{key}", data, expires_in_sec=expiry)
 
 
-# [Alert, Internal]
+# [Internal]
 def del_cache(dt, key=None):
     if key:
         frappe.cache().delete_key(f"{dt}-{key}")

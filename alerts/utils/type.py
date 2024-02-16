@@ -11,7 +11,7 @@ import frappe
 _type_dt_ = "Alert Type"
 
 
-# [Internal, Migrate]
+# [Internal]
 def get_type(name: str):
     from .cache import get_cached_doc
     

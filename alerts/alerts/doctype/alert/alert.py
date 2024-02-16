@@ -64,14 +64,9 @@ class Alert(Document):
         clear_doc_cache(self.doctype, self.name)
         if (
             self.has_value_changed("status") and
-            self.status in ("Active", "Finished")
+            self.status == "Active"
         ):
-            from alerts.utils import clear_alert_cache
-            
-            if self.status == "Active":
-                self.flags.send_alert = True
-            
-            clear_alert_cache()
+            self.flags.send_alert = True
     
     
     def on_update_after_submit(self):
