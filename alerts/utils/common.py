@@ -29,14 +29,19 @@ def error(msg, throw=True):
         frappe.throw(msg, title=__module__)
 
 
-# [Alert, Alerts Settings]
+# [Alert, Alerts Settings, Update]
 def is_doc_exists(dt, name=None):
+    params = {"doctype": dt}
     if name is None:
-        name = dt
-    return frappe.db.exists(dt, name) != None
+        params["name"] = dt
+    elif isinstance(name, str):
+        params["name"] = name
+    elif isinstance(name, dict):
+        params.update(name)
+    return frappe.db.exists(params) != None
 
 
-# [Alert Type, Alerts Settings, Update]
+# [Alert Type, Alerts Settings]
 def doc_count(dt, filters: dict):
     return frappe.db.count(dt, filters)
 

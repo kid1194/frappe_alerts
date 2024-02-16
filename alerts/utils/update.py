@@ -5,7 +5,6 @@
 
 
 import frappe
-from frappe import _
 from frappe.utils import cint
 
 from alerts import __production__
@@ -34,18 +33,12 @@ def check_for_update():
 
 # [Internal]
 def update_check(doc):
-    import re
+    from frappe.utils import get_datetime
     
-    from frappe.utils import (
-        get_request_session,
-        cstr,
-        now,
-        markdown
-    )
+    if cint((get_datetime() - get_datetime(doc.latest_check)).days) < 1:
+        return 0
     
-    from alerts import __version__
-    
-    from .common import doc_count, parse_json
+    from frappe.utils import get_request_session
     
     try:
         http = get_request_session()
@@ -61,24 +54,32 @@ def update_check(doc):
     if status_code != 200 and status_code != 201:
         return 0
     
+    from .common import parse_json
+    
     data = parse_json(data)
     
     if (
-        not data or not isinstance(data, dict) or
-        not getattr(data, "tag_name", "") or
-        not getattr(data, "body", "")
+        not data or
+        not isinstance(data, dict) or
+        not data.get("tag_name", "") or
+        not data.get("body", "")
     ):
         return 0
     
-    latest_version = re.findall(r"(\d+(?:\.\d+)+)", cstr(data.get("tag_name")))
+    import re
+    
+    latest_version = re.findall(r"(\d+(?:\.\d+|)+)", str(data.get("tag_name")))
     if not latest_version:
         return 0
+    
+    from frappe.utils import now
+    
+    from alerts import __version__
     
     latest_version = latest_version.pop()
     has_update = compare_versions(latest_version, __version__) > 0
     
     doc.latest_check = now()
-    
     if has_update:
         doc.latest_version = latest_version
         doc.has_update = 1
@@ -87,18 +88,21 @@ def update_check(doc):
     
     if (
         has_update and
-        cint(doc.send_update_notification) and
-        doc_count("User", {
-            "name": doc.update_notification_sender,
-            "enabled": 1
-        }) == 1
+        str(data.get("body")) and
+        cint(doc.send_update_notification)
     ):
-        enqueue_send_notification(
-            latest_version,
-            doc.update_notification_sender,
-            [v.user for v in doc.update_notification_receivers],
-            markdown(response.get("body"))
-        )
+        from .background import is_job_running, enqueue_job
+        
+        job_name = f"alerts-send-notification-{latest_version}"
+        if not is_job_running(job_name):
+            enqueue_job(
+                "alerts.utils.update.send_notification",
+                job_name,
+                version=latest_version,
+                sender=doc.update_notification_sender,
+                receivers=[v.user for v in doc.update_notification_receivers],
+                message=str(data.get("body"))
+            )
     
     return 1 if has_update else 0
 
@@ -127,34 +131,27 @@ def compare_versions(verA, verB):
 
 
 # [Internal]
-def enqueue_send_notification(version, sender, receivers, message):
-    from .background import is_job_running, enqueue_job
-    
-    job_name = f"alerts-send-notification-{version}"
-    if not is_job_running(job_name):
-        enqueue_job(
-            "alerts.utils.update.send_notification",
-            job_name,
-            version=version,
-            sender=sender,
-            receivers=receivers,
-            message=message
-        )
-
-
-# [Internal]
 def send_notification(version, sender, receivers, message):
-    from frappe.desk.doctype.notification_settings.notification_settings import (
-        is_notifications_enabled
-    )
+    from frappe.utils import markdown
     
-    from alerts import __module__
+    message = markdown(message)
+    if not message:
+        return 0
     
-    from .settings import settings_dt
+    from .common import is_doc_exists
+    
+    if not is_doc_exists("User", {"name": sender, "enabled": 1}):
+        return 0
     
     receivers = filter_receivers(receivers);
     if not receivers:
         return 0
+    
+    from frappe import _
+    
+    from alerts import __module__
+    
+    from .settings import settings_dt
     
     dt = settings_dt()
     doc = {
@@ -168,32 +165,45 @@ def send_notification(version, sender, receivers, message):
         ),
     }
     for receiver in receivers:
-        if is_notifications_enabled(receiver):
-            (frappe.new_doc("Notification Log")
-                .update(doc)
-                .update({"for_user": receiver})
-                .insert(ignore_permissions=True, ignore_mandatory=True))
+        (frappe.new_doc("Notification Log")
+            .update(doc)
+            .update({"for_user": receiver})
+            .insert(ignore_permissions=True, ignore_mandatory=True))
 
 
 # [Internal]
 def filter_receivers(names: list):
     dt = "User"
-    data = frappe.get_all(
+    names = list(set(names))
+    names = frappe.get_all(
         dt,
         fields=["name"],
         filters=[
-            [dt, "name", "in", list(set(names))],
+            [dt, "name", "in", names],
             [dt, "enabled", "=", 1]
         ],
         pluck="name",
+        ignore_permissions=True,
         strict=False
     )
-    
-    if (
-        not data or
-        not isinstance(data, list)
-    ):
+    if not names or not isinstance(names, list):
         return None
     
-    data = [v for v in data if v in names]
-    return data
+    dt = "Notification Settings"
+    users = frappe.get_all(
+        dt,
+        fields=["name", "enabled"],
+        filters=[[dt, "name", "in", names]],
+        pluck="name",
+        ignore_permissions=True,
+        strict=False
+    )
+    if users and isinstance(users, list):
+        for v in users:
+            if v["name"] in names and not cint(v["enabled"]):
+                names.pop(names.index(v["name"]))
+    
+    if not names:
+        return None
+    
+    return names
