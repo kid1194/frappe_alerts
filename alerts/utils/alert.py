@@ -285,6 +285,8 @@ def get_alerts_cache(user: str):
     
     access = get_cache(_alert_dt_, f"{user}-access", True)
     log_error("Boot alerts access check: " + str(access))
+    if not access:
+        access = 1
     if access:
         del_cache(_alert_dt_, f"{user}-access")
         cache = get_cache(_alert_dt_, user, True)
