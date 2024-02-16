@@ -82,9 +82,12 @@ def type_alerts_exists(alert_type):
 
 # [Internal]
 def get_user_alerts(user: str):
+    from .common import log_error
+    
     key = f"{user}-alerts"
     data = get_cache(_alert_dt_, key, True)
     if isinstance(data, list):
+        log_error("Cached alerts: " + str(alerts))
         return data
     
     tmp = []
@@ -94,8 +97,6 @@ def get_user_alerts(user: str):
     if not alerts:
         set_cache(_alert_dt_, key, tmp, expiry)
         return tmp
-    
-    from .common import log_error
     
     log_error("Daily alerts: " + str(alerts))
     parents = []
@@ -258,11 +259,16 @@ def cache_alerts(user: str):
 def enqueue_alerts(user: str):
     from .background import enqueue_job
     
-    enqueue_job(
-        "alerts.utils.alert.show_user_alerts",
-        f"show-user-alerts-for-{user}",
-        user=user
-    )
+    try:
+        enqueue_job(
+            "alerts.utils.alert.show_user_alerts",
+            f"show-user-alerts-for-{user}",
+            user=user
+        )
+    except Exception as exc:
+        from .common import log_error
+        
+        log_error(str(exc))
 
 
 # [Internal]
@@ -274,9 +280,10 @@ def show_user_alerts(user: str):
         
         try:
             emit_show_alerts({"alerts": data})
-            log_error("Alerts enqueued: " + str(data))
         except Exception as exc:
             log_error(str(exc))
+        finally:
+            log_error("Alerts enqueued: " + str(data))
 
 
 # [Alerts Alert]
