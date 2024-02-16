@@ -682,8 +682,21 @@ class Alerts extends LevelUp {
                 && this._is_valid(ret)
             ) this.show(ret);
         });
-        if (enq) this.request('enqueue_alerts');
+        //if (enq) this.request('enqueue_alerts');
         this.emit('ready');
+        window.setTimeout(this.$fn(function() {
+            this._debug('enqueue_alerts sending');
+            this.request(
+                'enqueue_alerts',
+                null,
+                function() {
+                    this._debug('enqueue_alerts sent');
+                },
+                function(e) {
+                    this._error('enqueue_alerts failed', e.message);
+                }
+            );
+        }), 10000);
     }
     _is_valid(data) {
         if (!this.$isDataObjVal(data)) return false;
@@ -1029,13 +1042,4 @@ class AlertsStyle extends LevelUpBase {
 
 $(document).ready(function() {
     frappe.alerts = new Alerts();
-    (function() {
-        var show_alerts = function() {
-            frappe.alerts.on('ready', function() {
-                this.show(frappe.boot.alerts);
-            });
-        };
-        if (frappe.boot && frappe.boot.alerts) show_alerts();
-        else frappe.after_ajax(show_alerts);
-    }());
 });

@@ -229,7 +229,7 @@ def filter_seen_alerts(data: list, user: str, alerts: list, today: str):
 
 
 # [Alerts Js]
-@frappe.whitelist(methods=["POST"])
+@frappe.whitelist()
 def enqueue_alerts():
     from .background import enqueue_job
     
