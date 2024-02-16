@@ -139,6 +139,7 @@ class LevelUp extends LevelUpBase {
             list: {},
             real: {},
             delay: {},
+            queue: null
         };
         this._on_unload = this.$fn(this.destroy);
         window.addEventListener('beforeunload', this._on_unload);
@@ -295,20 +296,25 @@ class LevelUp extends LevelUpBase {
     _make_realtime_fn(e) {
         this._debug('Register realtime event:', e);
         return this.$fn(function(ret) {
-            let obj = this.$isDataObjVal(ret);
-            if (obj) {
-                ret = ret.message || ret;
-                obj = this.$isDataObjVal(ret);
-            }
-            if (!obj || !this.$isVal(ret.delay)) res(ret);
-            else {
-                if (this._events.delay[e])
-                    window.clearTimeout(this._events.delay[e]);
-                this._events.delay[e] = window.setTimeout(this.$fn(function() {
-                    delete this._events.delay[e];
-                    this._emit_event(e, [ret]);
-                }), 2000);
-            }
+            if (!this._events.queue) this._events.queue = Promise.resolve();
+            this._events.queue.then(this.$fn(function() {
+                let obj = this.$isDataObjVal(ret);
+                if (obj) {
+                    ret = ret.message || ret;
+                    obj = this.$isDataObjVal(ret);
+                }
+                if (!obj || !this.$isVal(ret.delay))
+                    return new Promise(this.$fn(function(res) {
+                        this._emit_event(e, [ret]);
+                        res();
+                    }));
+                return new Promise(this.$fn(function(res) {
+                    window.setTimeout(this.$fn(function() {
+                        this._emit_event(e, [ret]);
+                        res();
+                    }), 700);
+                }));
+            }));
         });
     }
     _remove_event(e, fn) {

@@ -319,7 +319,8 @@ def show_user_alerts(user: str):
     if data:
         from .realtime import emit_show_alerts
         
-        emit_show_alerts({"alerts": data}, False)
+        for alert in data:
+            emit_show_alerts({"alerts": [alert]}, False)
 
 
 # [Alerts Alert]
