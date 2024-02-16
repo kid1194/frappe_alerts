@@ -23,17 +23,17 @@ def is_job_running(name: str):
 
 ## [Alert, Files, Update]
 def enqueue_job(method: str, job_name: str, **kwargs):
+    if "is_async" not in kwargs:
+        kwargs["is_async"] = True
     if is_version_gt(14):
         frappe.enqueue(
             method,
             job_id=job_name,
-            is_async=True,
             **kwargs
         )
     else:
         frappe.enqueue(
             method,
             job_name=job_name,
-            is_async=True,
             **kwargs
         )

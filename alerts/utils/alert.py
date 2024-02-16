@@ -261,7 +261,6 @@ def enqueue_alerts(user: str):
     enqueue_job(
         "alerts.utils.alert.show_user_alerts",
         f"show-user-alerts-for-{user}",
-        queue="long",
         user=user
     )
 
@@ -273,10 +272,8 @@ def show_user_alerts(user: str):
         from .common import log_error
         from .realtime import emit_show_alerts
         
+        emit_show_alerts({"alerts": data})
         log_error("Alerts enqueued: " + str(data))
-        for alert in data:
-            alert["delay"] = 1
-            emit_show_alerts({"alerts": [alert]})
 
 
 # [Alerts Alert]
