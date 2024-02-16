@@ -272,8 +272,11 @@ def show_user_alerts(user: str):
         from .common import log_error
         from .realtime import emit_show_alerts
         
-        emit_show_alerts({"alerts": data})
-        log_error("Alerts enqueued: " + str(data))
+        try:
+            emit_show_alerts({"alerts": data})
+            log_error("Alerts enqueued: " + str(data))
+        except Exception as exc:
+            log_error(str(exc))
 
 
 # [Alerts Alert]
