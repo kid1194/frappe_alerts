@@ -159,7 +159,7 @@ def get_daily_alerts(date: str, expiry: int):
 def get_alerts_for_user(user: str, alerts: list, parents: list, expiry: int):
     dt = f"{_alert_dt_} For User"
     data = get_cache(dt, user, True)
-    if isinstance(data, list):
+    if data and isinstance(data, list):
         if data:
             parents.extend(data)
     
@@ -188,7 +188,7 @@ def get_alerts_for_user(user: str, alerts: list, parents: list, expiry: int):
 def get_alerts_for_roles(user: str, alerts: list, parents: list, expiry: int):
     dt = f"{_alert_dt_} For Role"
     data = get_cache(dt, user, True)
-    if isinstance(data, list):
+    if data and isinstance(data, list):
         if data:
             parents.extend(data)
     
