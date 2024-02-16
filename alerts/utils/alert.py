@@ -313,6 +313,7 @@ def send_alert(doc):
     
     user = frappe.session.user
     data = frappe._dict({
+        "delay": 1,
         "name": doc.name,
         "title": doc.title,
         "alert_type": doc.alert_type,

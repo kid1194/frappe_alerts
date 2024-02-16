@@ -33,10 +33,10 @@ def check_for_update():
 
 # [Internal]
 def update_check(doc):
-    from frappe.utils import get_datetime
+    # from frappe.utils import get_datetime
     
-    if cint((get_datetime() - get_datetime(doc.latest_check)).days) < 1:
-        return 0
+    # if cint((get_datetime() - get_datetime(doc.latest_check)).days) < 1:
+    #     return 0
     
     from frappe.utils import get_request_session
     

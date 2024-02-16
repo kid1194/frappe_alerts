@@ -138,6 +138,7 @@ class LevelUp extends LevelUpBase {
         this._events = {
             list: {},
             real: {},
+            delay: {},
         };
         this._on_unload = this.$fn(this.destroy);
         window.addEventListener('beforeunload', this._on_unload);
@@ -260,7 +261,7 @@ class LevelUp extends LevelUpBase {
             if (e === 'ready' || e === 'destroy') _once = 1;
             if (!this._events.list[e]) {
                 this._events.list[e] = [];
-                if (e.indexOf(this._realtime) >= 0) {
+                if (e.indexOf(this._realtime) === 0) {
                     this._events.real[e] = this._make_realtime_fn(e);
                     frappe.realtime.on(e, this._events.real[e]);
                 }
@@ -292,6 +293,7 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     _make_realtime_fn(e) {
+        this._debug('Register realtine event:', e);
         return this.$fn(function(ret) {
             (new Promise(this.$fn(function(res, rej) {
                 let obj = this.$isDataObjVal(ret);
@@ -301,10 +303,10 @@ class LevelUp extends LevelUpBase {
                 }
                 if (!obj || !this.$isVal(ret.delay)) res(ret);
                 else {
-                    if (this._events.real[e]._to)
-                        window.clearTimeout(this._events.real[e]._to);
-                    this._events.real[e]._to = window.setTimeout(this.$fn(function() {
-                        this._events.real[e]._to = null;
+                    if (this._events.delay[e])
+                        window.clearTimeout(this._events.delay[e]);
+                    this._events.delay[e] = window.setTimeout(this.$fn(function() {
+                        delete this._events.delay[e];
                         res(ret);
                     }), 700);
                 }
@@ -660,6 +662,7 @@ class Alerts extends LevelUp {
             ) this.show(ret.alerts);
         })
         .on('alerts_show_alert', function(ret) {
+            this._debug('alerts_show_alert', ret);
             if (
                 this._is_enabled
                 && this.$isDataObjVal(ret)
