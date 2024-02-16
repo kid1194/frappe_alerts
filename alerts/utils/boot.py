@@ -13,11 +13,12 @@ def extend(bootinfo):
         from .alert import get_alerts_cache
         
         bootinfo.alerts = get_alerts_cache(user)
-    except Exception:
+    except Exception as exc:
         from frappe import _
         
         from .common import log_error
         
+        log_error(str(exc))
         log_error(_(
             "An error has occurred while getting "
             + "cached alerts on boot of user \"{0}\"."
