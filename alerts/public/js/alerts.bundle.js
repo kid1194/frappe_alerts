@@ -709,7 +709,7 @@ class Alerts extends LevelUp {
             .setMessage(data.message)
             .setStyle(
                 data.background,
-                dota.border_color,
+                data.border_color,
                 data.title_color,
                 data.content_color
             )
@@ -779,7 +779,7 @@ class AlertsMock extends LevelUpBase {
             .setMessage('This is a mock alert message.')
             .setStyle(
                 data.background,
-                dota.border_color,
+                data.border_color,
                 data.title_color,
                 data.content_color
             )
