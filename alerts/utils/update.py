@@ -24,7 +24,8 @@ def check_for_update():
     if cint(doc.is_enabled):
         from frappe.utils import get_datetime
         
-        if cint((get_datetime() - get_datetime(doc.latest_check)).minutes) < 5:
+        diff = cint(float((get_datetime() - get_datetime(doc.latest_check)).total_seconds()) / 60)
+        if diff < 5:
             return 0
         
         return update_check(doc)

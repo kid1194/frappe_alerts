@@ -235,11 +235,12 @@ def enqueue_alerts():
     
     user = frappe.session.user
     try:
-        enqueue_job(
-            "alerts.utils.alert.show_user_alerts",
-            f"show-user-alerts-for-{user}",
-            user=user
-        )
+        show_user_alerts(user)
+        # enqueue_job(
+        #     "alerts.utils.alert.show_user_alerts",
+        #     f"show-user-alerts-for-{user}",
+        #     user=user
+        # )
     except Exception as exc:
         from .common import log_error
         
@@ -254,7 +255,7 @@ def show_user_alerts(user: str):
         from .realtime import emit_show_alerts
         
         try:
-            emit_show_alerts({"alerts": data}, False)
+            emit_show_alerts({"alerts": data})
         except Exception as exc:
             log_error(str(exc))
         finally:

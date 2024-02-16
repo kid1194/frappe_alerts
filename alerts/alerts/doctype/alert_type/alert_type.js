@@ -20,9 +20,9 @@ frappe.ui.form.on('Alert Type', {
     refresh: function(frm) {
         if (!frm._type.ready) frm.trigger('load_toolbar');
     },
-    disabled: function(frm) {
+    /*disabled: function(frm) {
         frm.trigger('load_toolbar');
-    },
+    },*/
     validate: function(frm) {
         if (
             !cint(frm.doc.disabled)
