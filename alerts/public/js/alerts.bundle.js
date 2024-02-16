@@ -264,9 +264,9 @@ class LevelUp extends LevelUpBase {
                 if (e.indexOf(this._realtime) === 0) {
                     this._events.real[e] = this._make_realtime_fn(e);
                     frappe.realtime.on(e, this._events.real[e]);
-                    this._debug('Register realtime event:', e, !!frappe.socketio.socket);
                 }
             }
+            this._debug('Registered event:', e);
             this._events.list[e].push({f: fn, o: _once});
         }
         return this;
@@ -295,6 +295,7 @@ class LevelUp extends LevelUpBase {
     }
     _make_realtime_fn(e) {
         return this.$fn(function(ret) {
+            try {
             this._debug('Triggered realtime event:', e, ret);
             var promise = new Promise(this.$fn(function(res) {
                 this._debug('Resolving realtime event:', e);
@@ -318,6 +319,9 @@ class LevelUp extends LevelUpBase {
                 this._events.queue,
                 promise
             ]);
+            } catch(ex) {
+                this._error(ex.message);
+            }
         });
     }
     _remove_event(e, fn) {
