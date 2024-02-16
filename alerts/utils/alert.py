@@ -262,8 +262,11 @@ def filter_seen_alerts(data: list, user: str, alerts: list, today: str, expiry: 
 
 # [Access]
 def cache_alerts(user: str):
-    set_cache(_alert_dt_, f"{user}-access", 1, 30)
+    from .common import log_error
+    
+    set_cache(_alert_dt_, f"{user}-access", 1, 120)
     data = get_user_alerts(user)
+    log_error("Access alerts list: " + str(data))
     if not data:
         data = []
     expiry = seconds_left_for_day()
@@ -272,19 +275,21 @@ def cache_alerts(user: str):
 
 # [Boot]
 def get_alerts_cache(user: str):
+    from .common import log_error
+    
     access = get_cache(_alert_dt_, f"{user}-access", True)
+    log_error("Boot alerts access check: " + (1 if access else 0))
     if access:
         del_cache(_alert_dt_, f"{user}-access")
         cache = get_cache(_alert_dt_, user, True)
-        if isinstance(cache, list):
+        if not (cache is None):
             del_cache(_alert_dt_, user)
-            if not cache:
-                return None
-            
-            return cache
+        if isinstance(cache, list):
+            return cache if cache else None
         
         from .background import enqueue_job
         
+        log_error("Boot alerts enqueued")
         enqueue_job(
             "alerts.utils.alert.show_user_alerts",
             f"show-user-alerts-for-{user}",
@@ -297,9 +302,12 @@ def get_alerts_cache(user: str):
 # [Internal]
 def show_user_alerts(user: str):
     data = get_cache(_alert_dt_, user, True)
-    del_cache(_alert_dt_, user)
-    if not isinstance(data, list):
+    if not (data is None):
+        del_cache(_alert_dt_, user)
+    if not data or not isinstance(data, list):
         data = get_user_alerts(user)
+    from .common import log_error
+    log_error("Alerts enqueued: " + str(data))
     if data:
         from .realtime import emit_show_alerts
         

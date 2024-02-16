@@ -12,9 +12,7 @@ def extend(bootinfo):
     try:
         from .alert import get_alerts_cache
         
-        alerts = get_alerts_cache(user)
-        if alerts:
-            bootinfo.alerts = alerts
+        bootinfo.alerts = get_alerts_cache(user)
     except Exception:
         from frappe import _
         

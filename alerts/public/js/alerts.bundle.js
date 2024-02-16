@@ -293,7 +293,7 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     _make_realtime_fn(e) {
-        this._debug('Register realtine event:', e);
+        this._debug('Register realtime event:', e);
         return this.$fn(function(ret) {
             (new Promise(this.$fn(function(res, rej) {
                 let obj = this.$isDataObjVal(ret);
@@ -308,7 +308,7 @@ class LevelUp extends LevelUpBase {
                     this._events.delay[e] = window.setTimeout(this.$fn(function() {
                         delete this._events.delay[e];
                         res(ret);
-                    }), 700);
+                    }), 2000);
                 }
             }))).then(this.$fn(function(ret) {
                 this._emit_event(e, [ret]);
