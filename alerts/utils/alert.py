@@ -254,7 +254,7 @@ def show_user_alerts(user: str):
         from .realtime import emit_show_alerts
         
         try:
-            emit_show_alerts({"alerts": data})
+            emit_show_alerts({"alerts": data}, False)
         except Exception as exc:
             log_error(str(exc))
         finally:
