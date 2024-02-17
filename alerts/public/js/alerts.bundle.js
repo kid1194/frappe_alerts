@@ -857,7 +857,7 @@ class AlertsDialog extends LevelUpBase {
         this._class = _class;
         this._opts = {};
         this._sound = {loaded: 0, playing: 0, timeout: null};
-        this.$getter('_name', '');
+        this.$getter('name', '');
     }
     setName(text) {
         if (this.$isStrVal(text)) this._name = text;
