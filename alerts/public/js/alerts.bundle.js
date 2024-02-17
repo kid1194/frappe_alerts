@@ -192,6 +192,9 @@ class LevelUp extends LevelUpBase {
                 break;
             }
         } else {*/
+            this._state_popped = this.$fn(function() {
+                this._debug('On popstate');
+            });
             this._hash_change = this.$fn(function() {
                 this._debug('On hash changed');
                 if (frappe && window.location.hash == frappe._cur_route) return;
@@ -200,22 +203,24 @@ class LevelUp extends LevelUpBase {
                 this.off();
                 this.emit('state_change');
             });
-            $(window).on('hashchange', this._on_change);
+            window.addEventListener('popstate', this._state_popped);
+            $(window).on('hashchange', this._hash_change);
         //}
     }
     
     options(opts) { return this.$extend(this, opts, 1); }
     destroy() {
         window.removeEventListener('beforeunload', this._on_unload);
-        if (frappe) {
+        /*if (frappe) {
             for (var i = 0, ks = ['route', 'router'], l = ks.length; i < l; i++) {
                 if (!frappe[ks[i]] || !frappe[ks[i]].off) continue;
                 frappe[ks[i]].off('change', this._hash_change);
                 break;
             }
-        } else {
-            $(window).off('hashchange', this._on_change);
-        }
+        } else {*/
+            window.removeEventListener('popstate', this._state_popped);
+            $(window).off('hashchange', this._hash_change);
+        //}
         this.emit('destroy').off(1);
         super.destroy();
     }
