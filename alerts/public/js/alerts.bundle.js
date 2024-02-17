@@ -131,8 +131,9 @@ class LevelUpBase {
         return d;
     }
     $fn() {
-        arguments[1] = arguments[1] || this;
-        return $.proxy.apply(null, arguments);
+        var a = this.$toArr(arguments);
+        a[1] = a[1] || this;
+        return $.proxy.apply(null, a);
     }
     $afn(fn, a, o) {
         var d = [fn, o || this];
