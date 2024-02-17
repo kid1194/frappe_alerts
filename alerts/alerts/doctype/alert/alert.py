@@ -4,7 +4,7 @@
 # Licence: Please refer to LICENSE file
 
 
-from frappe import _, throw
+from frappe import _, _dict, throw
 from frappe.utils import cint, getdate
 from frappe.model.document import Document
 
@@ -94,7 +94,7 @@ class Alert(Document):
             from alerts.utils import send_alert
             
             self.flags.pop("send_alert")
-            data = frappe._dict({
+            data = _dict({
                 "name": self.name,
                 "title": self.title,
                 "alert_type": self.alert_type,
