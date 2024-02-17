@@ -111,7 +111,7 @@ frappe.ui.form.on('Alert', {
         frm._alert.is_submitted = docstatus === 1;
         frm._alert.is_cancelled = docstatus === 2;
         
-        if (frm._alert.is_draft || frm._alerts.form_disabled) return;
+        if (frm._alert.is_draft || !frm._alerts || frm._alerts.form_disabled) return;
         
         frappe.alerts.disable_form(frm, '{0} has been {1}.', [
             cstr(frm.doc.doctype || frm.doctype),
