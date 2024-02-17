@@ -247,12 +247,10 @@ def user_alerts():
 
 # [Alerts Alert]
 def send_alert(data):
-    from .common import log_error
     from .realtime import emit_show_alert
     from .type import add_type_data
     
     add_type_data(data.alert_type, data)
-    log_error("Sending alert \"{0}\".".format(data.name))
     emit_show_alert(data)
 
 
