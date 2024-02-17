@@ -35,7 +35,7 @@ frappe.ui.form.on('Alert', {
     onload: function(frm) {
         frm.events.on_load(frm);
         
-        if (frm._alerts.app_disabled || !frm._alert.is_draft) return;
+        if (!frm._alerts || frm._alerts.app_disabled || !frm._alert.is_draft) return;
         frm.set_query('role', 'for_roles', function(doc, cdt, cdn) {
             var qry = {filters: {disabled: 0, desk_access: 1}};
             if ((doc.for_roles || '').length) {
