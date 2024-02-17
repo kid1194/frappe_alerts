@@ -180,7 +180,7 @@ class LevelUp extends LevelUpBase {
         };
         this._on_unload = this.$fn(this.destroy);
         window.addEventListener('beforeunload', this._on_unload);
-        if (frappe) {
+        /*if (frappe) {
             this._hash_change = this.$fn(function() {
                 this.clean_form();
                 this.off();
@@ -191,7 +191,7 @@ class LevelUp extends LevelUpBase {
                 frappe[ks[i]].on('change', this._hash_change);
                 break;
             }
-        } else {
+        } else {*/
             this._hash_change = this.$fn(function() {
                 if (frappe && window.location.hash == frappe._cur_route) return;
                 this.clean_form();
@@ -199,7 +199,7 @@ class LevelUp extends LevelUpBase {
                 this.emit('state_change');
             });
             $(window).on('hashchange', this._on_change);
-        }
+        //}
     }
     
     options(opts) { return this.$extend(this, opts, 1); }
@@ -459,6 +459,8 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     setup_form(frm, workflow) {
+        if (!frm) frm = window.cur_frm;
+        if (!frm) return this;
         this.init_form(frm);
         frm[this._key].app_disabled = this.is_enabled;
         if (this.is_enabled) this.enable_form(frm, workflow);
@@ -466,6 +468,8 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     enable_form(frm, workflow) {
+        if (!frm) frm = window.cur_frm;
+        if (!frm) return this;
         this.init_form(frm);
         if (!frm[this._key].form_disabled) return this.emit('form_enabled');
         var fields = frm[this._key].fields_disabled;
