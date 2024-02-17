@@ -29,10 +29,11 @@ frappe.listview_settings['Alert'] = {
                 dt = this.doctype;
                 if (dt === 'Alert') {
                     if (!args.fields) args.fields = [];
-                    ['reached', 'status'].forEach(function(f) {
-                        f = frappe.model.get_full_column_name(f, dt);
+                    var fs = ['reached', 'status'];
+                    for (var i = 0, l = fs.length, f; i < l; i++) {
+                        f = frappe.model.get_full_column_name(fs[i], dt);
                         if (args.fields.indexOf(f) < 0) args.fields.push(f);
-                    });
+                    }
                 }
                 return args;
             };

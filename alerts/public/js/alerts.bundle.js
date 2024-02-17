@@ -13,24 +13,47 @@ if (typeof String.prototype.trim !== 'function')
     }());
 (function() {
     window.addEventListener('load', function() {
-        var imports = {
+        function loader(data) {
+            var $head = document.getElementsByTagName('head')[0];
+            for (var k in data) {
+                if (!data[k][0]) {
+                    if (data[k][2]) data[k][2]();
+                    continue;
+                }
+                var $el = document.getElementById(k);
+                if (!!$el) continue;
+                $el = document.createElement('script');
+                $el.id = k;
+                $el.src = data[k][1];
+                $el.type = 'text/javascript';
+                $el.async = true;
+                if (data[k][2]) $el.onload = data[k][2];
+                $head.appendChild($el);
+            }
+        }
+        loader({
             promise_polyfill: [
                 typeof window.Promise !== 'function',
                 'https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js',
+                function() {
+                    if (typeof Promise.wait !== 'function')
+                        Promise.wait = function(ms) {
+                            return new Promise(function(resolve) {
+                                window.setTimeout(resolve, ms);
+                            });
+                        };
+                    if (typeof Promise.prototype.timeout !== 'function')
+                        Promise.prototype.timeout = function(ms) {
+                            return Promise.race([
+                                this,
+                                Promise.wait(ms).then(function() {
+                                    throw new Error('Time out');
+                                })
+                            ]);
+                        };
+                },
             ],
-        },
-        $head = document.getElementsByTagName('head')[0];
-        for (var k in imports) {
-            if (!imports[k][0]) continue;
-            var $el = document.getElementById(k);
-            if (!!$el) continue;
-            $el = document.createElement('script');
-            $el.id = k;
-            $el.src = imports[k][1];
-            $el.type = 'text/javascript';
-            $el.async = true;
-            $head.appendChild($el);
-        }
+        });
     }, {
         capture: true,
         once: true,
@@ -67,9 +90,13 @@ class LevelUpBase {
     $isArrVal(v) { return this.$isArr(v) && v.length; }
     $isArgs(v) { return this.$isVal(v) && this.$type(v) === 'Arguments'; }
     $isArgsVal(v) { return this.$isArgs(v) && v.length; }
+    $isArrLike(v) {
+        return this.$isObjLike(v) && !this.$isStr(v) && this.$isNum(v.length);
+    }
     $isObjLike(v) { return this.$isVal(v) && typeof v === 'object'; }
     $isDataObj(v) { return this.$isVal(v) && $.isPlainObject(v); }
     $isDataObjVal(v) { return this.$isDataObj(v) && !$.isEmptyObject(v); }
+    $isPromise(v) { return this.$isVal(v) && this.$type(v) === 'Promise'; }
     $isEmpty(v) {
         return !this.$isVal(v) || v === '' || v === 0 || v === false || $.isEmptyObject(v);
     }
@@ -79,19 +106,18 @@ class LevelUpBase {
         if (v && this.$isDataObjVal(v)) {
             var s = this.$isBoolLike(i);
             if (!s && !this.$isArrVal(i)) i = null;
-            for (var k in v) {
-                if (!s && !this.$isVoid(o[k])) o['_' + k] = v[k];
-                else this.$getter(k, v[k], o, s || (i && i.indexOf(k) < 0));
-            }
+            for (var k in v) this.$getter(k, v[k], o, s || (i && i.indexOf(k) < 0));
         }
         return this;
     }
     $getter(k, v, o, s) {
         o = o || this;
-        if (s) Object.defineProperty(o, k,  {get() { return v; }});
-        else {
+        if (s && this.$isVal(o['_' + k])) {
+            Object.defineProperty(o, k,  {get() { return v; }});
+        } else {
             o['_' + k] = v;
-            Object.defineProperty(o, k, {get() { return this['_' + k]; }});
+            if (!this.$isVal(o[k]))
+                Object.defineProperty(o, k, {get() { return this['_' + k]; }});
         }
         return this;
     }
@@ -104,9 +130,21 @@ class LevelUpBase {
         try { return JSON.parse(v); } catch(_) {}
         return d;
     }
-    $fn(fn, o) { return $.proxy(fn, o || this); }
+    $fn() {
+        arguments[1] = arguments[1] || this;
+        return $.proxy.apply(null, arguments);
+    }
+    $afn(fn, a, o) {
+        var d = [fn, o || this];
+        if (this.$isVal(a)) {
+            if (!this.$isArrLike(a)) d.push(a);
+            else d.push.apply(d, a);
+        }
+        return $.proxy.apply(null, d);
+    }
     $call(fn, a, o) {
-        a = a ? this.$toArr(a) : '';
+        if (!this.$isVal(a)) a = '';
+        else if (!this.$isArrLike(a)) a = [a];
         o = o || this;
         switch (a.length) {
             case 0: return fn.call(o);
@@ -134,21 +172,48 @@ class LevelUp extends LevelUpBase {
             _prefix: '[' + name + ']',
             _namespace: namespace || '',
             _testing: !!debug
-        });
+        }, 1);
         this._events = {
             list: {},
             real: {},
-            queue: null
         };
         this._on_unload = this.$fn(this.destroy);
         window.addEventListener('beforeunload', this._on_unload);
+        if (frappe) {
+            this._hash_change = this.$fn(function() {
+                this.clean_form();
+                this.off();
+                this.emit('state_change');
+            });
+            for (var i = 0, ks = ['route', 'router'], l = ks.length; i < l; i++) {
+                if (!frappe[ks[i]] || !frappe[ks[i]].on) continue;
+                frappe[ks[i]].on('change', this._hash_change);
+                break;
+            }
+        } else {
+            this._hash_change = this.$fn(function() {
+                if (frappe && window.location.hash == frappe._cur_route) return;
+                this.clean_form();
+                this.off();
+                this.emit('state_change');
+            });
+            $(window).on('hashchange', this._on_change);
+        }
     }
     
-    options(opts) { return this.$extend(this, opts); }
+    options(opts) { return this.$extend(this, opts, 1); }
     destroy() {
         window.removeEventListener('beforeunload', this._on_unload);
-        this.emit('destroy');
-        for (var e in this._events.list) this._clear_events(e);
+        if (frappe) {
+            for (var i = 0, ks = ['route', 'router'], l = ks.length; i < l; i++) {
+                if (!frappe[ks[i]] || !frappe[ks[i]].off) continue;
+                frappe[ks[i]].off('change', this._hash_change);
+                break;
+            }
+        } else {
+            $(window).off('hashchange', this._on_change);
+        }
+        this.emit('destroy').off(1);
         super.destroy();
     }
     
@@ -249,36 +314,17 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     
-    on(event, fn, _once) {
-        if (!this.$isStrVal(event) || !this.$isFunc(fn)) return this;
-        event = event.split(' ');
-        for (var i = 0, l = event.length, e; i < l; i++) {
-            e = event[i];
-            if (e === 'ready' && this.is_ready) {
-                fn.call(this);
-                continue;
-            }
-            if (e === 'ready' || e === 'destroy') _once = 1;
-            if (!this._events.list[e]) {
-                this._events.list[e] = [];
-                if (e.indexOf(this._realtime) === 0) {
-                    this._events.real[e] = this._make_realtime_fn(e);
-                    frappe.realtime.on(e, this._events.real[e]);
-                }
-            }
-            this._debug('Registered event:', e);
-            this._events.list[e].push({f: fn, o: _once});
-        }
-        return this;
-    }
-    once(event, fn) { return this.on(event, fn, 1); }
+    on(event, fn, keep)  { return this._add_event(event, fn, 0, keep); }
+    once(event, fn) { return this._add_event(event, fn, 1); }
     off(event, fn) {
+        if (!this.$isVal(event)) return this._clear_events();
+        if (this.$isBoolLike(event)) return this._clear_events(event);
         if (!this.$isStrVal(event)) return this;
         if (!this.$isFunc(fn)) fn = null;
         event = event.split(' ');
         for (var i = 0, l = event.length, e; i < l; i++) {
             e = event[i];
-            if (this._events.list[e]) this._remove_event(e, fn);
+            if (this._events.list[e]) this._del_event(e, fn);
         }
         return this;
     }
@@ -293,70 +339,106 @@ class LevelUp extends LevelUpBase {
         }
         return this;
     }
+    emitp(event) {
+        if (!this.$isStrVal(event)) return Promise.reject();
+        var args = this.$toArr(arguments, 1),
+        prm;
+        if (args.length < 1) {
+            args = null;
+            prm = Promise.resolve();
+        } else if (this.$isPromise(args[args.length - 1])) {
+            prm = args.pop();
+            if (args.length < 1) args = null;
+        }
+        event = event.split(' ');
+        for (var i = 0, l = event.length, e; i < l; i++) {
+            e = event[i];
+            if (this._events.list[e]) this._emit_event(e, args, prm);
+        }
+        return prm;
+    }
+    _add_event(event, fn, once, keep) {
+        if (!this.$isStrVal(event) || !this.$isFunc(fn)) return this;
+        event = event.split(' ');
+        for (var i = 0, l = event.length, e; i < l; i++) {
+            e = event[i];
+            if (e === 'ready' && this.is_ready) {
+                fn.call(this);
+                continue;
+            }
+            if (e === 'ready' || e === 'destroy') once = 1;
+            if (!this._events.list[e]) {
+                this._events.list[e] = [];
+                if (e.indexOf(this._realtime) === 0) {
+                    this._events.real[e] = this._make_realtime_fn(e);
+                    frappe.realtime.on(e, this._events.real[e]);
+                }
+            }
+            this._events.list[e].push({f: fn, o: once, s: keep});
+        }
+        return this;
+    }
     _make_realtime_fn(e) {
         return this.$fn(function(ret) {
-            try {
-            this._debug('Triggered realtime event:', e, ret);
-            var promise = new Promise(this.$fn(function(res) {
-                this._debug('Resolving realtime event:', e);
-                var obj = this.$isDataObjVal(ret);
-                if (obj) {
-                    ret = ret.message || ret;
-                    obj = this.$isDataObjVal(ret);
-                }
-                if (!obj || !this.$isVal(ret.delay)) {
-                    this._emit_event(e, [ret]);
-                    res();
-                } else {
-                    window.setTimeout(this.$fn(function() {
-                        this._emit_event(e, [ret]);
-                        res();
-                    }), 700);
-                }
-            }));
-            if (!this._events.queue) this._events.queue = promise;
-            else this._events.queue = Promise.all([
-                this._events.queue,
-                promise
-            ]);
-            } catch(ex) {
-                this._error(ex.message);
+            var obj = this.$isDataObjVal(ret);
+            if (obj) {
+                ret = ret.message || ret;
+                obj = this.$isDataObjVal(ret);
             }
+            this._emit_event(
+                e, [ret], !obj || !this.$isVal(ret.delay)
+                ? Promise.resolve() : Promise.wait(700)
+            );
         });
     }
-    _remove_event(e, fn) {
-        if (!fn) this._clear_events(e);
-        else {
-            var evs = this._events.list[e].slice(),
-            ret = [];
-            for (var i = 0, x = 0, l = evs.length; i < l; i++) {
-                if (evs[i].f !== fn) ret[x++] = evs[i];
-            }
-            if (!ret.length) this._clear_events(e);
-            else this._events.list[e] = ret;
+    _del_event(e, fn) {
+        if (!fn) {
+            if (this._events.real[e])
+                frappe.realtime.off(e, this._events.real[e]);
+            delete this._events.list[e];
+            delete this._events.real[e];
+            return;
         }
+        var evs = this._events.list[e].slice(),
+        ret = [];
+        for (var i = 0, x = 0, l = evs.length; i < l; i++) {
+            if (evs[i].f !== fn) ret[x++] = evs[i];
+        }
+        if (!ret.length) this._del_event(e);
+        else this._events.list[e] = ret;
     }
-    _clear_events(e) {
-        if (this._events.real[e])
-            frappe.realtime.off(e, this._events.real[e]);
-        delete this._events.list[e];
-        delete this._events.real[e];
-    }
-    _emit_event(e, args) {
+    _emit_event(e, args, p) {
         var evs = this._events.list[e].slice(),
         ret = [];
         for (var i = 0, x = 0, l = evs.length, ev; i < l; i++) {
             ev = evs[i];
-            if (!args) ev.f.call(this);
-            else ev.f.apply(this, args);
-            if (!ev.o) ret[x++] = ev;
+            if (!p) this.$call(ev.f, args);
+            else p.then(this.$afn(ev.f, args));
+            if (ev.s || !ev.o) ret[x++] = ev;
         }
-        if (!ret.length) this._clear_events(e);
+        if (!ret.length) this._del_event(e);
+        else this._events.list[e] = ret;
+    }
+    _clear_events(all) {
+        for (var e in this._events.list) {
+            if (all) this._del_event(e);
+            else this._filter_event(e);
+        }
+        return this;
+    }
+    _filter_event(e) {
+        var evs = this._events.list[e].slice(),
+        ret = [];
+        for (var i = 0, x = 0, l = evs.length; i < l; i++) {
+            if (evs[i].s) ret[x++] = evs[i];
+        }
+        if (!ret.length) this._del_event(e);
         else this._events.list[e] = ret;
     }
     
     init_form(frm) {
-        if (this.$isVal(frm[this._key])) return this;
+        if (!frm) frm = window.cur_frm;
+        if (!frm || this.$isVal(frm[this._key])) return this;
         frm[this._key] = {
             is_ready: false,
             app_disabled: false,
@@ -368,6 +450,11 @@ class LevelUp extends LevelUpBase {
         this.on('ready', function() {
             if (frm) frm[this._key].is_ready = true;
         });
+        return this;
+    }
+    clean_form(frm) {
+        if (!frm) frm = window.cur_frm;
+        if (frm) delete frm[this._key];
         return this;
     }
     setup_form(frm, workflow) {
@@ -464,7 +551,7 @@ class LevelUp extends LevelUpBase {
                 frm[this._key].fields_disabled.indexOf(key), 1
             );
         frm.set_df_property(key, 'read_only', 0);
-        if (cint(field.df.translatable) && field.$wrapper) {
+        if (!!cint(field.df.translatable) && field.$wrapper) {
             var $btn = field.$wrapper.find('.clearfix .btn-translation');
             if ($btn.length) $btn.show();
         }
@@ -483,7 +570,7 @@ class LevelUp extends LevelUpBase {
         ) return this;
         frm[this._key].fields_disabled.push(key);
         frm.set_df_property(key, 'read_only', 1);
-        if (cint(field.df.translatable) && field.$wrapper) {
+        if (!!cint(field.df.translatable) && field.$wrapper) {
             var $btn = field.$wrapper.find('.clearfix .btn-translation');
             if ($btn.length) $btn.hide();
         }
@@ -629,10 +716,10 @@ class Alerts extends LevelUp {
             true
         );
         
+        this.$getter('_id', frappe.utils.get_random(5), null, 1);
         this.$getter('is_ready', false);
         this.$getter('is_enabled', false);
         
-        this._id = frappe.utils.get_random(5);
         this._dialog = null;
         this._init = 0;
         this._list = [];
@@ -645,39 +732,32 @@ class Alerts extends LevelUp {
         else
             this.request('is_enabled', null, this._setup);
     }
+    get has_alerts() { return !!this._list.length; }
     mock() {
         this._mock = this._mock || new AlertsMock();
         return this._mock;
     }
     show(data) {
         if (this.$isDataObjVal(data)) data = [data];
-        if (!this.$isArrVal(data)) return this;
-        this._list.push.apply(this._list, data);
-        return this._build();
+        if (this.$isArrVal(data)) this._queue(data);
+        if (!this.has_alerts) return this;
+        return this._render();
     }
     _setup(ret) {
         this._is_ready = true;
         this._is_enabled = !!ret;
-        if (!frappe.socketio.socket)
-            frappe.socketio.init();
-        this.on('change', function(ret) {
-            if (this._is_enabled && !this._init)
-                this._get_alerts();
-        })
-        .on('alerts_app_status_changed', function(ret) {
-            if (!ret || ret.is_enabled == null) return;
+        if (!frappe.socketio.socket) frappe.socketio.init();
+        this.on('alerts_app_status_changed', function(ret) {
+            if (!ret || !this.$isVal(ret.is_enabled)) return;
             var old = this._is_enabled;
             this._is_enabled = !!ret.is_enabled;
-            if (this._is_enabled !== old) this.emit('change');
-        })
-        .on('alerts_show', function(ret) {
-            this._debug('alerts_show', ret);
-            if (
-                this._is_enabled
-                && this.$isDataObjVal(ret)
-                && this.$isArrVal(ret.alerts)
-            ) this.show(ret.alerts);
-        })
+            if (this._is_enabled !== old) {
+                this.emit('change');
+                if (this._is_enabled && !this._init)
+                    this._get_alerts();
+                else if (this._is_enabled) this.show();
+            }
+        }, 1)
         .on('alerts_show_alert', function(ret) {
             this._debug('alerts_show_alert', ret);
             if (
@@ -685,7 +765,7 @@ class Alerts extends LevelUp {
                 && this.$isDataObjVal(ret)
                 && this._is_valid(ret)
             ) this.show(ret);
-        });
+        }, 1);
         this.emit('ready');
         if (this._is_enabled)
             window.setTimeout(this.$fn(this._get_alerts), 700);
@@ -698,16 +778,15 @@ class Alerts extends LevelUp {
             null,
             function(ret) {
                 this._init = 1;
-                this._debug('alerts_show', ret);
-                if (
-                    this._is_enabled
-                    && this.$isDataObjVal(ret)
-                    && this.$isArrVal(ret.alerts)
-                ) this.show(ret.alerts);
+                this._debug('Getting user alerts.', ret);
+                if (this.$isDataObjVal(ret) && this.$isArrVal(ret.alerts)) {
+                    if (this._is_enabled) this.show(ret.alerts);
+                    else this._queue(ret.alerts);
+                }
             },
             function(e) {
                 this._init = 0;
-                this._error('enqueue_alerts failed', e.message);
+                this._error('Getting user alerts failed.', e.message);
             }
         );
     }
@@ -736,12 +815,13 @@ class Alerts extends LevelUp {
         if (seen >= cint(data.number_of_repeats)) return false;
         return true;
     }
-    _build() {
-        if (this._list.length) this._build_dialog();
+    _queue(data) { this._list.push.apply(this._list, data); }
+    _render() {
+        if (this._list.length) this._render_dialog();
         else if (this._seen.length) this._mmark_seens();
         return this;
     }
-    _build_dialog() {
+    _render_dialog() {
         if (!this._dialog)
             this._dialog = new AlertsDialog(this._id, 'alerts-dialog-' + this._id);
         
@@ -764,7 +844,7 @@ class Alerts extends LevelUp {
             .onShow(this.$fn(function() {
                 this._seen.push(this._dialog.name);
             }))
-            .onHide(this.$fn(this._build), 200)
+            .onHide(this.$fn(this._render), 200)
             .render()
             .show();
     }
@@ -816,10 +896,10 @@ class AlertsMock extends LevelUpBase {
     }
     build(data) {
         if (!this.$isDataObjVal(data)) return this;
-        this._dialog = this._dialog || new AlertsDialog(this._id, 'alerts-mock-dialog-' + this._id);
+        if (!this._dialog) this._dialog = new AlertsDialog(this._id, 'alerts-mock-dialog-' + this._id);
         this._dialog
             .setTitle(data.name)
-            .setMessage('This is a mock alert message.')
+            .setMessage(data.message || 'This is a mock alert message.')
             .setStyle(
                 data.background,
                 data.border_color,
@@ -879,8 +959,7 @@ class AlertsDialog extends LevelUpBase {
         return this;
     }
     setTimeout(sec) {
-        if (this.$isNumVal(sec))
-            this._timeout = cint(sec * 1000);
+        if (this.$isNumVal(sec)) this._timeout = sec * 1000;
         return this;
     }
     setSound(file, fallback) {
@@ -891,19 +970,21 @@ class AlertsDialog extends LevelUpBase {
         else file = '/assets/frappe/sounds/' + file.toLowerCase() + '.mp3';
         if (!this.$isStrVal(file)) return this;
         if (!this.$sound) {
-            this.$sound = $('<audio>').attr({
-                id: 'sound-' + this._id,
-                volume: '0.2',
-                preload: 'auto',
-            });
+            this.$sound = $('<audio>')
+                .attr({
+                    id: 'sound-' + this._id,
+                    volume: '0.2',
+                    preload: 'auto',
+                })
+                .click(function(e) {
+                    try { $(e.target).play(); } catch(_) {}
+                })
+                .hide();
             $('body').append(this.$sound);
-            this.$sound.click(function(e) {
-                try { $(e.target).play(); } catch(_) {}
-            });
         }
         this.$sound
-            .off('canplaythrough')
             .attr('src', file)
+            .off('canplaythrough')
             .on('canplaythrough', this.$fn(function() {
                 this._sound.loaded = 1;
             }));
@@ -916,18 +997,18 @@ class AlertsDialog extends LevelUpBase {
     }
     onShow(fn, delay) {
         if (this.$isFunc(fn)) {
-            if (cint(delay) < 1) this._on_show = this.$fn(fn);
+            if (!this.$isNumVal(delay)) this._on_show = this.$fn(fn);
             else this._on_show = this.$fn(function() {
-                window.setTimeout(this.$fn(fn), cint(delay));
+                window.setTimeout(this.$fn(fn), delay);
             });
         }
         return this;
     }
     onHide(fn, delay) {
         if (this.$isFunc(fn)) {
-            if (cint(delay) < 1) this._on_hide = this.$fn(fn);
+            if (!this.$isNumVal(delay)) this._on_hide = this.$fn(fn);
             else this._on_hide = this.$fn(function() {
-                window.setTimeout(this.$fn(fn), cint(delay));
+                window.setTimeout(this.$fn(fn), delay);
             });
         }
         return this;

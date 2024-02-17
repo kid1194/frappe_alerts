@@ -8,8 +8,6 @@ from frappe import _, throw
 from frappe.utils import cint
 from frappe.model.document import Document
 
-from alerts.utils import clear_doc_cache
-
 
 class AlertsSettings(Document):
     def before_validate(self):
@@ -29,6 +27,8 @@ class AlertsSettings(Document):
     
     
     def before_save(self):
+        from alerts.utils import clear_doc_cache
+        
         clear_doc_cache(self.doctype)
     
     

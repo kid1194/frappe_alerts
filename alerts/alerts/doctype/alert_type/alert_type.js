@@ -13,37 +13,32 @@ frappe.ui.form.on('Alert Type', {
             .on('ready change', function() {
                 this.setup_form(frm);
             });
-        frm._type = {
-            ready: 0
-        };
     },
     refresh: function(frm) {
-        if (!frm._type.ready) frm.trigger('load_toolbar');
+        frm.events.setup_toolbar(frm);
     },
     disabled: function(frm) {
-        frm.trigger('load_toolbar');
+        frm.events.setup_toolbar(frm);
     },
     validate: function(frm) {
         if (
-            !cint(frm.doc.disabled)
-            && cstr(frm.doc.display_sound) === 'Custom'
+            cstr(frm.doc.display_sound) === 'Custom'
             && !cstr(frm.doc.custom_display_sound).length
         ) {
             frappe.alerts.error('A valid alert type custom display sound is required.');
             return false;
         }
     },
-    load_toolbar: function(frm) {
-        frm._type.ready = 1;
-        let label = __('Preview');
-        if (frm.custom_buttons[label]) {
-            if (cint(frm.doc.disabled)) {
+    setup_toolbar: function(frm) {
+        var label = __('Preview');
+        if (!!cint(frm.doc.disabled)) {
+            if (frm.custom_buttons[label]) {
                 frm.custom_buttons[label].remove();
                 delete frm.custom_buttons[label];
             }
             return;
         }
-        if (cint(frm.doc.disabled)) return;
+        if (frm.custom_buttons[label]) return;
         frm.add_custom_button(label, function() {
             frappe.alerts.mock().build(frm.doc);
         });

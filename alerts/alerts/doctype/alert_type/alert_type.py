@@ -8,10 +8,7 @@ from frappe import _, throw
 from frappe.utils import cint
 from frappe.model.document import Document
 
-from alerts.utils import (
-    clear_doc_cache,
-    doc_count
-)
+from alerts.utils import clear_doc_cache
 
 
 class AlertType(Document):
@@ -26,10 +23,15 @@ class AlertType(Document):
     def validate(self):
         if not self.name:
             throw(_("A valid alert type name is required."))
-        limit = 0 if self.is_new() else 1
-        if doc_count(self.doctype, {"name": self.name}) != limit:
-            throw(_("The alert type \"{0}\" already exists.").format(self.name))
-        if self.display_sound == "Custom" and not self.custom_display_sound:
+        if self.is_new():
+            from alerts.utils import doc_count
+            
+            if doc_count(self.doctype, {"name": self.name}) > 0:
+                throw(_("The alert type \"{0}\" already exists.").format(self.name))
+        if (
+            self.display_sound == "Custom" and
+            not self.custom_display_sound
+        ):
             throw(_("A valid alert type custom display sound is required."))
     
     
@@ -54,6 +56,8 @@ class AlertType(Document):
     
     
     def on_trash(self):
+        clear_doc_cache(self.doctype, self.name)
+        
         from alerts.utils import type_alerts_exists
         
         if type_alerts_exists(self.name):

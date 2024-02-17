@@ -24,8 +24,10 @@ def check_for_update():
     if cint(doc.is_enabled):
         from frappe.utils import get_datetime
         
-        diff = cint(float((get_datetime() - get_datetime(doc.latest_check)).total_seconds()) / 60)
-        if diff < 5:
+        dif = get_datetime(doc.latest_check)
+        dif = float((get_datetime() - dif).total_seconds())
+        dif = abs(cint(dif / 60))
+        if dif < 5:
             return 0
         
         return update_check(doc)
@@ -172,35 +174,24 @@ def send_notification(version, sender, receivers, message):
 
 # [Internal]
 def filter_receivers(names: list):
-    dt = "User"
-    names = list(set(names))
-    names = frappe.get_all(
-        dt,
-        fields=["name"],
-        filters=[
-            [dt, "name", "in", names],
-            [dt, "enabled", "=", 1]
-        ],
-        pluck="name",
-        ignore_permissions=True,
-        strict=False
+    from .common import filter_docs
+    
+    names = filter_docs(
+        "User", "name",
+        {"name": names, "enabled": 1}
     )
-    if not names or not isinstance(names, list):
+    if not names:
         return None
     
-    dt = "Notification Settings"
-    users = frappe.get_all(
-        dt,
-        fields=["name", "enabled"],
-        filters=[[dt, "name", "in", names]],
-        pluck="name",
-        ignore_permissions=True,
-        strict=False
+    users = filter_docs(
+        "Notification Settings",
+        ["name", "enabled"],
+        {"name": names}
     )
-    if users and isinstance(users, list):
+    if users:
         for v in users:
-            if v["name"] in names and not cint(v["enabled"]):
-                names.pop(names.index(v["name"]))
+            if not cint(v["enabled"]):
+                names.remove(v["name"])
     
     if not names:
         return None

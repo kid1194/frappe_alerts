@@ -46,6 +46,44 @@ def doc_count(dt, filters: dict):
     return frappe.db.count(dt, filters)
 
 
+# [Update]
+def filter_docs(dt, fields: (str | list)=None, filters: dict=None):
+    if not fields:
+        fields = ["name"]
+    elif isinstance(fields, list):
+        if len(fields) > 1:
+            pluck = None
+        else:
+            pluck = fields[0]
+    else:
+        pluck = fields
+    
+    _filters = []
+    if filters:
+        for k in filters:
+            if isinstance(filters[k], list):
+                if len(filters[k]) > 1 and isinstance(filters[k][1], list):
+                    _filters.append([dt, k, filters[k][0], filters[k][1]])
+                else:
+                    _filters.append([dt, k, "in", filters[k]])
+            else:
+                _filters.append([dt, k, "=", filters[k]])
+    
+    data = frappe.get_all(
+        dt,
+        fields=fields,
+        filters=_filters,
+        pluck=pluck,
+        ignore_permissions=True,
+        strict=False
+    )
+    
+    if not data or not isinstance(data, list):
+        return None
+    
+    return data
+
+
 # [Alert, Files, Query, Update]
 def parse_json(data, default=None):
     if not isinstance(data, str):
