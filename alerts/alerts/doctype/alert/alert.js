@@ -127,7 +127,7 @@ frappe.ui.form.on('Alert', {
     },
     setup_toolbar: function(frm) {
         var label = __('Preview');
-        if (!frm._alert.is_draft) {
+        if (!!frm.is_new() || !frm._alert.is_draft) {
             if (frm.custom_buttons[label]) {
                 frm.custom_buttons[label].remove();
                 delete frm.custom_buttons[label];

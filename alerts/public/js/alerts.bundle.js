@@ -193,7 +193,9 @@ class LevelUp extends LevelUpBase {
             }
         } else {*/
             this._hash_change = this.$fn(function() {
+                this._debug('On hash changed');
                 if (frappe && window.location.hash == frappe._cur_route) return;
+                this._debug('Hash has changed');
                 this.clean_form();
                 this.off();
                 this.emit('state_change');
@@ -771,6 +773,7 @@ class Alerts extends LevelUp {
                 && this._is_valid(ret)
             ) this.show(ret);
         }, 1);
+        this._debug('Class ready');
         this.emit('ready');
         if (this._is_enabled)
             window.setTimeout(this.$fn(this._get_alerts), 700);
