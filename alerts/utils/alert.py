@@ -246,36 +246,13 @@ def user_alerts():
 
 
 # [Alerts Alert]
-def send_alert(doc):
+def send_alert(data):
+    from .common import log_error
     from .realtime import emit_show_alert
     from .type import add_type_data
     
-    user = frappe.session.user
-    data = frappe._dict({
-        "delay": 1,
-        "name": doc.name,
-        "title": doc.title,
-        "alert_type": doc.alert_type,
-        "message": doc.message,
-        "is_repeatable": cint(doc.is_repeatable)
-    })
-    add_type_data(doc.alert_type, data)
-    data.number_of_repeats = cint(doc.number_of_repeats)
-    data.users = [v.user for v in doc.for_users]
-    data.roles = [v.role for v in doc.for_roles]
-    data.seen_by = {}
-    data.seen_today = []
-    
-    if doc.seen_by:
-        today = nowdate()
-        for v in doc.seen_by:
-            if v.user not in data.seen_by:
-                data.seen_by[v.user] = 1
-            else:
-                data.seen_by[v.user] += 1
-            if v.user not in data.seen_today and v.date == today:
-                data.seen_today.append(v.user)
-    
+    add_type_data(data.alert_type, data)
+    log_error("Sending alert \"{0}\".".format(data.name))
     emit_show_alert(data)
 
 

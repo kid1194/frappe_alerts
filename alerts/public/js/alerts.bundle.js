@@ -180,47 +180,26 @@ class LevelUp extends LevelUpBase {
         };
         this._on_unload = this.$fn(this.destroy);
         window.addEventListener('beforeunload', this._on_unload);
-        /*if (frappe) {
-            this._hash_change = this.$fn(function() {
-                this.clean_form();
-                this.off();
-                this.emit('state_change');
-            });
-            for (var i = 0, ks = ['route', 'router'], l = ks.length; i < l; i++) {
-                if (!frappe[ks[i]] || !frappe[ks[i]].on) continue;
-                frappe[ks[i]].on('change', this._hash_change);
-                break;
-            }
-        } else {*/
-            this._state_popped = this.$fn(function() {
-                this._debug('On popstate');
-            });
-            this._hash_change = this.$fn(function() {
-                this._debug('On hash changed');
-                if (frappe && window.location.hash == frappe._cur_route) return;
-                this._debug('Hash has changed');
-                this.clean_form();
-                this.off();
-                this.emit('state_change');
-            });
-            window.addEventListener('popstate', this._state_popped);
-            $(window).on('hashchange', this._hash_change);
-        //}
+        this._is_state_popped = 0;
+        this._state_popped = this.$fn(function() {
+            if (this._is_state_popped) return;
+            this._is_state_popped = 1;
+            this._debug('On popstate');
+            this._debug('Hash has changed');
+            this.clean_form();
+            this.off();
+            this.emit('state_change');
+            window.setTimeout(this.$fn(function() {
+                this._is_state_popped = 0;
+            }), 300);
+        });
+        window.addEventListener('popstate', this._state_popped);
     }
     
     options(opts) { return this.$extend(this, opts, 1); }
     destroy() {
         window.removeEventListener('beforeunload', this._on_unload);
-        /*if (frappe) {
-            for (var i = 0, ks = ['route', 'router'], l = ks.length; i < l; i++) {
-                if (!frappe[ks[i]] || !frappe[ks[i]].off) continue;
-                frappe[ks[i]].off('change', this._hash_change);
-                break;
-            }
-        } else {*/
-            window.removeEventListener('popstate', this._state_popped);
-            $(window).off('hashchange', this._hash_change);
-        //}
+        window.removeEventListener('popstate', this._state_popped);
         this.emit('destroy').off(1);
         super.destroy();
     }
@@ -759,7 +738,12 @@ class Alerts extends LevelUp {
         this._is_ready = true;
         this._is_enabled = !!ret;
         if (!frappe.socketio.socket) frappe.socketio.init();
-        this.on('alerts_app_status_changed', function(ret) {
+        this.on('state_change', function() {
+            if (this._is_enabled && !this._init)
+                this._get_alerts();
+            else if (this._is_enabled) this.show();
+        }, 1)
+        .on('alerts_app_status_changed', function(ret) {
             if (!ret || !this.$isVal(ret.is_enabled)) return;
             var old = this._is_enabled;
             this._is_enabled = !!ret.is_enabled;
