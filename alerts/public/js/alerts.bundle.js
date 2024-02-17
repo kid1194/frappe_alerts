@@ -185,10 +185,8 @@ class LevelUp extends LevelUpBase {
             if (this._is_state_popped) return;
             this._is_state_popped = 1;
             this._debug('On popstate');
-            this._debug('Hash has changed');
             this.clean_form();
-            this.off();
-            this.emit('state_change');
+            this.emit('state_change').off();
             window.setTimeout(this.$fn(function() {
                 this._is_state_popped = 0;
             }), 300);
@@ -200,6 +198,7 @@ class LevelUp extends LevelUpBase {
     destroy() {
         window.removeEventListener('beforeunload', this._on_unload);
         window.removeEventListener('popstate', this._state_popped);
+        this.clean_form();
         this.emit('destroy').off(1);
         super.destroy();
     }
@@ -424,7 +423,7 @@ class LevelUp extends LevelUpBase {
     }
     
     init_form(frm) {
-        if (!frm) frm = window.cur_frm;
+        frm = this._get_form(frm);
         if (!frm || this.$isVal(frm[this._key])) return this;
         frm[this._key] = {
             is_ready: false,
@@ -440,12 +439,12 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     clean_form(frm) {
-        if (!frm) frm = window.cur_frm;
+        frm = this._get_form(frm);
         if (frm) delete frm[this._key];
         return this;
     }
     setup_form(frm, workflow) {
-        if (!frm) frm = window.cur_frm;
+        frm = this._get_form(frm);
         if (!frm) return this;
         this.init_form(frm);
         frm[this._key].app_disabled = this.is_enabled;
@@ -454,7 +453,7 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     enable_form(frm, workflow) {
-        if (!frm) frm = window.cur_frm;
+        frm = this._get_form(frm);
         if (!frm) return this;
         this.init_form(frm);
         if (!frm[this._key].form_disabled) return this.emit('form_enabled');
@@ -487,6 +486,8 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     disable_form(frm, msg, args, workflow, color) {
+        frm = this._get_form(frm);
+        if (!frm) return this;
         this.init_form(frm);
         if (frm[this._key].form_disabled) return this.emit('form_disabled');
         if (!this.$isVal(color) && this.$isStr(workflow)) {
@@ -521,6 +522,7 @@ class LevelUp extends LevelUpBase {
         }
         return this;
     }
+    _get_form(frm) { return frm || window.cur_frm; }
     _no_workflow(frm, workflow) {
         try {
             return !frm || !!frm.is_new() || !workflow
@@ -530,6 +532,8 @@ class LevelUp extends LevelUpBase {
     }
     
     enable_field(frm, key) {
+        frm = this._get_form(frm);
+        if (!frm) return this;
         this.init_form(frm);
         if (!!frm[this._key].tables_disabled[key]) return this;
         var field = frm.get_field(key);
@@ -549,6 +553,8 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     disable_field(frm, key) {
+        frm = this._get_form(frm);
+        if (!frm) return this;
         this.init_form(frm);
         if (
             frm[this._key].fields_disabled.indexOf(key) >= 0
@@ -572,6 +578,8 @@ class LevelUp extends LevelUpBase {
     }
     
     enable_table(frm, key) {
+        frm = this._get_form(frm);
+        if (!frm) return this;
         this.init_form(frm);
         if (!frm[this._key].tables_disabled[key]) return this;
         var obj = frm[this._key].tables_disabled[key],
@@ -594,6 +602,8 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     disable_table(frm, key) {
+        frm = this._get_form(frm);
+        if (!frm) return this;
         this.init_form(frm);
         if (frm[this._key].tables_disabled[key]) return this;
         var field = frm.get_field(key);
@@ -651,6 +661,8 @@ class LevelUp extends LevelUpBase {
     }
     
     invalid_field(frm, key, error, args) {
+        frm = this._get_form(frm);
+        if (!frm) return this;
         var field = frm.get_field(key);
         if (!field) return this;
         var change = 0;
@@ -675,6 +687,8 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     valid_field(frm, key) {
+        frm = this._get_form(frm);
+        if (!frm) return this;
         var field = frm.get_field(key);
         if (!field) return this;
         var change = 0;
