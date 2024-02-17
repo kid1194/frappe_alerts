@@ -65,7 +65,7 @@ frappe.ui.form.on('Alerts Settings', {
             );
         list.push(
             '<li><strong>' + __('Latest Check') + ':</strong> '
-                + frappe.datetime.user_to_str(frm.doc.latest_check)
+                + frappe.datetime.convert_to_system_tz(frm.doc.latest_check)
             + '</li>'
         );
         

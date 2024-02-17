@@ -17,12 +17,12 @@ frappe.ui.form.on('Alert Type', {
             ready: 0
         };
     },
-    refresh: function(frm) {
+    onload: function(frm) {
         if (!frm._type.ready) frm.trigger('load_toolbar');
     },
-    /*disabled: function(frm) {
+    disabled: function(frm) {
         frm.trigger('load_toolbar');
-    },*/
+    },
     validate: function(frm) {
         if (
             !cint(frm.doc.disabled)
@@ -35,23 +35,18 @@ frappe.ui.form.on('Alert Type', {
     },
     load_toolbar: function(frm) {
         frm._type.ready = 1;
-        if (frm._type.$preview) {
-            if (!cint(frm.doc.disabled)) return;
-            var $link = frm.page.is_in_group_button_dropdown(
-                frm.page.menu,
-                'li > a.grey-link > span',
-                __('Preview')
-            );
-            if ($link) $link.remove();
-            frm._type.$preview.remove();
-            frm._type.$preview = null;
-        } else {
-            if (cint(frm.doc.disabled)) return;
-            frm._type.$preview = frm.page.add_button(
-                __('Preview'),
-                function() { frappe.alerts.mock().build(frm.doc); },
-                {btn_class: 'btn-info'}
-            );
+        let label = __('Preview');
+        if (frm.custom_buttons[label]) {
+            if (cint(frm.doc.disabled)) {
+                frm.custom_buttons[label].remove();
+                delete frm.custom_buttons[label];
+            }
+            return;
         }
+        if (cint(frm.doc.disabled)) return;
+        frm.add_custom_button(label, function() {
+            frappe.alerts.mock().build(frm.doc);
+        });
+        frm.change_custom_button_type(label, null, 'info');
     },
 });
