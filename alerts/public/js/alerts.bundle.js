@@ -472,14 +472,14 @@ class LevelUp extends LevelUpBase {
                 frm[this._key].has_intro = false;
                 frm.set_intro();
             }
-        } catch(e) {
-            this._error('Enable form error', e.message, e.stack);
-        } finally {
             frm[this._key].form_disabled = false;
             if (frm[this._key].fields_disabled.length) {
                 frm[this._key].fields_disabled = [];
                 frm[this._key].tables_disabled = {};
             }
+        } catch(e) {
+            this._error('Enable form error', e.message, e.stack);
+        } finally {
             this._has_error = false;
             this.emit('form_enabled');
         }
@@ -513,10 +513,10 @@ class LevelUp extends LevelUpBase {
                 frm[this._key].has_intro = true;
                 frm.set_intro(__(msg, args), color || 'red');
             }
+            frm[this._key].form_disabled = true;
         } catch(e) {
             this._error('Disable form error', e.message, e.stack);
         } finally {
-            frm[this._key].form_disabled = true;
             this._has_error = false;
             this.emit('form_disabled');
         }
