@@ -24,7 +24,4 @@ def settings(for_update=False):
 def is_enabled():
     from frappe.utils import cint
     
-    from .alert import enqueue_alerts
-    
-    enqueue_alerts()
     return cint(settings().is_enabled) == 1

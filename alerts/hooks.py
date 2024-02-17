@@ -29,7 +29,7 @@ after_migrate = "alerts.setup.migrate.after_migrate"
 after_uninstall = "alerts.setup.uninstall.after_uninstall"
 
 
-#extend_bootinfo = "alerts.utils.boot.extend"
+on_login = ["alerts.utils.access.on_login"]
 
 
 scheduler_events = {

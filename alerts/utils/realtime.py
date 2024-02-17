@@ -21,11 +21,6 @@ def emit_app_status_changed(data, after_commit=True):
 
 
 # [Alert]
-def emit_show_alerts(data, after_commit=True):
-    emit_event("alerts_show", data, after_commit)
-
-
-# [Alert]
 def emit_show_alert(data, after_commit=True):
     emit_event("alerts_show_alert", data, after_commit)
 

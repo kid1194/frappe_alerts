@@ -68,12 +68,10 @@ def type_alerts_exists(alert_type):
 # [Internal]
 def get_user_alerts(user: str):
     from .cache import get_cache, set_cache
-    from .common import log_error
     
     key = f"{user}-alerts"
     data = get_cache(_alert_dt_, key, True)
     if isinstance(data, list):
-        log_error("Cached alerts: " + str(data))
         return data
     
     tmp = []
@@ -84,11 +82,9 @@ def get_user_alerts(user: str):
         set_cache(_alert_dt_, key, tmp, expiry)
         return tmp
     
-    log_error("Daily alerts: " + str(alerts))
     parents = []
     get_alerts_for_user(user, alerts, parents)
     get_alerts_for_roles(user, alerts, parents)
-    log_error("Filtered alerts: " + str(parents))
     if not parents:
         set_cache(_alert_dt_, key, tmp, expiry)
         return tmp
@@ -112,13 +108,11 @@ def get_user_alerts(user: str):
     qry = type_join_query(qry, doc.alert_type)
     
     data = qry.run(as_dict=True)
-    log_error("Listed alerts: " + str(data))
     if not data or not isinstance(data, list):
         set_cache(_alert_dt_, key, tmp, expiry)
         return tmp
     
     data = filter_seen_alerts(data, user, parents, today)
-    log_error("Filtered unseen alerts: " + str(data))
     if not data:
         data = tmp
     
@@ -228,38 +222,27 @@ def filter_seen_alerts(data: list, user: str, alerts: list, today: str):
     return list(data.values())
 
 
-# [Alerts Js]
-@frappe.whitelist()
-def enqueue_alerts():
+# [Access]
+def enqueue_alerts(user: str):
     from .background import enqueue_job
     
-    user = frappe.session.user
     try:
-        show_user_alerts(user)
-        # enqueue_job(
-        #     "alerts.utils.alert.show_user_alerts",
-        #     f"show-user-alerts-for-{user}",
-        #     user=user
-        # )
+        enqueue_job(
+            "alerts.utils.alert.get_user_alerts",
+            f"show-user-alerts-for-{user}",
+            user=user
+        )
     except Exception as exc:
         from .common import log_error
         
         log_error(str(exc))
 
 
-# [Internal]
-def show_user_alerts(user: str):
-    data = get_user_alerts(user)
-    if data:
-        from .common import log_error
-        from .realtime import emit_show_alerts
-        
-        try:
-            emit_show_alerts({"alerts": data})
-        except Exception as exc:
-            log_error(str(exc))
-        finally:
-            log_error("Alerts enqueued: " + str(data))
+# [Alerts Js]
+@frappe.whitelist()
+def user_alerts():
+    data = get_user_alerts(frappe.session.user)
+    return {"alerts": data}
 
 
 # [Alerts Alert]

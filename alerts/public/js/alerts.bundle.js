@@ -634,13 +634,14 @@ class Alerts extends LevelUp {
         
         this._id = frappe.utils.get_random(5);
         this._dialog = null;
+        this._init = 0;
         this._list = [];
         this._seen = [];
         this._seen_retry = 0;
         this._mock = null;
         
         if (cstr(window.location.pathname).indexOf('Alerts%20Settings') >= 0)
-            this._setup(1, 1);
+            this._setup(1);
         else
             this.request('is_enabled', null, this._setup);
     }
@@ -654,13 +655,16 @@ class Alerts extends LevelUp {
         this._list.push.apply(this._list, data);
         return this._build();
     }
-    _setup(ret, enq) {
+    _setup(ret) {
         this._is_ready = true;
         this._is_enabled = !!ret;
         if (!frappe.socketio.socket)
             frappe.socketio.init();
-        this._debug('Socket init', !!frappe.socketio.socket);
-        this.on('alerts_app_status_changed', function(ret) {
+        this.on('change', function(ret) {
+            if (this._is_enabled && !this._init)
+                this._get_alerts();
+        })
+        .on('alerts_app_status_changed', function(ret) {
             if (!ret || ret.is_enabled == null) return;
             var old = this._is_enabled;
             this._is_enabled = !!ret.is_enabled;
@@ -682,21 +686,30 @@ class Alerts extends LevelUp {
                 && this._is_valid(ret)
             ) this.show(ret);
         });
-        //if (enq) this.request('enqueue_alerts');
         this.emit('ready');
-        window.setTimeout(this.$fn(function() {
-            this._debug('enqueue_alerts sending');
-            this.request(
-                'enqueue_alerts',
-                null,
-                function() {
-                    this._debug('enqueue_alerts sent');
-                },
-                function(e) {
-                    this._error('enqueue_alerts failed', e.message);
-                }
-            );
-        }), 10000);
+        if (this._is_enabled)
+            window.setTimeout(this.$fn(this._get_alerts), 700);
+    }
+    _get_alerts() {
+        if (this._init) return;
+        this._init = 1;
+        this.request(
+            'user_alerts',
+            null,
+            function(ret) {
+                this._init = 1;
+                this._debug('alerts_show', ret);
+                if (
+                    this._is_enabled
+                    && this.$isDataObjVal(ret)
+                    && this.$isArrVal(ret.alerts)
+                ) this.show(ret.alerts);
+            },
+            function(e) {
+                this._init = 0;
+                this._error('enqueue_alerts failed', e.message);
+            }
+        );
     }
     _is_valid(data) {
         if (!this.$isDataObjVal(data)) return false;

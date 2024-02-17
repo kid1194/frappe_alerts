@@ -11,7 +11,7 @@ import frappe
 from alerts import __module__
 
 
-# [Alert, Boot, Update]
+# [Access, Alert, Update]
 def log_error(msg):
     from alerts.version import is_version_lt
     
@@ -21,7 +21,7 @@ def log_error(msg):
         frappe.log_error(__module__, msg)
 
 
-# [Boot]
+# []
 def error(msg, throw=True):
     if not throw:
         log_error(msg)
@@ -52,15 +52,5 @@ def parse_json(data, default=None):
         return data
     try:
         return json.loads(data)
-    except Exception:
-        return default
-
-
-# [Cache]
-def to_json(data, default=None):
-    if isinstance(data, str):
-        return data
-    try:
-        return json.dumps(data)
     except Exception:
         return default
