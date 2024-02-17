@@ -17,7 +17,7 @@ frappe.ui.form.on('Alert Type', {
             ready: 0
         };
     },
-    onload: function(frm) {
+    refresh: function(frm) {
         if (!frm._type.ready) frm.trigger('load_toolbar');
     },
     disabled: function(frm) {
