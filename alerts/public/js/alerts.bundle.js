@@ -67,14 +67,14 @@ class LevelUpBase {
         for (var k in this) { if (this.$hasProp(k)) delete this[k]; }
     }
     $void() { return void 0; }
+    $isVal(v) { return v != null; }
+    $isNull(v) { return v === null; }
+    $isVoid(v) { return v === this.$void(); }
     $type(v) {
         if (!this.$isVal(v)) return this.$isVoid(v) ? 'Undefined' : 'Null';
         var t = Object.prototype.toString.call(v).slice(8, -1);
         return t === 'Number' && isNaN(v) ? 'NaN' : t;
     }
-    $isVal(v) { return v != null; }
-    $isNull(v) { return v === null; }
-    $isVoid(v) { return v === this.$void(); }
     $isStr(v) { return this.$isVal(v) && this.$type(v) === 'String'; }
     $isStrVal(v) { return this.$isStr(v) && v.length; }
     $isNum(v) { return this.$isVal(v) && this.$type(v) === 'Number' && isFinite(v); }
