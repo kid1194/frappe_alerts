@@ -434,6 +434,8 @@ class LevelUp extends LevelUpBase {
             tables_disabled: {},
         };
         this.on('ready', function() {
+            if (this._is_state_popped) return;
+            frm = this._get_form(frm);
             if (frm) frm[this._key].is_ready = true;
         });
         return this;
@@ -444,22 +446,27 @@ class LevelUp extends LevelUpBase {
         return this;
     }
     setup_form(frm, workflow) {
+        if (this._is_state_popped) return this;
         frm = this._get_form(frm);
         if (!frm) return this;
         this.init_form(frm);
-        frm[this._key].app_disabled = this.is_enabled;
-        if (this.is_enabled) this.enable_form(frm, workflow);
-        else this.disable_form(frm, this._name + ' app is disabled.', null, workflow);
+        try {
+            frm[this._key].app_disabled = this.is_enabled;
+            if (this.is_enabled) this.enable_form(frm, workflow);
+            else this.disable_form(frm, this._name + ' app is disabled.', null, workflow);
+        } catch(e) {
+            this._error('Setup form error', e.message, e.stack);
+        }
         return this;
     }
     enable_form(frm, workflow) {
         frm = this._get_form(frm);
         if (!frm) return this;
         this.init_form(frm);
-        if (!frm[this._key].form_disabled) return this.emit('form_enabled');
-        var fields = frm[this._key].fields_disabled;
-        if (!fields.length) return this;
         try {
+            if (!frm[this._key].form_disabled) return this.emit('form_enabled');
+            var fields = frm[this._key].fields_disabled;
+            if (!fields.length) return this;
             for (var i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
                 if (f && fields.indexOf(f.df.fieldname) < 0) continue;
@@ -489,19 +496,19 @@ class LevelUp extends LevelUpBase {
         frm = this._get_form(frm);
         if (!frm) return this;
         this.init_form(frm);
-        if (frm[this._key].form_disabled) return this.emit('form_disabled');
-        if (!this.$isVal(color) && this.$isStr(workflow)) {
-            if (workflow.length) color = workflow;
-            workflow = null;
-        }
-        if (!this.$isStrVal(msg)) msg = null;
-        else if (this.$isBoolLike(args)) {
-            workflow = !!args;
-            args = null;
-        } else if (!this.$isArrVal(args) && !this.$isDataObjVal(args)) {
-            args = null;
-        }
         try {
+            if (frm[this._key].form_disabled) return this.emit('form_disabled');
+            if (!this.$isVal(color) && this.$isStr(workflow)) {
+                if (workflow.length) color = workflow;
+                workflow = null;
+            }
+            if (!this.$isStrVal(msg)) msg = null;
+            else if (this.$isBoolLike(args)) {
+                workflow = !!args;
+                args = null;
+            } else if (!this.$isArrVal(args) && !this.$isDataObjVal(args)) {
+                args = null;
+            }
             for (var i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
                 if (f.df.fieldtype === 'Table') this.disable_table(frm, f.df.fieldname);
@@ -535,20 +542,24 @@ class LevelUp extends LevelUpBase {
         frm = this._get_form(frm);
         if (!frm) return this;
         this.init_form(frm);
-        if (!!frm[this._key].tables_disabled[key]) return this;
-        var field = frm.get_field(key);
-        if (
-            !field || !field.df || !field.df.fieldtype
-            || !this._is_field(field.df.fieldtype)
-        ) return this;
-        if (frm[this._key].fields_disabled.indexOf(key) >= 0)
-            frm[this._key].fields_disabled.splice(
-                frm[this._key].fields_disabled.indexOf(key), 1
-            );
-        frm.set_df_property(key, 'read_only', 0);
-        if (!!cint(field.df.translatable) && field.$wrapper) {
-            var $btn = field.$wrapper.find('.clearfix .btn-translation');
-            if ($btn.length) $btn.show();
+        try {
+            if (!!frm[this._key].tables_disabled[key]) return this;
+            var field = frm.get_field(key);
+            if (
+                !field || !field.df || !field.df.fieldtype
+                || !this._is_field(field.df.fieldtype)
+            ) return this;
+            if (frm[this._key].fields_disabled.indexOf(key) >= 0)
+                frm[this._key].fields_disabled.splice(
+                    frm[this._key].fields_disabled.indexOf(key), 1
+                );
+            frm.set_df_property(key, 'read_only', 0);
+            if (!!cint(field.df.translatable) && field.$wrapper) {
+                var $btn = field.$wrapper.find('.clearfix .btn-translation');
+                if ($btn.length) $btn.show();
+            }
+        } catch(e) {
+            this._error('Enable field error', e.message, e.stack);
         }
         return this;
     }
@@ -556,20 +567,24 @@ class LevelUp extends LevelUpBase {
         frm = this._get_form(frm);
         if (!frm) return this;
         this.init_form(frm);
-        if (
-            frm[this._key].fields_disabled.indexOf(key) >= 0
-            || !!frm[this._key].tables_disabled[key]
-        ) return this;
-        var field = frm.get_field(key);
-        if (
-            !field || !field.df || !field.df.fieldtype
-            || !this._is_field(field.df.fieldtype)
-        ) return this;
-        frm[this._key].fields_disabled.push(key);
-        frm.set_df_property(key, 'read_only', 1);
-        if (!!cint(field.df.translatable) && field.$wrapper) {
-            var $btn = field.$wrapper.find('.clearfix .btn-translation');
-            if ($btn.length) $btn.hide();
+        try {
+            if (
+                frm[this._key].fields_disabled.indexOf(key) >= 0
+                || !!frm[this._key].tables_disabled[key]
+            ) return this;
+            var field = frm.get_field(key);
+            if (
+                !field || !field.df || !field.df.fieldtype
+                || !this._is_field(field.df.fieldtype)
+            ) return this;
+            frm[this._key].fields_disabled.push(key);
+            frm.set_df_property(key, 'read_only', 1);
+            if (!!cint(field.df.translatable) && field.$wrapper) {
+                var $btn = field.$wrapper.find('.clearfix .btn-translation');
+                if ($btn.length) $btn.hide();
+            }
+        } catch(e) {
+            this._error('Disable field error', e.message, e.stack);
         }
         return this;
     }
@@ -581,62 +596,70 @@ class LevelUp extends LevelUpBase {
         frm = this._get_form(frm);
         if (!frm) return this;
         this.init_form(frm);
-        if (!frm[this._key].tables_disabled[key]) return this;
-        var obj = frm[this._key].tables_disabled[key],
-        grid = frm.get_field(key).grid;
-        delete frm[this._key].tables_disabled[key];
-        frm[this._key].fields_disabled.splice(
-            frm[this._key].fields_disabled.indexOf(key), 1
-        );
-        if (grid.meta && this.$isVal(obj.editable_grid))
-            grid.meta.editable_grid = obj.editable_grid;
-        if (this.$isVal(obj.static_rows)) grid.static_rows = obj.static_rows;
-        if (this.$isVal(obj.sortable_status)) grid.sortable_status = obj.sortable_status;
-        if (this.$isVal(obj.header_row))
-            grid.header_row.configure_columns_button.show();
-        if (this.$isVal(obj.header_search))
-            grid.header_search.wrapper.show();
-        if (grid.wrapper)
-            this._toggle_buttons(grid.wrapper, obj, true);
-        frm.refresh_field(key);
+        try {
+            if (!frm[this._key].tables_disabled[key]) return this;
+            var obj = frm[this._key].tables_disabled[key],
+            grid = frm.get_field(key).grid;
+            delete frm[this._key].tables_disabled[key];
+            frm[this._key].fields_disabled.splice(
+                frm[this._key].fields_disabled.indexOf(key), 1
+            );
+            if (grid.meta && this.$isVal(obj.editable_grid))
+                grid.meta.editable_grid = obj.editable_grid;
+            if (this.$isVal(obj.static_rows)) grid.static_rows = obj.static_rows;
+            if (this.$isVal(obj.sortable_status)) grid.sortable_status = obj.sortable_status;
+            if (this.$isVal(obj.header_row))
+                grid.header_row.configure_columns_button.show();
+            if (this.$isVal(obj.header_search))
+                grid.header_search.wrapper.show();
+            if (grid.wrapper)
+                this._toggle_buttons(grid.wrapper, obj, true);
+            frm.refresh_field(key);
+        } catch(e) {
+            this._error('Enable table error', e.message, e.stack);
+        }
         return this;
     }
     disable_table(frm, key) {
         frm = this._get_form(frm);
         if (!frm) return this;
         this.init_form(frm);
-        if (frm[this._key].tables_disabled[key]) return this;
-        var field = frm.get_field(key);
-        if (!field || !field.df || !field.df.fieldtype || field.df.fieldtype !== 'Table') return this;
-        var grid = field.grid;
-        if (!grid) return this;
-        frm[this._key].fields_disabled.push(key);
-        var obj = frm[this._key].tables_disabled[key] = {};
-        if (grid.meta) {
-            obj.editable_grid = grid.meta.editable_grid;
-            grid.meta.editable_grid = true;
+        try {
+            if (frm[this._key].tables_disabled[key]) return this;
+            var field = frm.get_field(key);
+            if (!field || !field.df || !field.df.fieldtype || field.df.fieldtype !== 'Table') return this;
+            var grid = field.grid;
+            if (!grid) return this;
+            frm[this._key].fields_disabled.push(key);
+            var obj = frm[this._key].tables_disabled[key] = {};
+            if (grid.meta) {
+                obj.editable_grid = grid.meta.editable_grid;
+                grid.meta.editable_grid = true;
+            }
+            obj.static_rows = grid.static_rows;
+            grid.static_rows = 1;
+            obj.sortable_status = grid.sortable_status;
+            grid.sortable_status = 0;
+            if (
+                grid.header_row && grid.header_row.configure_columns_button
+                && grid.header_row.configure_columns_button.is(':visible')
+            ) {
+                obj.header_row = 1;
+                grid.header_row.configure_columns_button.hide();
+            }
+            if (
+                grid.header_search && grid.header_search.wrapper
+                && grid.header_search.wrapper.is(':visible')
+            ) {
+                obj.header_search = 1;
+                grid.header_row.wrapper.hide();
+            }
+            if (grid.wrapper)
+                this._toggle_buttons(grid.wrapper, obj, false);
+            frm.refresh_field(key);
+        } catch(e) {
+            this._error('Disable table error', e.message, e.stack);
         }
-        obj.static_rows = grid.static_rows;
-        grid.static_rows = 1;
-        obj.sortable_status = grid.sortable_status;
-        grid.sortable_status = 0;
-        if (
-            grid.header_row && grid.header_row.configure_columns_button
-            && grid.header_row.configure_columns_button.is(':visible')
-        ) {
-            obj.header_row = 1;
-            grid.header_row.configure_columns_button.hide();
-        }
-        if (
-            grid.header_search && grid.header_search.wrapper
-            && grid.header_search.wrapper.is(':visible')
-        ) {
-            obj.header_search = 1;
-            grid.header_row.wrapper.hide();
-        }
-        if (grid.wrapper)
-            this._toggle_buttons(grid.wrapper, obj, false);
-        frm.refresh_field(key);
         return this;
     }
     _toggle_buttons(grid, obj, show) {
@@ -663,50 +686,58 @@ class LevelUp extends LevelUpBase {
     invalid_field(frm, key, error, args) {
         frm = this._get_form(frm);
         if (!frm) return this;
-        var field = frm.get_field(key);
-        if (!field) return this;
-        var change = 0;
-        if (field.df && !field.df.invalid) {
-            field.df.invalid = 1;
-            if (this.$isFunc(field.set_invalid))
-                field.set_invalid();
-            change++;
-        }
-        if (this.$isStrVal(error)) {
-            if (this.$isFunc(field.set_new_description)) {
-                field.set_new_description(__(error, args));
-                change++;
-            } else if (this.$isFunc(field.set_description)) {
-                if (field.df && field.df.description)
-                    field.df.old_description = field.df.description;
-                field.set_description(__(error, args));
+        try {
+            var field = frm.get_field(key);
+            if (!field) return this;
+            var change = 0;
+            if (field.df && !field.df.invalid) {
+                field.df.invalid = 1;
+                if (this.$isFunc(field.set_invalid))
+                    field.set_invalid();
                 change++;
             }
+            if (this.$isStrVal(error)) {
+                if (this.$isFunc(field.set_new_description)) {
+                    field.set_new_description(__(error, args));
+                    change++;
+                } else if (this.$isFunc(field.set_description)) {
+                    if (field.df && field.df.description)
+                        field.df.old_description = field.df.description;
+                    field.set_description(__(error, args));
+                    change++;
+                }
+            }
+            if (change) frm.refresh_field(key);
+        } catch(e) {
+            this._error('Invalid field error', e.message, e.stack);
         }
-        if (change) frm.refresh_field(key);
         return this;
     }
     valid_field(frm, key) {
         frm = this._get_form(frm);
         if (!frm) return this;
-        var field = frm.get_field(key);
-        if (!field) return this;
-        var change = 0;
-        if (field.df && field.df.invalid) {
-            field.df.invalid = 0;
-            if (this.$isFunc(field.set_invalid))
-                field.set_invalid();
-            change++;
-        }
-        if (this.$isFunc(field.set_description)) {
-            if (field.df && field.df.old_description) {
-                field.df.description = field.df.old_description;
-                delete field.df.old_description;
+        try {
+            var field = frm.get_field(key);
+            if (!field) return this;
+            var change = 0;
+            if (field.df && field.df.invalid) {
+                field.df.invalid = 0;
+                if (this.$isFunc(field.set_invalid))
+                    field.set_invalid();
+                change++;
             }
-            field.set_description();
-            change++;
+            if (this.$isFunc(field.set_description)) {
+                if (field.df && field.df.old_description) {
+                    field.df.description = field.df.old_description;
+                    delete field.df.old_description;
+                }
+                field.set_description();
+                change++;
+            }
+            if (change) frm.refresh_field(key);
+        } catch(e) {
+            this._error('Valid field error', e.message, e.stack);
         }
-        if (change) frm.refresh_field(key);
         return this;
     }
 }
