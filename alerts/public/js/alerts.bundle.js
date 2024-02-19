@@ -440,6 +440,7 @@ class LevelUp extends LevelUpBase {
             change: this.$delayed(function() {
                 if (!this.is_form || !this.is_self_form())
                     this.clean_form().emit('state_change').off();
+                else this.emit('state_change');
             }, 16, 1),
         };
         window.addEventListener('beforeunload', this._window.events.unload);
