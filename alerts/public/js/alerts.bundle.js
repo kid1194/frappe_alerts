@@ -6,22 +6,29 @@
 */
 
 
-if (typeof String.prototype.trim !== 'function')
-    (function() {
-        var rtrim = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g;
-        String.prototype.trim = function() { return this.replace(rtrim, ''); };
-    }());
 (function() {
     window.addEventListener('load', function() {
         function loader(data) {
-            var $head = document.getElementsByTagName('head')[0];
-            for (var k in data) {
+            let $head = document.getElementsByTagName('head')[0],
+            bundled = frappe.assets && typeof frappe.assets.bundled_asset === 'function'
+                ? frappe.assets.bundled_asset : null,
+            exists = frappe.assets && typeof frappe.assets.exists === 'function'
+                ? frappe.assets.exists : null;
+            for (let k in data) {
                 if (!data[k][0]) {
                     if (data[k][2]) data[k][2]();
                     continue;
                 }
-                var $el = document.getElementById(k);
-                if (!!$el) continue;
+                if (bundled) data[k][1] = bundled(data[k][1]);
+                if (exists && exists(data[k][1])) {
+                    if (data[k][2]) data[k][2]();
+                    continue;
+                }
+                let $el = document.getElementById(k);
+                if (!!$el) {
+                    if (data[k][2]) data[k][2]();
+                    continue;
+                }
                 $el = document.createElement('script');
                 $el.id = k;
                 $el.src = data[k][1];
@@ -32,9 +39,10 @@ if (typeof String.prototype.trim !== 'function')
             }
         }
         loader({
-            promise_polyfill: [
-                typeof window.Promise !== 'function',
-                'https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js',
+            core_polyfill: [
+                typeof String.prototype.trim !== 'function'
+                || typeof window.Promise !== 'function',
+                'https://polyfill.io/v3/polyfill.min.js?features=String.prototype.trim%2CPromise',
                 function() {
                     if (typeof Promise.wait !== 'function')
                         Promise.wait = function(ms) {
@@ -51,7 +59,7 @@ if (typeof String.prototype.trim !== 'function')
                                 })
                             ]);
                         };
-                },
+                }
             ],
         });
     }, {
@@ -62,17 +70,17 @@ if (typeof String.prototype.trim !== 'function')
 }());
 
 
-class LevelUpBase {
+class LevelUpCore {
     destroy() {
-        for (var k in this) { if (this.$hasProp(k)) delete this[k]; }
+        for (let k in this) { if (this.$hasProp(k)) delete this[k]; }
     }
-    $void() { return void 0; }
+    get $void() { return void 0; }
     $isVal(v) { return v != null; }
     $isNull(v) { return v === null; }
-    $isVoid(v) { return v === this.$void(); }
+    $isVoid(v) { return v === this.$void; }
     $type(v) {
         if (!this.$isVal(v)) return this.$isVoid(v) ? 'Undefined' : 'Null';
-        var t = Object.prototype.toString.call(v).slice(8, -1);
+        let t = Object.prototype.toString.call(v).slice(8, -1);
         return t === 'Number' && isNaN(v) ? 'NaN' : t;
     }
     $isStr(v) { return this.$isVal(v) && this.$type(v) === 'String'; }
@@ -104,20 +112,18 @@ class LevelUpBase {
     $def(o, p, s) { return this.$extend(o, p).$extend(o, s, 1); }
     $extend(o, v, i) {
         if (v && this.$isDataObjVal(v)) {
-            var s = this.$isBoolLike(i);
+            let s = this.$isBoolLike(i);
             if (!s && !this.$isArrVal(i)) i = null;
-            for (var k in v) this.$getter(k, v[k], o, s || (i && i.indexOf(k) < 0));
+            for (let k in v) this.$getter(k, v[k], o, s || (i && i.indexOf(k) < 0));
         }
         return this;
     }
     $getter(k, v, o, s) {
         o = o || this;
-        if (s && this.$isVal(o['_' + k])) {
-            Object.defineProperty(o, k,  {get() { return v; }});
-        } else {
-            o['_' + k] = v;
-            if (!this.$isVal(o[k]))
-                Object.defineProperty(o, k, {get() { return this['_' + k]; }});
+        if (!s) o['_' + k] = v;
+        if (!this.$isVal(o[k])) {
+            if (s)  Object.defineProperty(o, k,  {get() { return v; }});
+            else Object.defineProperty(o, k, {get() { return this['_' + k]; }});
         }
         return this;
     }
@@ -131,12 +137,12 @@ class LevelUpBase {
         return d;
     }
     $fn() {
-        var a = this.$toArr(arguments);
+        let a = this.$toArr(arguments);
         a[1] = a[1] || this;
         return $.proxy.apply(null, a);
     }
     $afn(fn, a, o) {
-        var d = [fn, o || this];
+        let d = [fn, o || this];
         if (this.$isVal(a)) {
             if (!this.$isArrLike(a)) d.push(a);
             else d.push.apply(d, a);
@@ -157,50 +163,58 @@ class LevelUpBase {
             default: return fn.apply(o, a);
         }
     }
+    $timeout(fn, tm) {
+        if (!this.$isFunc(fn)) window.clearTimeout(fn);
+        else return window.setTimeout(this.$fn(fn), tm);
+    }
+    $delayed(fn, delay, later) { return new LevelUpDelayer(this.$fn(fn), delay, later); }
 }
 
 
-class LevelUp extends LevelUpBase {
+class LevelUpDelayer {
+    constructor(fn, delay, later) {
+        this._fn = function() {
+            if (!arguments.length) fn();
+            else fn.apply(null, arguments);
+        };
+        this._tm = delay;
+        this._ref = null;
+        if (!later) this.start();
+    }
+    start() {
+        this.cancel();
+        this._ref = window.setTimeout(this._fn, this._tm);
+        return this;
+    }
+    cancel() {
+        if (this._ref) window.clearTimeout(this._ref);
+        this._ref = null;
+        return this;
+    }
+    destroy() {
+        this.cancel();
+        let prop = Object.prototype.hasOwnProperty;
+        for (let k in this) { if (prop.call(this, k)) delete this[k]; }
+    }
+}
+
+
+class LevelUpBase extends LevelUpCore {
     constructor(name, key, namespace, debug) {
         super();
         name = name || 'Level Up';
         key = key || 'LU';
         if (namespace) namespace += '.';
-        this.$extend(this, {
-            _name: name,
+        this.options({
+            name: name,
+            key: key,
             _key: '_' + key,
             _realtime: key + '_',
             _prefix: '[' + name + ']',
             _namespace: namespace || '',
             _testing: !!debug
-        }, 1);
-        this._events = {
-            list: {},
-            real: {},
-        };
-        this._on_unload = this.$fn(this.destroy);
-        window.addEventListener('beforeunload', this._on_unload);
-        this._is_state_popped = 0;
-        this._state_popped = this.$fn(function() {
-            if (this._is_state_popped) return;
-            this._is_state_popped = 1;
-            this._debug('On popstate');
-            this.clean_form();
-            this.emit('state_change').off();
-            window.setTimeout(this.$fn(function() {
-                this._is_state_popped = 0;
-            }), 300);
         });
-        window.addEventListener('popstate', this._state_popped);
-    }
-    
-    options(opts) { return this.$extend(this, opts, 1); }
-    destroy() {
-        window.removeEventListener('beforeunload', this._on_unload);
-        window.removeEventListener('popstate', this._state_popped);
-        this.clean_form();
-        this.emit('destroy').off(1);
-        super.destroy();
+        this._events = {list: {}, real: {}};
     }
     
     $alert(t, m, a, d, i, f) {
@@ -212,12 +226,12 @@ class LevelUp extends LevelUpBase {
             m = t;
             t = null;
         }
-        var o = {
+        let o = {
             title: this._prefix + ': ' + __(this.$isStrVal(t) ? t : d),
             indicator: i,
             message: __('' + m, a),
         };
-        if (!f) frappe.mprint(o);
+        if (!f) frappe.msgprint(o);
         else {
             this._has_error = true;
             frappe.throw(o);
@@ -251,22 +265,22 @@ class LevelUp extends LevelUpBase {
     _warn() { return this.$console('warn', arguments); }
     _error() { return this.$console('error', arguments); }
     
-    method(v) { return this._namespace + v; }
+    get_method(v) { return this._namespace + v; }
     request(method, args, callback, error, _freeze) {
-        if (method.indexOf('.') < 0) method = this.method(method);
+        if (method.indexOf('.') < 0) method = this.get_method(method);
         if (!this.$isFunc(callback)) callback = null;
         if (!this.$isFunc(error)) error = null;
-        var opts = {
+        let opts = {
             method: method,
             freeze: this.$isVal(_freeze),
             callback: this.$fn(function(ret) {
                 if (!this.$isVal(ret)) ret = null;
-                if (ret && this.$isDataObj(ret)) ret = ret.message || ret;
-                if (!ret || !this.$isDataObj(ret) || !ret.error) {
+                if (this.$isDataObj(ret)) ret = ret.message || ret;
+                if (!this.$isDataObj(ret) || !ret.error) {
                     if (callback) callback.call(this, ret);
                     return;
                 }
-                var err;
+                let err;
                 if (this.$isStrVal(ret)) err = ret;
                 else if (this.$isDataObjVal(ret)) {
                     if (this.$isStrVal(ret.message)) err = ret.message;
@@ -277,7 +291,7 @@ class LevelUp extends LevelUpBase {
                 else error.call(this, {message: __(message, args)});
             }),
             error: this.$fn(function(ret, txt) {
-                var err;
+                let err;
                 if (this.$isStrVal(ret)) err = ret;
                 else if (this.$isStrVal(txt)) err = txt;
                 else err = 'The request sent raised an error.';
@@ -308,7 +322,7 @@ class LevelUp extends LevelUpBase {
         if (!this.$isStrVal(event)) return this;
         if (!this.$isFunc(fn)) fn = null;
         event = event.split(' ');
-        for (var i = 0, l = event.length, e; i < l; i++) {
+        for (let i = 0, l = event.length, e; i < l; i++) {
             e = event[i];
             if (this._events.list[e]) this._del_event(e, fn);
         }
@@ -316,43 +330,25 @@ class LevelUp extends LevelUpBase {
     }
     emit(event) {
         if (!this.$isStrVal(event)) return this;
-        var args = this.$toArr(arguments, 1);
+        let args = this.$toArr(arguments, 1);
         if (args.length < 1) args = null;
         event = event.split(' ');
-        for (var i = 0, l = event.length, e; i < l; i++) {
+        for (let i = 0, l = event.length, e; i < l; i++) {
             e = event[i];
             if (this._events.list[e]) this._emit_event(e, args);
         }
         return this;
     }
-    emitp(event) {
-        if (!this.$isStrVal(event)) return Promise.reject();
-        var args = this.$toArr(arguments, 1),
-        prm;
-        if (args.length < 1) {
-            args = null;
-            prm = Promise.resolve();
-        } else if (this.$isPromise(args[args.length - 1])) {
-            prm = args.pop();
-            if (args.length < 1) args = null;
-        }
-        event = event.split(' ');
-        for (var i = 0, l = event.length, e; i < l; i++) {
-            e = event[i];
-            if (this._events.list[e]) this._emit_event(e, args, prm);
-        }
-        return prm;
-    }
     _add_event(event, fn, once, keep) {
         if (!this.$isStrVal(event) || !this.$isFunc(fn)) return this;
         event = event.split(' ');
-        for (var i = 0, l = event.length, e; i < l; i++) {
+        for (let i = 0, l = event.length, e; i < l; i++) {
             e = event[i];
             if (e === 'ready' && this.is_ready) {
                 fn.call(this);
                 continue;
             }
-            if (e === 'ready' || e === 'destroy') once = 1;
+            if (['ready', 'destroy', 'after_destroy'].indexOf(e) >= 0) once = 1;
             if (!this._events.list[e]) {
                 this._events.list[e] = [];
                 if (e.indexOf(this._realtime) === 0) {
@@ -366,7 +362,7 @@ class LevelUp extends LevelUpBase {
     }
     _make_realtime_fn(e) {
         return this.$fn(function(ret) {
-            var obj = this.$isDataObjVal(ret);
+            let obj = this.$isDataObjVal(ret);
             if (obj) {
                 ret = ret.message || ret;
                 obj = this.$isDataObjVal(ret);
@@ -385,18 +381,18 @@ class LevelUp extends LevelUpBase {
             delete this._events.real[e];
             return;
         }
-        var evs = this._events.list[e].slice(),
+        let evs = this._events.list[e].slice(),
         ret = [];
-        for (var i = 0, x = 0, l = evs.length; i < l; i++) {
+        for (let i = 0, x = 0, l = evs.length; i < l; i++) {
             if (evs[i].f !== fn) ret[x++] = evs[i];
         }
         if (!ret.length) this._del_event(e);
         else this._events.list[e] = ret;
     }
     _emit_event(e, args, p) {
-        var evs = this._events.list[e].slice(),
+        let evs = this._events.list[e].slice(),
         ret = [];
-        for (var i = 0, x = 0, l = evs.length, ev; i < l; i++) {
+        for (let i = 0, x = 0, l = evs.length, ev; i < l; i++) {
             ev = evs[i];
             if (!p) this.$call(ev.f, args);
             else p.then(this.$afn(ev.f, args));
@@ -406,35 +402,109 @@ class LevelUp extends LevelUpBase {
         else this._events.list[e] = ret;
     }
     _clear_events(all) {
-        for (var e in this._events.list) {
+        for (let e in this._events.list) {
             if (all) this._del_event(e);
             else this._filter_event(e);
         }
         return this;
     }
     _filter_event(e) {
-        var evs = this._events.list[e].slice(),
+        let evs = this._events.list[e].slice(),
         ret = [];
-        for (var i = 0, x = 0, l = evs.length; i < l; i++) {
+        for (let i = 0, x = 0, l = evs.length; i < l; i++) {
             if (evs[i].s) ret[x++] = evs[i];
         }
         if (!ret.length) this._del_event(e);
         else this._events.list[e] = ret;
     }
+}
+
+
+class LevelUp extends LevelUpBase {
+    constructor(name, key, namespace, debug) {
+        super(name, key, namespace, debug);
+        this._router = {
+            obj: null,
+            old: false,
+        };
+        this._window = {
+            events: {
+                unload: this.$fn(this.destroy),
+                popstate: this.$fn(function() {
+                    this._window.change.start();
+                }),
+                change: this.$fn(function() {
+                    this._window.change.start();
+                }),
+            },
+            change: this.$delayed(function() {
+                if (!this.is_form || !this.is_self_form())
+                    this.clean_form().emit('state_change').off();
+            }, 16, 1),
+        };
+        window.addEventListener('beforeunload', this._window.events.unload);
+        window.addEventListener('popstate', this._window.events.popstate);
+        this._change_listener('on');
+    }
+    
+    options(opts) { return this.$extend(this, opts, 1); }
+    destroy() {
+        window.removeEventListener('beforeunload', this._on_unload);
+        window.removeEventListener('popstate', this._state_popped);
+        this._change_listener('off');
+        this._window.change.destroy();
+        this.clean_form();
+        this.emit('destroy').emit('after_destroy').off(1);
+        super.destroy();
+    }
+    _change_listener(fn) {
+        if (!window.frappe) return;
+        if (!this._router.obj)
+            for (let ks = ['route', 'router'], i = 0, l = ks.length; i < l; i++) {
+                if (!window.frappe[ks[i]]) continue;
+                this._router.obj = window.frappe[ks[i]];
+                this._router.old = i < 1;
+                break;
+            }
+        if (this.$isFunc(this._router.obj[fn]))
+            this._router.obj[fn]('change', this._window.events.change);
+    }
+    
+    get_view() {
+        if (!this._router.obj) return 'app';
+        let view;
+        try {
+            if (this._router.old) view = this._router.obj.parse()[0];
+            else view = window.frappe.get_route_str().split('/')[0];
+        } catch(_) {}
+        return (view || 'app').toLowerCase();
+    }
+    
+    get is_form() { return this.get_view() === 'form'; }
+    is_self_form(frm) {
+        frm = this._get_form(frm);
+        if (!frm) return false;
+        return this.$isStrVal(frm.doctype)
+            && frm.doctype.toLowerCase().indexOf(this.key) >= 0;
+    }
+    _get_form(frm) {
+        frm = frm || window.cur_frm;
+        return this.$isObjLike(frm) ? frm : null;
+    }
     
     init_form(frm) {
         frm = this._get_form(frm);
-        if (!frm || this.$isVal(frm[this._key])) return this;
+        if (!frm) return this;
+        this._window.change.cancel();
+        this.clean_form().off();
         frm[this._key] = {
             is_ready: false,
             app_disabled: false,
             form_disabled: false,
             has_intro: false,
             fields_disabled: [],
-            tables_disabled: {},
         };
         this.on('ready', function() {
-            if (this._is_state_popped) return;
             frm = this._get_form(frm);
             if (frm) frm[this._key].is_ready = true;
         });
@@ -445,15 +515,14 @@ class LevelUp extends LevelUpBase {
         if (frm) delete frm[this._key];
         return this;
     }
+    
     setup_form(frm, workflow) {
-        if (this._is_state_popped) return this;
-        frm = this._get_form(frm);
-        if (!frm) return this;
         this.init_form(frm);
+        if (!this.is_self_form(frm)) return this;
         try {
             frm[this._key].app_disabled = this.is_enabled;
             if (this.is_enabled) this.enable_form(frm, workflow);
-            else this.disable_form(frm, this._name + ' app is disabled.', null, workflow);
+            else this.disable_form(frm, this.name + ' app is disabled.', null, workflow);
         } catch(e) {
             this._error('Setup form error', e.message, e.stack);
         }
@@ -462,12 +531,14 @@ class LevelUp extends LevelUpBase {
     enable_form(frm, workflow) {
         frm = this._get_form(frm);
         if (!frm) return this;
-        this.init_form(frm);
+        let self = this.is_self_form(frm);
         try {
-            if (!frm[this._key].form_disabled) return this.emit('form_enabled');
-            var fields = frm[this._key].fields_disabled;
-            if (!fields.length) return this;
-            for (var i = 0, l = frm.fields.length, f; i < l; i++) {
+            if (self) {
+                if (!frm[this._key].form_disabled) return this.emit('form_enabled');
+                let fields = frm[this._key].fields_disabled;
+                if (!fields.length) return this;
+            }
+            for (let i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
                 if (f && fields.indexOf(f.df.fieldname) < 0) continue;
                 if (f.df.fieldtype === 'Table') this.enable_table(frm, f.df.fieldname);
@@ -475,18 +546,19 @@ class LevelUp extends LevelUpBase {
             }
             if (this._no_workflow(frm, workflow)) frm.enable_save();
             else frm.page.show_actions_menu();
-            if (frm[this._key].has_intro) {
+            if (self && frm[this._key].has_intro) {
                 frm[this._key].has_intro = false;
                 frm.set_intro();
-            }
-            frm[this._key].form_disabled = false;
-            if (frm[this._key].fields_disabled.length) {
-                frm[this._key].fields_disabled = [];
-                frm[this._key].tables_disabled = {};
             }
         } catch(e) {
             this._error('Enable form error', e.message, e.stack);
         } finally {
+            if (self)
+                try {
+                    frm[this._key].form_disabled = false;
+                    if (frm[this._key].fields_disabled.length)
+                        frm[this._key].fields_disabled = [];
+                } catch(_) {}
             this._has_error = false;
             this.emit('form_enabled');
         }
@@ -495,9 +567,9 @@ class LevelUp extends LevelUpBase {
     disable_form(frm, msg, args, workflow, color) {
         frm = this._get_form(frm);
         if (!frm) return this;
-        this.init_form(frm);
+        let self = this.is_self_form(frm);
         try {
-            if (frm[this._key].form_disabled) return this.emit('form_disabled');
+            if (self && frm[this._key].form_disabled) return this.emit('form_disabled');
             if (!this.$isVal(color) && this.$isStr(workflow)) {
                 if (workflow.length) color = workflow;
                 workflow = null;
@@ -509,7 +581,7 @@ class LevelUp extends LevelUpBase {
             } else if (!this.$isArrVal(args) && !this.$isDataObjVal(args)) {
                 args = null;
             }
-            for (var i = 0, l = frm.fields.length, f; i < l; i++) {
+            for (let i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
                 if (f.df.fieldtype === 'Table') this.disable_table(frm, f.df.fieldname);
                 else this.disable_field(frm, f.df.fieldname);
@@ -517,19 +589,21 @@ class LevelUp extends LevelUpBase {
             if (this._no_workflow(frm, workflow)) frm.disable_save();
             else frm.page.hide_actions_menu();
             if (msg) {
-                frm[this._key].has_intro = true;
+                if (self) frm[this._key].has_intro = true;
                 frm.set_intro(__(msg, args), color || 'red');
             }
-            frm[this._key].form_disabled = true;
         } catch(e) {
             this._error('Disable form error', e.message, e.stack);
         } finally {
+            if (self)
+                try {
+                    frm[this._key].form_disabled = true;
+                } catch(_) {}
             this._has_error = false;
             this.emit('form_disabled');
         }
         return this;
     }
-    _get_form(frm) { return frm || window.cur_frm; }
     _no_workflow(frm, workflow) {
         try {
             return !frm || !!frm.is_new() || !workflow
@@ -541,21 +615,21 @@ class LevelUp extends LevelUpBase {
     enable_field(frm, key) {
         frm = this._get_form(frm);
         if (!frm) return this;
-        this.init_form(frm);
+        let self = this.is_self_form(frm);
         try {
-            if (!!frm[this._key].tables_disabled[key]) return this;
-            var field = frm.get_field(key);
+            if (self && frm[this._key].fields_disabled.indexOf(key) < 0) return this;
+            let field = frm.get_field(key);
             if (
                 !field || !field.df || !field.df.fieldtype
                 || !this._is_field(field.df.fieldtype)
             ) return this;
-            if (frm[this._key].fields_disabled.indexOf(key) >= 0)
+            if (self)
                 frm[this._key].fields_disabled.splice(
                     frm[this._key].fields_disabled.indexOf(key), 1
                 );
             frm.set_df_property(key, 'read_only', 0);
             if (!!cint(field.df.translatable) && field.$wrapper) {
-                var $btn = field.$wrapper.find('.clearfix .btn-translation');
+                let $btn = field.$wrapper.find('.clearfix .btn-translation');
                 if ($btn.length) $btn.show();
             }
         } catch(e) {
@@ -566,21 +640,18 @@ class LevelUp extends LevelUpBase {
     disable_field(frm, key) {
         frm = this._get_form(frm);
         if (!frm) return this;
-        this.init_form(frm);
+        let self = this.is_self_form(frm);
         try {
-            if (
-                frm[this._key].fields_disabled.indexOf(key) >= 0
-                || !!frm[this._key].tables_disabled[key]
-            ) return this;
-            var field = frm.get_field(key);
+            if (self && frm[this._key].fields_disabled.indexOf(key) >= 0) return this;
+            let field = frm.get_field(key);
             if (
                 !field || !field.df || !field.df.fieldtype
                 || !this._is_field(field.df.fieldtype)
             ) return this;
-            frm[this._key].fields_disabled.push(key);
+            if (self) frm[this._key].fields_disabled.push(key);
             frm.set_df_property(key, 'read_only', 1);
             if (!!cint(field.df.translatable) && field.$wrapper) {
-                var $btn = field.$wrapper.find('.clearfix .btn-translation');
+                let $btn = field.$wrapper.find('.clearfix .btn-translation');
                 if ($btn.length) $btn.hide();
             }
         } catch(e) {
@@ -595,25 +666,36 @@ class LevelUp extends LevelUpBase {
     enable_table(frm, key) {
         frm = this._get_form(frm);
         if (!frm) return this;
-        this.init_form(frm);
+        let self = this.is_self_form(frm);
         try {
-            if (!frm[this._key].tables_disabled[key]) return this;
-            var obj = frm[this._key].tables_disabled[key],
-            grid = frm.get_field(key).grid;
-            delete frm[this._key].tables_disabled[key];
-            frm[this._key].fields_disabled.splice(
-                frm[this._key].fields_disabled.indexOf(key), 1
-            );
-            if (grid.meta && this.$isVal(obj.editable_grid))
-                grid.meta.editable_grid = obj.editable_grid;
-            if (this.$isVal(obj.static_rows)) grid.static_rows = obj.static_rows;
-            if (this.$isVal(obj.sortable_status)) grid.sortable_status = obj.sortable_status;
-            if (this.$isVal(obj.header_row))
+            if (self && frm[this._key].fields_disabled.indexOf(key) < 0) return this;
+            let grid = frm.get_field(key).grid;
+            if (self)
+                frm[this._key].fields_disabled.splice(
+                    frm[this._key].fields_disabled.indexOf(key), 1
+                );
+            if (grid.meta && this.$isVal(grid.meta._editable_grid)) {
+                grid.meta.editable_grid = grid.meta._editable_grid;
+                delete grid.meta._editable_grid;
+            }
+            if (this.$isVal(grid._static_rows)) {
+                grid.static_rows = grid._static_rows;
+                delete grid._static_rows;
+            }
+            if (this.$isVal(grid._sortable_status)) {
+                grid.sortable_status = grid._sortable_status;
+                delete grid._sortable_status;
+            }
+            if (this.$isVal(grid._header_row)) {
                 grid.header_row.configure_columns_button.show();
-            if (this.$isVal(obj.header_search))
+                delete grid._header_row;
+            }
+            if (this.$isVal(grid._header_search)) {
                 grid.header_search.wrapper.show();
+                delete grid._header_search;
+            }
             if (grid.wrapper)
-                this._toggle_buttons(grid.wrapper, obj, true);
+                this._toggle_buttons(grid, true, self);
             frm.refresh_field(key);
         } catch(e) {
             this._error('Enable table error', e.message, e.stack);
@@ -623,73 +705,99 @@ class LevelUp extends LevelUpBase {
     disable_table(frm, key) {
         frm = this._get_form(frm);
         if (!frm) return this;
-        this.init_form(frm);
+        let self = this.is_self_form(frm);
         try {
-            if (frm[this._key].tables_disabled[key]) return this;
-            var field = frm.get_field(key);
+            if (self && frm[this._key].fields_disabled.indexOf(key) >= 0) return this;
+            let field = frm.get_field(key);
             if (!field || !field.df || !field.df.fieldtype || field.df.fieldtype !== 'Table') return this;
-            var grid = field.grid;
+            let grid = field.grid;
             if (!grid) return this;
-            frm[this._key].fields_disabled.push(key);
-            var obj = frm[this._key].tables_disabled[key] = {};
+            if (self) frm[this._key].fields_disabled.push(key);
             if (grid.meta) {
-                obj.editable_grid = grid.meta.editable_grid;
+                grid.meta._editable_grid = grid.meta.editable_grid;
                 grid.meta.editable_grid = true;
             }
-            obj.static_rows = grid.static_rows;
+            grid._static_rows = grid.static_rows;
             grid.static_rows = 1;
-            obj.sortable_status = grid.sortable_status;
+            grid._sortable_status = grid.sortable_status;
             grid.sortable_status = 0;
             if (
                 grid.header_row && grid.header_row.configure_columns_button
                 && grid.header_row.configure_columns_button.is(':visible')
             ) {
-                obj.header_row = 1;
+                grid._header_row = 1;
                 grid.header_row.configure_columns_button.hide();
             }
             if (
                 grid.header_search && grid.header_search.wrapper
                 && grid.header_search.wrapper.is(':visible')
             ) {
-                obj.header_search = 1;
+                grid._header_search = 1;
                 grid.header_row.wrapper.hide();
             }
-            if (grid.wrapper)
-                this._toggle_buttons(grid.wrapper, obj, false);
+            if (grid.wrapper) this._toggle_buttons(grid, false, self);
             frm.refresh_field(key);
         } catch(e) {
             this._error('Disable table error', e.message, e.stack);
         }
         return this;
     }
-    _toggle_buttons(grid, obj, show) {
-        var btns = {
-            add_row: '.grid-add-row',
-            add_multi_row: '.grid-add-multiple-rows',
-            download: '.grid-download',
-            upload: '.grid-upload',
+    _toggle_buttons(grid, show, self) {
+        let btns = {
+            _add_row: '.grid-add-row',
+            _add_multi_row: '.grid-add-multiple-rows',
+            _download: '.grid-download',
+            _upload: '.grid-upload',
         },
         $btn;
-        for (var k in btns) {
-            if (show && !this.$isVal(obj[k])) continue;
-            $btn = grid.find(btns[k]);
-            if ($btn.length && $btn.is(':visible') != show) {
-                if (show) $btn.show();
-                else {
-                    obj[k] = 1;
+        for (let k in btns) {
+            if (show && self && !this.$isVal(grid[k])) continue;
+            $btn = grid.wrapper.find(btns[k]);
+            if ($btn.length)
+                if (show) {
+                    delete grid[k];
+                    $btn.show();
+                } else {
+                    grid[k] = 1;
                     $btn.hide();
                 }
-            }
         }
     }
     
+    valid_field(frm, key) {
+        frm = this._get_form(frm);
+        if (!frm) return this;
+        try {
+            let field = frm.get_field(key);
+            if (!field) return this;
+            let change = 0;
+            if (field.df && field.df.invalid) {
+                field.df.invalid = 0;
+                if (this.$isFunc(field.set_invalid))
+                    field.set_invalid();
+                change++;
+            }
+            if (this.$isFunc(field.set_description)) {
+                if (field.df && field.df.old_description) {
+                    field.df.description = field.df.old_description;
+                    delete field.df.old_description;
+                }
+                field.set_description();
+                change++;
+            }
+            if (change) frm.refresh_field(key);
+        } catch(e) {
+            this._error('Valid field error', e.message, e.stack);
+        }
+        return this;
+    }
     invalid_field(frm, key, error, args) {
         frm = this._get_form(frm);
         if (!frm) return this;
         try {
-            var field = frm.get_field(key);
+            let field = frm.get_field(key);
             if (!field) return this;
-            var change = 0;
+            let change = 0;
             if (field.df && !field.df.invalid) {
                 field.df.invalid = 1;
                 if (this.$isFunc(field.set_invalid))
@@ -710,33 +818,6 @@ class LevelUp extends LevelUpBase {
             if (change) frm.refresh_field(key);
         } catch(e) {
             this._error('Invalid field error', e.message, e.stack);
-        }
-        return this;
-    }
-    valid_field(frm, key) {
-        frm = this._get_form(frm);
-        if (!frm) return this;
-        try {
-            var field = frm.get_field(key);
-            if (!field) return this;
-            var change = 0;
-            if (field.df && field.df.invalid) {
-                field.df.invalid = 0;
-                if (this.$isFunc(field.set_invalid))
-                    field.set_invalid();
-                change++;
-            }
-            if (this.$isFunc(field.set_description)) {
-                if (field.df && field.df.old_description) {
-                    field.df.description = field.df.old_description;
-                    delete field.df.old_description;
-                }
-                field.set_description();
-                change++;
-            }
-            if (change) frm.refresh_field(key);
-        } catch(e) {
-            this._error('Valid field error', e.message, e.stack);
         }
         return this;
     }
@@ -784,11 +865,11 @@ class Alerts extends LevelUp {
         this._is_enabled = !!ret;
         if (!frappe.socketio.socket) frappe.socketio.init();
         this.on('state_change', function() {
-            if (this._is_enabled && !this._init)
-                this._get_alerts();
-            else if (this._is_enabled) this.show();
+            if (this._is_enabled && this.has_alerts) this.show();
+            else if (this._is_enabled) this._get_alerts();
         }, 1)
         .on('alerts_app_status_changed', function(ret) {
+            this._debug('alerts_app_status_changed', ret);
             if (!ret || !this.$isVal(ret.is_enabled)) return;
             var old = this._is_enabled;
             this._is_enabled = !!ret.is_enabled;
@@ -807,23 +888,24 @@ class Alerts extends LevelUp {
                 && this._is_valid(ret)
             ) this.show(ret);
         }, 1);
-        this._debug('Class ready');
         this.emit('ready');
         if (this._is_enabled)
-            window.setTimeout(this.$fn(this._get_alerts), 700);
+            this.$timeout(this._get_alerts, 700);
     }
     _get_alerts() {
-        if (this._init) return;
         this._init = 1;
         this.request(
             'user_alerts',
             null,
             function(ret) {
-                this._init = 1;
                 this._debug('Getting user alerts.', ret);
-                if (this.$isDataObjVal(ret) && this.$isArrVal(ret.alerts)) {
-                    if (this._is_enabled) this.show(ret.alerts);
-                    else this._queue(ret.alerts);
+                if (!this.$isDataObjVal(ret)) this._init = 0;
+                else {
+                    this._is_enabled = !!ret.is_enabled;
+                    if (this._is_enabled && this.$isArrVal(ret.alerts)) {
+                        if (this._is_enabled) this.show(ret.alerts);
+                        else this._queue(ret.alerts);
+                    }
                 }
             },
             function(e) {
@@ -916,10 +998,10 @@ class Alerts extends LevelUp {
     _retry_mark_seens() {
         if (!this._seen_retry) {
             this._seen_retry++;
-            window.setTimeout(this.$fn(this._mmark_seens), 2000);
+            this.$timeout(this._mmark_seens, 2000);
         } else {
             this._seen_retry = 0;
-            this.error(this._name + ' app is currently facing a problem.');
+            this.error(this.name + ' app is currently facing a problem.');
         }
     }
     destroy() {
@@ -931,7 +1013,7 @@ class Alerts extends LevelUp {
 }
 
 
-class AlertsMock extends LevelUpBase {
+class AlertsMock extends LevelUpCore {
     constructor() {
         super();
         this._id = frappe.utils.get_random(5);
@@ -972,7 +1054,7 @@ class AlertsMock extends LevelUpBase {
 }
 
 
-class AlertsDialog extends LevelUpBase {
+class AlertsDialog extends LevelUpCore {
     constructor(id, _class) {
         super();
         this._id = id;
@@ -1041,7 +1123,7 @@ class AlertsDialog extends LevelUpBase {
         if (this.$isFunc(fn)) {
             if (!this.$isNumVal(delay)) this._on_show = this.$fn(fn);
             else this._on_show = this.$fn(function() {
-                window.setTimeout(this.$fn(fn), delay);
+                this.$timeout(fn, delay);
             });
         }
         return this;
@@ -1050,7 +1132,7 @@ class AlertsDialog extends LevelUpBase {
         if (this.$isFunc(fn)) {
             if (!this.$isNumVal(delay)) this._on_hide = this.$fn(fn);
             else this._on_hide = this.$fn(function() {
-                window.setTimeout(this.$fn(fn), delay);
+                this.$timeout(fn, delay);
             });
         }
         return this;
@@ -1072,7 +1154,7 @@ class AlertsDialog extends LevelUpBase {
         this.playSound();
         this._dialog.show();
         if (this._timeout)
-            window.setTimeout(this.$fn(this.hide), this._timeout);
+            this.$timeout(this.hide, this._timeout);
         return this;
     }
     hide() {
@@ -1088,11 +1170,11 @@ class AlertsDialog extends LevelUpBase {
             return this;
         }
         this.stopSound();
-        this._sound.timeout = window.setTimeout(this.$fn(this.playSound), 200);
+        this._sound.timeout = this.$timeout(this.playSound, 200);
         return this;
     }
     stopSound() {
-        if (this._sound.timeout) window.clearTimeout(this._sound.timeout);
+        if (this._sound.timeout) this.$timeout(this._sound.timeout);
         this._sound.timeout = null;
         if (this.$sound && this._sound.playing)
             try { this.$sound[0].stop(); } catch(_) {}
@@ -1120,7 +1202,7 @@ class AlertsDialog extends LevelUpBase {
 }
 
 
-class AlertsStyle extends LevelUpBase {
+class AlertsStyle extends LevelUpCore {
     constructor(id, _class) {
         super();
         this._id = 'style-' + id;

@@ -241,8 +241,15 @@ def enqueue_alerts(user: str):
 # [Alerts Js]
 @frappe.whitelist()
 def user_alerts():
-    data = get_user_alerts(frappe.session.user)
-    return {"alerts": data}
+    from .settings import is_enabled
+    
+    data = {"is_enabled": 1 if is_enabled() else 0}
+    if data["is_enabled"]:
+        data["alerts"] = get_user_alerts(frappe.session.user)
+    else:
+        data["alerts"] = []
+    
+    return data
 
 
 # [Alerts Alert]
