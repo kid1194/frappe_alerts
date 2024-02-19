@@ -839,6 +839,7 @@ class Alerts extends LevelUp {
         
         this._dialog = null;
         this._init = 0;
+        this._in_req = 0;
         this._list = [];
         this._seen = [];
         this._seen_retry = 0;
@@ -889,15 +890,20 @@ class Alerts extends LevelUp {
             ) this.show(ret);
         }, 1);
         this.emit('ready');
-        if (this._is_enabled)
+        if (this._is_enabled) {
+            this._init = 1;
             this.$timeout(this._get_alerts, 700);
+        }
     }
     _get_alerts() {
+        if (this._in_req) return;
         this._init = 1;
+        this._in_req = 1;
         this.request(
             'user_alerts',
             null,
             function(ret) {
+                this._in_req = 0;
                 this._debug('Getting user alerts.', ret);
                 if (!this.$isDataObjVal(ret)) this._init = 0;
                 else {
@@ -910,6 +916,7 @@ class Alerts extends LevelUp {
             },
             function(e) {
                 this._init = 0;
+                this._in_req = 0;
                 this._error('Getting user alerts failed.', e.message);
             }
         );
