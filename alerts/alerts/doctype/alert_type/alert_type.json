@@ -21,7 +21,13 @@
   "border_color",
   "style_column",
   "title_color",
-  "content_color"
+  "content_color",
+  "dark_style_section",
+  "dark_background",
+  "dark_border_color",
+  "dark_style_column",
+  "dark_title_color",
+  "dark_content_color"
  ],
  "fields": [
   {
@@ -88,7 +94,7 @@
   {
    "fieldname": "style_section",
    "fieldtype": "Section Break",
-   "label": "Style"
+   "label": "Light Theme Style"
   },
   {
    "fieldname": "background",
@@ -117,10 +123,43 @@
    "fieldtype": "Color",
    "label": "Content Color",
    "read_only_depends_on": "eval:doc.disabled"
+  },
+  {
+   "fieldname": "dark_style_section",
+   "fieldtype": "Section Break",
+   "label": "Dark Theme Style"
+  },
+  {
+   "fieldname": "dark_background",
+   "fieldtype": "Color",
+   "label": "Background Color",
+   "read_only_depends_on": "eval:doc.disabled"
+  },
+  {
+   "fieldname": "dark_border_color",
+   "fieldtype": "Color",
+   "label": "Border Color",
+   "read_only_depends_on": "eval:doc.disabled"
+  },
+  {
+   "fieldname": "dark_style_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dark_title_color",
+   "fieldtype": "Color",
+   "label": "Title Color",
+   "read_only_depends_on": "eval:doc.disabled"
+  },
+  {
+   "fieldname": "dark_content_color",
+   "fieldtype": "Color",
+   "label": "Content Color",
+   "read_only_depends_on": "eval:doc.disabled"
   }
  ],
  "icon": "fa fa-bell-o",
- "modified": "2024-02-11 04:04:04.119400",
+ "modified": "2024-02-20 04:04:04.119400",
  "modified_by": "Administrator",
  "module": "Alerts",
  "name": "Alert Type",

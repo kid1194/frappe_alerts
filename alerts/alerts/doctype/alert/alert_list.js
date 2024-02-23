@@ -12,15 +12,11 @@ frappe.provide('frappe.listview_settings');
 frappe.listview_settings['Alert'] = {
     hide_name_column: true,
     onload: function(list) {
-        frappe.alerts.on('ready change', function() {
-            frappe.dom.unfreeze();
-            if (!this.is_enabled)
-                frappe.dom.freeze(
-                    '<strong class="text-danger">'
-                    + __('Alerts app has been disabled.')
-                    + '</strong>'
-                );
-        });
+        frappe.alerts
+        .on('ready', function() {
+            this.$timeout(this.setup_list, 800);
+        })
+        .on('change', function() { this.setup_list(); });
         
         try {
             list.orig_get_args = list.get_args;
@@ -29,10 +25,11 @@ frappe.listview_settings['Alert'] = {
                 dt = this.doctype;
                 if (dt === 'Alert') {
                     if (!args.fields) args.fields = [];
-                    ['reached', 'status'].forEach(function(f) {
-                        f = frappe.model.get_full_column_name(f, dt);
+                    var fs = ['reached', 'status'];
+                    for (var i = 0, l = fs.length, f; i < l; i++) {
+                        f = frappe.model.get_full_column_name(fs[i], dt);
                         if (args.fields.indexOf(f) < 0) args.fields.push(f);
-                    });
+                    }
                 }
                 return args;
             };

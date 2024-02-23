@@ -9,17 +9,18 @@ import frappe
 
 # [Alert Type]
 def delete_files(doctype, name, files):
-    from .background import enqueue_job
-    from .common import parse_json
-    
     if not files:
         return 0
     
     if files and isinstance(files, str):
+        from .common import parse_json
+        
         files = parse_json(files)
     
     if not files or not isinstance(files, list):
         return 0
+    
+    from .background import enqueue_job
     
     enqueue_job(
         "alerts.utils.files.files_delete",
@@ -42,7 +43,7 @@ def files_delete(doctype, name, files):
             [dt, "attached_to_doctype", "=", doctype]
         ]
     )
-    if data:
+    if data and isinstance(data, list):
         if not isinstance(name, list):
             name = [name]
         

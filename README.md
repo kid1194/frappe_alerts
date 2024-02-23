@@ -2,7 +2,7 @@
 
 A small **Frappe** module that displays custom alerts to specific recipients after login.
 
-![v1.0.1](https://img.shields.io/badge/v1.0.1-2024/02/15-green?style=plastic)
+![v1.0.2](https://img.shields.io/badge/v1.0.2-2024/02/16-green?style=plastic)
 
 **Apologies in advance for any problem or bug you face with this module.**
 **Please report any problem or bug you face so it can be fixed.**
@@ -160,7 +160,7 @@ bench restart
   - Select `Custom` option to be able to upload a `Custom Display Sound`
   - Select `None` to disable the `Display Sound`
 - To customize the look of the alert:
-  - Change the `Background Color`, `Border Color`, `Title Color` and `Content Color`
+  - Change the `Background Color`, `Border Color`, `Title Color` and `Content Color` for both, **Light** and **Dark** themes
   - Click on `Preview` to see how the custom style will look
 
 ### Alert

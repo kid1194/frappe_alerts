@@ -8,15 +8,10 @@ from frappe import _, throw
 from frappe.utils import cint
 from frappe.model.document import Document
 
-from alerts.utils import clear_doc_cache
-
 
 class AlertsSettings(Document):
     def before_validate(self):
-        if (
-            cint(self.is_enabled) and
-            self.update_notification_receivers
-        ):
+        if self.update_notification_receivers:
             existing = []
             for v in self.update_notification_receivers:
                 if v.user in existing:
@@ -26,15 +21,14 @@ class AlertsSettings(Document):
     
     
     def validate(self):
-        if (
-            cint(self.is_enabled) and
-            cint(self.send_update_notification)
-        ):
+        if cint(self.send_update_notification):
             self._check_sender()
             self._check_receivers()
     
     
     def before_save(self):
+        from alerts.utils import clear_doc_cache
+        
         clear_doc_cache(self.doctype)
     
     
@@ -42,9 +36,7 @@ class AlertsSettings(Document):
         if self.has_value_changed("is_enabled"):
             from alerts.utils import emit_app_status_changed
             
-            emit_app_status_changed({
-                "is_enabled": cint(self.is_enabled)
-            })
+            emit_app_status_changed({"is_enabled": cint(self.is_enabled)})
     
     
     def _check_sender(self):

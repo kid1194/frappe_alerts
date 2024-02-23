@@ -4,32 +4,29 @@
 # Licence: Please refer to LICENSE file
 
 
+import frappe
+
+
 # [Internal]
-def emit_event(event: str, data, after_commit=True):
-    import frappe
-    
-    frappe.publish_realtime(
-        event=event,
-        message=data,
-        after_commit=after_commit
-    )
+def emit_event(event: str, data):
+    frappe.publish_realtime(event=event, message=data)
 
 
 # [Alerts Settings]
-def emit_app_status_changed(data, after_commit=True):
-    emit_event("alerts_app_status_changed", data, after_commit)
+def emit_app_status_changed(data):
+    emit_event("alerts_app_status_changed", data)
+
+
+# [Alerts Type]
+def emit_type_changed(data):
+    emit_event("alerts_type_changed", data)
 
 
 # [Alert]
-def emit_show_alerts(data, after_commit=True):
-    emit_event("alerts_show", data, after_commit)
+def emit_show_alert(data):
+    emit_event("alerts_show_alert", data)
 
 
 # [Alert]
-def emit_show_alert(data, after_commit=True):
-    emit_event("alerts_show_alert", data, after_commit)
-
-
-# [Alert]
-def emit_alert_seen(data, after_commit=True):
-    emit_event("alerts_alert_seen", data, after_commit)
+def emit_alert_seen(data):
+    emit_event("alerts_alert_seen", data)

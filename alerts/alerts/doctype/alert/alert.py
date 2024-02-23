@@ -4,11 +4,8 @@
 # Licence: Please refer to LICENSE file
 
 
-from frappe import _, throw
-from frappe.utils import (
-    cint,
-    getdate
-)
+from frappe import _, _dict, throw
+from frappe.utils import cint, getdate
 from frappe.model.document import Document
 
 from alerts.utils import clear_doc_cache
@@ -56,7 +53,7 @@ class Alert(Document):
             self.flags.send_alert = True
     
     
-    def on_update(self):
+    def on_submit(self):
         self._send_alert()
     
     
@@ -64,14 +61,9 @@ class Alert(Document):
         clear_doc_cache(self.doctype, self.name)
         if (
             self.has_value_changed("status") and
-            self.status in ("Active", "Finished")
+            self.status == "Active"
         ):
-            from alerts.utils import clear_alert_cache
-            
-            if self.status == "Active":
-                self.flags.send_alert = True
-            
-            clear_alert_cache()
+            self.flags.send_alert = True
     
     
     def on_update_after_submit(self):
@@ -102,4 +94,29 @@ class Alert(Document):
             from alerts.utils import send_alert
             
             self.flags.pop("send_alert")
-            send_alert(self)
+            data = _dict({
+                "name": self.name,
+                "title": self.title,
+                "alert_type": self.alert_type,
+                "message": self.message,
+                "is_repeatable": cint(self.is_repeatable),
+                "number_of_repeats": cint(self.number_of_repeats),
+                "users": [v.user for v in self.for_users],
+                "roles": [v.role for v in self.for_roles],
+                "seen_by": {},
+                "seen_today": []
+            })
+            
+            if self.seen_by:
+                from frappe.utils import nowdate
+                
+                today = nowdate()
+                for v in self.seen_by:
+                    if v.user not in data.seen_by:
+                        data.seen_by[v.user] = 1
+                    else:
+                        data.seen_by[v.user] += 1
+                    if v.user not in data.seen_today and v.date == today:
+                        data.seen_today.append(v.user)
+            
+            send_alert(data)

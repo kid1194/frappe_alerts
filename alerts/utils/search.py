@@ -87,7 +87,6 @@ def prepare_data(data, dt, column, txt, as_dict):
         return (cstr(value).lower().startswith(args[0].lower()) is not True, value)
     
     data = sorted(data, key=relevance_sorter)
-    
     if as_dict:
         for r in data:
             r.pop("_relevance")

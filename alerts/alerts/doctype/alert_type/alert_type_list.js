@@ -11,15 +11,11 @@ frappe.provide('frappe.listview_settings');
 
 frappe.listview_settings['Alert Type'] = {
     onload: function(list) {
-        frappe.alerts.on('ready change', function() {
-            frappe.dom.unfreeze();
-            if (!this.is_enabled)
-                frappe.dom.freeze(
-                    '<strong class="text-danger">'
-                    + __('Alerts app has been disabled.')
-                    + '</strong>'
-                );
-        });
+        frappe.alerts
+        .on('ready', function() {
+            this.$timeout(this.setup_list, 800);
+        })
+        .on('change', function() { this.setup_list(); });
         
         try {
             list.orig_get_args = list.get_args;

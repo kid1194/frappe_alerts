@@ -4,6 +4,7 @@
 # Licence: Please refer to LICENSE file
 
 
+import frappe
 from frappe.utils import now
 from frappe.utils.user import get_system_managers
 
@@ -12,6 +13,8 @@ from alerts import __version__
 
 # [Hooks]
 def after_sync():
+    frappe.clear_cache()
+    
     from alerts.utils.settings import settings
     from alerts.utils.type import add_type
     
@@ -24,7 +27,11 @@ def after_sync():
             "background": "#DC3545",
             "border_color": "#A71D2A",
             "title_color": "#FFFFFF",
-            "content_color": "#FFFFFF"
+            "content_color": "#FFFFFF",
+            "dark_background": "#DC3545",
+            "dark_border_color": "#A71D2A",
+            "dark_title_color": "#FFFFFF",
+            "dark_content_color": "#FFFFFF"
         },
         {
             "name": "Warning",
@@ -34,7 +41,11 @@ def after_sync():
             "background": "#FFC107",
             "border_color": "#BA8B00",
             "title_color": "#000000",
-            "content_color": "#000000"
+            "content_color": "#000000",
+            "dark_background": "#FFC107",
+            "dark_border_color": "#BA8B00",
+            "dark_title_color": "#FFFFFF",
+            "dark_content_color": "#FFFFFF"
         },
         {
             "name": "Notice",
@@ -44,7 +55,11 @@ def after_sync():
             "background": "#17A2B8",
             "border_color": "#0F6674",
             "title_color": "#FFFFFF",
-            "content_color": "#FFFFFF"
+            "content_color": "#FFFFFF",
+            "dark_background": "#17A2B8",
+            "dark_border_color": "#0F6674",
+            "dark_title_color": "#FFFFFF",
+            "dark_content_color": "#FFFFFF"
         }
     ]
     for data in types:
@@ -56,19 +71,17 @@ def after_sync():
         idx = 0
         if "Administrator" in managers:
             idx = managers.index("Administrator")
-        sender = managers.pop(idx)
         
-        doc.update_notification_sender = sender
+        doc.update_notification_sender = managers[idx]
         
         if doc.update_notification_receivers:
             doc.update_notification_receivers.clear()
         
-        if manager:
-            for manager in managers:
-                doc.append(
-                    "update_notification_receivers",
-                    {"user": manager}
-                )
+        for manager in managers:
+            doc.append(
+                "update_notification_receivers",
+                {"user": manager}
+            )
         
         if not doc.update_notification_receivers:
             doc.send_update_notification = 0
@@ -82,5 +95,4 @@ def after_sync():
     doc.latest_version = __version__
     doc.latest_check = now()
     doc.has_update = 0
-        
     doc.save(ignore_permissions=True)

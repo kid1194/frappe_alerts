@@ -5,5 +5,4 @@
 
 
 __module__ = "Alerts"
-__version__ = "1.0.1"
-__production__ = False
+__version__ = "1.0.2"

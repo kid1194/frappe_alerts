@@ -13,7 +13,6 @@ frappe.ui.form.on('Alert', {
             .on('ready change', function() {
                 this.setup_form(frm);
             });
-        
         frm._alert = {
             is_draft: false,
             is_submitted: false,
@@ -36,7 +35,7 @@ frappe.ui.form.on('Alert', {
     onload: function(frm) {
         frm.events.on_load(frm);
         
-        if (frm._alerts.app_disabled || !frm._alert.is_draft) return;
+        if (!frm._alerts || frm._alerts.app_disabled || !frm._alert.is_draft) return;
         frm.set_query('role', 'for_roles', function(doc, cdt, cdn) {
             var qry = {filters: {disabled: 0, desk_access: 1}};
             if ((doc.for_roles || '').length) {
@@ -71,6 +70,9 @@ frappe.ui.form.on('Alert', {
         
         if (!!frm.is_new()) frm.trigger('validate_date');
     },
+    refresh: function(frm) {
+        frm.events.setup_toolbar(frm);
+    },
     from_date: function(frm) {
         if (!frm._alert.in_validate)
             frm.events.validate_date(frm);
@@ -101,6 +103,7 @@ frappe.ui.form.on('Alert', {
     },
     on_submit: function(frm) {
         frm.events.on_load(frm);
+        frm.events.setup_toolbar(frm);
     },
     on_load: function(frm) {
         var docstatus = !!frm.is_new() ? 0 : cint(frm.doc.docstatus);
@@ -108,7 +111,7 @@ frappe.ui.form.on('Alert', {
         frm._alert.is_submitted = docstatus === 1;
         frm._alert.is_cancelled = docstatus === 2;
         
-        if (frm._alert.is_draft) return;
+        if (frm._alert.is_draft || !frm._alerts || frm._alerts.form_disabled) return;
         
         frappe.alerts.disable_form(frm, '{0} has been {1}.', [
             cstr(frm.doc.doctype || frm.doctype),
@@ -121,6 +124,21 @@ frappe.ui.form.on('Alert', {
             if (ret && cstr(ret.alert) === cstr(frm.docname))
                 frm.reload_doc();
         });
+    },
+    setup_toolbar: function(frm) {
+        var label = __('Preview');
+        if (!!frm.is_new() || !frm._alert.is_draft) {
+            if (frm.custom_buttons[label]) {
+                frm.custom_buttons[label].remove();
+                delete frm.custom_buttons[label];
+            }
+            return;
+        }
+        if (frm.custom_buttons[label]) return;
+        frm.add_custom_button(label, function() {
+            frappe.alerts.mock().build(frm.doc);
+        });
+        frm.change_custom_button_type(label, null, 'info');
     },
     validate_date: function(frm) {
         var from = cstr(frm.doc.from_date),

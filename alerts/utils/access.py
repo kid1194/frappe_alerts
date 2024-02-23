@@ -7,9 +7,11 @@
 # [Hooks]
 def on_login(login_manager):
     try:
-        from .alert import cache_alerts
+        from .alert import enqueue_alerts
+        from .type import enqueue_types
         
-        cache_alerts(login_manager.user)
+        enqueue_types()
+        enqueue_alerts(login_manager.user)
     except Exception:
         from frappe import _
         
