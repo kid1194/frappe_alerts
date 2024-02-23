@@ -36,9 +36,7 @@ class AlertsSettings(Document):
         if self.has_value_changed("is_enabled"):
             from alerts.utils import emit_app_status_changed
             
-            emit_app_status_changed({
-                "is_enabled": cint(self.is_enabled)
-            })
+            emit_app_status_changed({"is_enabled": cint(self.is_enabled)})
     
     
     def _check_sender(self):

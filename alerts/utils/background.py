@@ -9,7 +9,7 @@ import frappe
 from alerts.version import is_version_gt
 
 
-# [Update]
+# [Alert, Type, Update]
 def is_job_running(name: str):
     if is_version_gt(14):
         from frappe.utils.background_jobs import is_job_enqueued
@@ -23,7 +23,7 @@ def is_job_running(name: str):
         return True if name in jobs else False
 
 
-## [Alert, Files, Update]
+## [Alert, Files, Type, Update]
 def enqueue_job(method: str, job_name: str, **kwargs):
     if is_version_gt(14):
         frappe.enqueue(

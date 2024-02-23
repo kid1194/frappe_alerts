@@ -7,12 +7,12 @@
 import frappe
 
 
-# [Alert]
+# [Alert, Type]
 def get_cache(dt, key, expires: bool=False):
     return frappe.cache().get_value(f"{dt}-{key}", expires=expires)
 
 
-# [Alert]
+# [Alert, Type]
 def set_cache(dt, key, data, expiry: int=0):
     if expiry < 1:
         frappe.cache().set_value(f"{dt}-{key}", data)

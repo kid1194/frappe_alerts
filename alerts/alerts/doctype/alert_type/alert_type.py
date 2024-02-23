@@ -55,6 +55,10 @@ class AlertType(Document):
                 delete_files(self.doctype, names, [old.custom_display_sound])
     
     
+    def on_update(self):
+        self._emit_change()
+    
+    
     def on_trash(self):
         clear_doc_cache(self.doctype, self.name)
         
@@ -67,6 +71,8 @@ class AlertType(Document):
             from alerts.utils import delete_files
             
             delete_files(self.doctype, self.name, [self.custom_display_sound])
+        
+        self._emit_change(True)
     
     
     def _set_defaults(self):
@@ -76,6 +82,28 @@ class AlertType(Document):
             self.display_timeout = 0
         if self.display_sound != "Custom":
             self.custom_display_sound = None
+    
+    
+    def _emit_change(self, trash=False):
+        from alerts.utils import emit_type_changed
+        
+        data = {
+            "action": "add" if not trash else "trash",
+            "name": self.name
+        }
+        if not trash:
+            data.update({
+                "background": cstr(self.background),
+                "border_color": cstr(self.border_color),
+                "title_color": cstr(self.title_color),
+                "content_color": cstr(self.content_color),
+                "dark_background": cstr(self.dark_background),
+                "dark_border_color": cstr(self.dark_border_color),
+                "dark_title_color": cstr(self.dark_title_color),
+                "dark_content_color": cstr(self.dark_content_color)
+            })
+        
+        emit_type_changed(data)
     
     
     def _get_old_doc(self):

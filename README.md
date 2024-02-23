@@ -160,7 +160,7 @@ bench restart
   - Select `Custom` option to be able to upload a `Custom Display Sound`
   - Select `None` to disable the `Display Sound`
 - To customize the look of the alert:
-  - Change the `Background Color`, `Border Color`, `Title Color` and `Content Color`
+  - Change the `Background Color`, `Border Color`, `Title Color` and `Content Color` for both, **Light** and **Dark** themes
   - Click on `Preview` to see how the custom style will look
 
 ### Alert

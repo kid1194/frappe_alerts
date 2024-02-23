@@ -65,6 +65,68 @@ def type_alerts_exists(alert_type):
     return is_doc_exists(_alert_dt_, {"alert_type": alert_type})
 
 
+# [Access]
+def enqueue_alerts(user: str):
+    from .background import is_job_running, enqueue_job
+    
+    job_name = f"show-user-alerts-for-{user}"
+    if not is_job_running(job_name):
+        enqueue_job(
+            "alerts.utils.alert.get_user_alerts",
+            job_name,
+            user=user
+        )
+
+
+# [Alerts Js]
+@frappe.whitelist()
+def user_alerts(init=None):
+    from .settings import is_enabled
+    
+    data = {"is_enabled": 1 if is_enabled() else 0}
+    if data["is_enabled"]:
+        data["alerts"] = get_user_alerts(frappe.session.user)
+        if init:
+            from .type import get_types
+            
+            data["types"] = get_types()
+    else:
+        data["alerts"] = []
+    
+    return data
+
+
+# [Alerts Alert]
+def send_alert(data):
+    from .realtime import emit_show_alert
+    from .type import add_type_data
+    
+    add_type_data(data.alert_type, data)
+    emit_show_alert(data)
+
+
+# [Alerts Js]
+@frappe.whitelist(methods=["POST"])
+def mark_seens(names):
+    if names and isinstance(names, str):
+        from .common import parse_json
+        
+        names = parse_json(names)
+    
+    if not names or not isinstance(names, list):
+        return {
+            "error": 1,
+            "message": "Invalid arguments"
+        }
+    
+    user = frappe.session.user
+    for v in names:
+        if v and isinstance(v, str):
+            mark_as_seen(v, user)
+    
+    return {"success": 1}
+
+
 # [Internal]
 def get_user_alerts(user: str):
     from .cache import get_cache, set_cache
@@ -89,6 +151,8 @@ def get_user_alerts(user: str):
         set_cache(_alert_dt_, key, tmp, expiry)
         return tmp
     
+    from .type import type_join_query
+    
     doc = frappe.qb.DocType(_alert_dt_)
     qry = (
         frappe.qb.from_(doc)
@@ -102,11 +166,7 @@ def get_user_alerts(user: str):
         )
         .where(doc.name.isin(parents))
     )
-    
-    from .type import type_join_query
-    
     qry = type_join_query(qry, doc.alert_type)
-    
     data = qry.run(as_dict=True)
     if not data or not isinstance(data, list):
         set_cache(_alert_dt_, key, tmp, expiry)
@@ -220,67 +280,6 @@ def filter_seen_alerts(data: list, user: str, alerts: list, today: str):
                 data.pop(v["parent"], None)
     
     return list(data.values())
-
-
-# [Access]
-def enqueue_alerts(user: str):
-    from .background import enqueue_job
-    
-    try:
-        enqueue_job(
-            "alerts.utils.alert.get_user_alerts",
-            f"show-user-alerts-for-{user}",
-            user=user
-        )
-    except Exception as exc:
-        from .common import log_error
-        
-        log_error(str(exc))
-
-
-# [Alerts Js]
-@frappe.whitelist()
-def user_alerts():
-    from .settings import is_enabled
-    
-    data = {"is_enabled": 1 if is_enabled() else 0}
-    if data["is_enabled"]:
-        data["alerts"] = get_user_alerts(frappe.session.user)
-    else:
-        data["alerts"] = []
-    
-    return data
-
-
-# [Alerts Alert]
-def send_alert(data):
-    from .realtime import emit_show_alert
-    from .type import add_type_data
-    
-    add_type_data(data.alert_type, data)
-    emit_show_alert(data)
-
-
-# [Alerts Js]
-@frappe.whitelist(methods=["POST"])
-def mark_seens(names):
-    if names and isinstance(names, str):
-        from .common import parse_json
-        
-        names = parse_json(names)
-    
-    if not names or not isinstance(names, list):
-        return {
-            "error": 1,
-            "message": "Invalid arguments"
-        }
-    
-    user = frappe.session.user
-    for v in names:
-        if v and isinstance(v, str):
-            mark_as_seen(v, user)
-    
-    return {"success": 1}
 
 
 # [Internal]

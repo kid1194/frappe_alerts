@@ -14,15 +14,8 @@ def after_migrate():
     
     doc = settings()
     if doc.current_version != __version__:
-        
-        if doc.update_notification_receivers:
-            for v in doc.update_notification_receivers:
-                if v.user == doc.update_notification_sender:
-                    doc.update_notification_receivers.remove(v)
-        
         doc.current_version = __version__
         doc.latest_version = __version__
         doc.latest_check = now()
         doc.has_update = 0
-        
         doc.save(ignore_permissions=True)
