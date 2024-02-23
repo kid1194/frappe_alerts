@@ -13,13 +13,7 @@ frappe.listview_settings['Alert'] = {
     hide_name_column: true,
     onload: function(list) {
         frappe.alerts.on('ready change', function() {
-            frappe.dom.unfreeze();
-            if (!this.is_enabled)
-                frappe.dom.freeze(
-                    '<strong class="text-danger">'
-                    + __('Alerts app has been disabled.')
-                    + '</strong>'
-                );
+            this.setup_list();
         });
         
         try {

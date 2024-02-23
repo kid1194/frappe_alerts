@@ -44,14 +44,13 @@ frappe.ui.form.on('Alerts Settings', {
         }
     },
     check_for_update: function(frm) {
-        if (!!cint(frm.doc.is_enabled))
-            frappe.alerts.request(
-                'check_for_update',
-                null,
-                function(ret) {
-                    if (ret) frm.reload_doc();
-                }
-            );
+        frappe.alerts.request(
+            'check_for_update',
+            null,
+            function(ret) {
+                if (ret) frm.reload_doc();
+            }
+        );
     },
     validate: function(frm) {
         if (!!cint(frm.doc.send_update_notification)) {

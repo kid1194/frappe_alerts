@@ -771,6 +771,10 @@ class Alerts extends LevelUp {
         return this._mock;
     }
     show() { return this.has_alerts ? this._render() : this; }
+    setup_list() {
+        if (!this._is_enabled)
+            this.error(__(this._mod + ' app has been disabled.'));
+    }
     _setup(ret) {
         this._is_ready = true;
         this._is_enabled = !!ret;
