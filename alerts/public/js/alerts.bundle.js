@@ -764,10 +764,7 @@ class Alerts extends LevelUp {
     }
     get has_alerts() { return !!this._list.length; }
     mock() {
-        if (!this._mock) {
-            this._mock = new AlertsMock();
-            this._mock._slug = this._slug;
-        }
+        if (!this._mock) this._mock = new AlertsMock();
         return this._mock;
     }
     show() { return this.has_alerts ? this._render() : this; }
@@ -993,12 +990,14 @@ class AlertsMock extends LevelUpCore {
         if (data.alert_type)
             this._dialog.render(this._slug(data.alert_type));
         else
-            this._dialog.setStyle(
-                data.background, data.border_color,
-                data.title_color, data.content_color,
-                data.dark_background, data.dark_border_color,
-                data.dark_title_color, data.dark_content_color
-            );
+            this._dialog
+                .setStyle(
+                    data.background, data.border_color,
+                    data.title_color, data.content_color,
+                    data.dark_background, data.dark_border_color,
+                    data.dark_title_color, data.dark_content_color
+                )
+                .render();
         this._dialog.show();
         return this;
     }
@@ -1010,6 +1009,7 @@ class AlertsMock extends LevelUpCore {
         this._dialog && this._dialog.hide();
         return this;
     }
+    _slug(v) { return v.toLowerCase().replace(/ /g, '-'); }
     destroy() {
         this._dialog && this._dialog.destroy();
         super.destroy();
