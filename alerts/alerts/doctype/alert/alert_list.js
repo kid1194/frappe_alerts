@@ -12,9 +12,11 @@ frappe.provide('frappe.listview_settings');
 frappe.listview_settings['Alert'] = {
     hide_name_column: true,
     onload: function(list) {
-        frappe.alerts.on('ready change', function() {
-            this.setup_list();
-        });
+        frappe.alerts
+        .on('ready', function() {
+            this.$timeout(this.setup_list, 800);
+        })
+        .on('change', function() { this.setup_list(); });
         
         try {
             list.orig_get_args = list.get_args;
