@@ -8,11 +8,7 @@
 
 frappe.ui.form.on('Alert Type', {
     setup: function(frm) {
-        frappe.alerts
-            .init_form(frm)
-            .on('ready change', function() {
-                this.setup_form(frm);
-            });
+        frappe.alerts.on('ready change', function() { this.setup_form(frm); });
     },
     refresh: function(frm) {
         frm.events.setup_toolbar(frm);
@@ -25,7 +21,7 @@ frappe.ui.form.on('Alert Type', {
             cstr(frm.doc.display_sound) === 'Custom'
             && !cstr(frm.doc.custom_display_sound).length
         ) {
-            frappe.alerts.error('A valid alert type custom display sound is required.');
+            frappe.alerts.fatal(__('A valid alert type custom display sound is required.'));
             return false;
         }
     },

@@ -8,11 +8,7 @@
 
 frappe.ui.form.on('Alert', {
     setup: function(frm) {
-        frappe.alerts
-            .init_form(frm)
-            .on('ready change', function() {
-                this.setup_form(frm);
-            });
+        frappe.alerts.on('ready change', function() { this.setup_form(frm); });
         frm._alert = {
             is_draft: false,
             is_submitted: false,
@@ -46,7 +42,7 @@ frappe.ui.form.on('Alert', {
             return qry;
         });
         frm.set_query('user', 'for_users', function(doc, cdt, cdn) {
-            var qry = {query: frappe.alerts.path('search_users')};
+            var qry = {query: frappe.alerts.get_method('search_users')};
             if ((doc.for_users || '').length) {
                 qry.filters = {existing: []};
                 for (var i = 0, l = doc.for_users.length; i < l; i++)
@@ -113,16 +109,15 @@ frappe.ui.form.on('Alert', {
         
         if (frm._alert.is_draft || !frm._alerts || frm._alerts.form_disabled) return;
         
-        frappe.alerts.disable_form(frm, '{0} has been {1}.', [
-            cstr(frm.doc.doctype || frm.doctype),
+        frappe.alerts.disable_form(frm, __('{0} has been {1}.', [
+            cstr(frm.doctype),
             frm._alert.is_submitted ? 'submitted' : 'cancelled'
-        ], 0, frm._alert.is_submitted ? 'green' : 'red');
+        ]), 0, frm._alert.is_submitted ? 'green' : 'red');
         
         frm.set_df_property('seen_by_section', 'hidden', 0);
         
         frappe.alerts.on('alerts_alert_seen', function(ret) {
-            if (ret && cstr(ret.alert) === cstr(frm.docname))
-                frm.reload_doc();
+            if (ret && cstr(ret.alert) === cstr(frm.docname)) frm.reload_doc();
         });
     },
     setup_toolbar: function(frm) {

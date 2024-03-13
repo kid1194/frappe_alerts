@@ -13,33 +13,25 @@ frappe.ui.form.on('Alerts Settings', {
     update_notification_receivers: function(frm) {
         var key = 'update_notification_receivers',
         field = frm.get_field(key);
-        if (
-            !field
-            || !frappe.alerts.$isArrVal(field._rows_list)
-        ) return;
+        if (!field || !frappe.alerts.$isArrVal(field._rows_list)) return;
         var rows = field._rows_list.slice(),
         exist = [],
-        del = [],
+        keep = [],
         i = 0,
         l = rows.length;
         for (; i < l; i++) {
-            if (exist.indexOf(rows[i]) >= 0) del.push(i);
-            else exist.push(rows[i]);
-        }
-        if (!del.length) frappe.alerts.valid_field(frm, key);
-        else {
-            del = del.reverse();
-            var val = rows[del[0]];
-            i = 0;
-            l = del.length;
-            for (; i < l; i++) {
-                field.rows.splice(del[i], 1);
-                field._rows_list.splice(del[i], 1);
+            if (!exist.includes(rows[i])) {
+                exist.push(rows[i]);
+                keep.push(field.rows[i]);
             }
+        }
+        if (!keep.length || keep.length === field.rows.length)
+            frappe.alerts.valid_field(frm, key);
+        else {
+            frm.set_value(key, keep);
             frappe.alerts.invalid_field(
                 frm, key,
-                'The update notification receiver "{0}" has already been selected.',
-                [val]
+                __('The update notification receiver "{0}" has already been selected.', [val])
             );
         }
     },

@@ -6,44 +6,6 @@
 */
 
 
-window.addEventListener('load', function() {
-    function $isFn(v) { return typeof v === 'function'; }
-    (function() {
-        let id = 'core-polyfill';
-        function onload() {
-            if (!$isFn(Promise.wait))
-                Promise.wait = function(ms) {
-                    return new Promise(function(resolve) {
-                        window.setTimeout(resolve, ms);
-                    });
-                };
-            if (!$isFn(Promise.prototype.timeout))
-                Promise.prototype.timeout = function(ms) {
-                    return Promise.race([
-                        this,
-                        Promise.wait(ms)
-                            .then(function() { throw new Error('Time out'); })
-                    ]);
-                };
-        }
-        if ($isFn(String.prototype.trim) && $isFn(window.Promise)) onload();
-        else {
-            let $el = document.getElementById(id);
-            if (!!$el) onload();
-            else {
-                $el = document.createElement('script');
-                $el.id = id;
-                $el.src = 'https://polyfill.io/v3/polyfill.min.js?features=String.prototype.trim%2CPromise';
-                $el.type = 'text/javascript';
-                $el.async = true;
-                $el.onload = onload;
-                document.getElementsByTagName('head')[0].appendChild($el);
-            }
-        }
-    }());
-}, {capture: true, once: true, passive: true});
-
-
 class LevelUpCore {
     destroy() {
         for (let k in this) { if (this.$hasProp(k)) delete this[k]; }
@@ -53,67 +15,82 @@ class LevelUpCore {
         let t = Object.prototype.toString.call(v).slice(8, -1);
         return t === 'Number' && isNaN(v) ? 'NaN' : t;
     }
-    $isStr(v) { return v != null && this.$type(v) === 'String'; }
+    $hasProp(k, o) { return Object.prototype.hasOwnProperty.call(o || this, k); }
+    $isOf(v, t) { return v != null && this.$type(v) === t; }
+    $isObjLike(v) { return v != null && typeof v === 'object'; }
+    $isStr(v) { return this.$isOf(v, 'String'); }
     $isStrVal(v) { return this.$isStr(v) && v.length; }
-    $isNum(v) { return v != null && this.$type(v) === 'Number' && isFinite(v); }
-    $isNumVal(v, n) { return this.$isNum(v) && (!n ? v > 0 : v < 0); }
+    $isNum(v) { return this.$isOf(v, 'Number') && isFinite(v); }
     $isBool(v) { return v === true || v === false; }
-    $isBoolLike(v) {
-        return this.$isBool(v) || (this.$isNum(v) && (v === 0 || v === 1));
-    }
-    $isFunc(v) {
-        return v != null && (typeof v === 'function' || /(Function|^Proxy)$/.test(this.$type(v)));
-    }
-    $isArr(v) { return v != null && $.isArray(v); }
+    $isBoolLike(v) { return this.$isBool(v) || v === 0 || v === 1; }
+    $isFunc(v) { return typeof v === 'function' || /(Function|^Proxy)$/.test(this.$type(v)); }
+    $isArr(v) { return this.$isOf(v, 'Array'); }
     $isArrVal(v) { return this.$isArr(v) && v.length; }
-    $isArgs(v) { return v != null && this.$type(v) === 'Arguments'; }
+    $isArgs(v) { return this.$isOf(v, 'Arguments'); }
     $isArgsVal(v) { return this.$isArgs(v) && v.length; }
     $isArrLike(v) {
-        return this.$isObjLike(v) && !this.$isStr(v) && this.$isNum(v.length);
+        return this.$isObjLike(v) && !this.$isStr(v) && this.$isNum(v.length)
+            && (v.length === 0 || v[v.length - 1] != null);
     }
-    $isObjLike(v) { return v != null && typeof v === 'object'; }
-    $isDataObj(v) { return v != null && $.isPlainObject(v); }
-    $isDataObjVal(v) { return this.$isDataObj(v) && !$.isEmptyObject(v); }
-    $isPromise(v) { return v != null && this.$type(v) === 'Promise'; }
+    $isBaseObj(v) { return this.$isOf(v, 'Object'); }
+    $isObj(v, d) {
+        return this.$isObjLike(v) && (!(v = Object.getPrototypeOf(v))
+            || (this.$hasProp('constructor', v) && this.$isFunc(v.constructor)
+                && (!d || this.$fnStr(v.constructor) === this.$fnStr(Object))));
+    }
+    $fnStr(v) { return Function.prototype.toString.call(v); }
+    $isEmptyObj(v) {
+        if (this.$isObjLike(v)) for (let k in v) { if (this.$hasProp(k, v)) return false; }
+        return true;
+    }
+    $isDataObj(v) { return this.$isObj(v, 1); }
+    $isDataObjVal(v) { return this.$isDataObj(v) && !this.$isEmptyObj(v); }
     $isEmpty(v) {
-        return v == null || v === '' || v === 0 || v === false || $.isEmptyObject(v);
+        return v == null || v === '' || v === 0 || v === false
+        || (this.$isArrLike(v) && v.length ==+ 0) || this.$isEmptyObj(v);
     }
-    $hasProp(k, o) { return Object.prototype.hasOwnProperty.call(o || this, k); }
-    $def(p, s, o) { return this.$extend(p, 0, o).$extend(s, 1, 0); }
-    $extend(v, i, o) {
-        if (!this.$isDataObjVal(v)) return this;
-        let s = this.$isBoolLike(i);
-        if (!s && !this.$isArrVal(i)) i = null;
-        for (let k in v) this.$getter(k, v[k], s || (i && i.indexOf(k) < 0), o);
+    $ext(v, o, s, e) {
+        if (this.$isDataObj(v)) for (let k in v) this.$getter(k, v[k], s, e, o);
         return this;
     }
-    $getter(k, v, s, o) {
+    $def(v, o) { return this.$ext(v, o, 0); }
+    $xdef(v, o) { return this.$ext(v, o, 0, 1); }
+    $static(v, o) { return this.$ext(v, o, 1); }
+    $getter(k, v, s, e, o) {
         o = o || this;
-        if (!s) o['_' + k] = v;
-        if (o[k] == null)
-            Object.defineProperty(o, k, s ? {get() { return v; }}
-                 : {get() { return this['_' + k]; }});
+        if (!s) o[(k[0] !== '_' ? '_' : '') + k] = v;
+        if ((s || e) && o[k] == null)
+            Object.defineProperty(o, k, s ? {value: v} : {get() { return this['_' + k]; }});
         return this;
+    }
+    $extend() {
+        let a = this.$toArr(arguments),
+        d = this.$isBool(a[0]) && a.shift(),
+        v = this.$isBaseObj(a[0]) ? a.shift() : {};
+        for (let i = 0, l = a.length; i < l; i++) {
+            if (!this.$isBaseObj(a[i])) continue;
+            for (let k in a[i]) {
+                if (!this.$hasProp(k, a[i]) || a[i][k] == null) continue;
+                if (!d || !this.$isBaseObj(v[k]) || !this.$isBaseObj(a[i][k])) v[k] = a[i][k];
+                else this.$extend(d, v[k], a[i][k]);
+            }
+        }
+        return v;
     }
     $toArr(v, s, e) { try { return Array.prototype.slice.call(v, s, e); } catch(_) { return []; } }
     $toJson(v, d) { try { return JSON.stringify(v); } catch(_) { return d; } }
     $parseJson(v, d) { try { return JSON.parse(v); } catch(_) { return d; } }
-    $fn() {
-        let a = this.$toArr(arguments);
-        a[1] = a[1] || this;
-        return $.proxy.apply(null, a);
-    }
+    $fn(fn, o) { return fn.bind(o || this); }
     $afn(fn, a, o) {
-        let d = [fn, o || this];
-        if (a != null)
-            !this.$isArrLike(a) ? d.push(a) : d.push.apply(d, a);
-        return $.proxy.apply(null, d);
+        if (a == null) return this.$fn(fn, o);
+        a = !this.$isArr(a) ? [a] : a.slice();
+        a.unshift(o || this);
+        return fn.bind.apply(fn, a);
     }
     $call(fn, a, o) {
-        if (a == null) a = '';
-        else if (!this.$isArrLike(a)) a = [a];
+        if (a != null && !this.$isArrLike(a)) a = [a];
         o = o || this;
-        switch (a.length) {
+        switch ((a || '').length) {
             case 0: return fn.call(o);
             case 1: return fn.call(o, a[0]);
             case 2: return fn.call(o, a[0], a[1]);
@@ -124,41 +101,22 @@ class LevelUpCore {
         }
     }
     $timeout(fn, tm, a) {
-        if (!this.$isFunc(fn)) window.clearTimeout(fn);
-        else return window.setTimeout(this.$afn(fn, a), tm);
+        if (tm == null) return (fn && clearTimeout(fn)) || this;
+        return setTimeout(this.$afn(fn, a), tm || 0);
     }
-    $delayed(fn, delay, later) {
-        return new LevelUpDelayer(this.$fn(fn), delay, later);
-    }
-}
-
-
-class LevelUpDelayer {
-    constructor(fn, delay, later) {
-        this._fn = function(a) {
-            return function() {
-                if (!a.length) fn();
-                else fn.apply(null, a);
-            };
+    $proxy(fn, tm) {
+        fn = this.$fn(fn);
+        return {
+            _r: null,
+            _fn: function(a, d) {
+                this.cancel();
+                let f = function() { a.length ? fn.apply(null, a) : fn(); };
+                this._r = d ? setTimeout(f, tm) : f();
+            },
+            call: function() { this._fn(arguments); },
+            delay: function() { this._fn(arguments, 1); },
+            cancel: function() { this._r && (this._r = clearTimeout(this._r)); },
         };
-        this._tm = delay;
-        this._ref = null;
-        if (!later) this.start();
-    }
-    start() {
-        this.cancel();
-        this._ref = window.setTimeout(this._fn(arguments), this._tm);
-        return this;
-    }
-    cancel() {
-        this._ref && window.clearTimeout(this._ref);
-        this._ref = null;
-        return this;
-    }
-    destroy() {
-        this.cancel();
-        let prop = Object.prototype.hasOwnProperty;
-        for (let k in this) prop.call(this, k) && delete this[k];
     }
 }
 
@@ -166,53 +124,44 @@ class LevelUpDelayer {
 class LevelUpBase extends LevelUpCore {
     constructor(mod, key, doc, ns, prod) {
         super();
-        this._mod = mod || 'Level Up';
-        this._key = key || 'lu';
+        this._mod = mod;
+        this._key = key;
         this._tmp = '_' + this._key;
-        this._doc = new RegExp('^' + (doc || 'LevelUp'));
+        this._doc = new RegExp('^' + doc);
         this._real = this._key + '_';
         this._pfx = '[' + this._key.toUpperCase() + ']';
-        if (ns && ns.slice(-1) !== '.') ns += '.';
-        this._ns = ns || '';
+        this._ns = ns + (ns.slice(-1) !== '.' ? '.' : '');
         this._prod = !!prod;
+        this.$xdef({is_ready: true});
         this._events = {
-            con: !!frappe.socketio.socket,
+            sock: !!frappe.socketio.socket,
             list: {},
             real: {},
-            once: ['ready', 'destroy', 'after_destroy']
+            once: 'ready page_change page_pop destroy after_destroy'.split(' ')
         };
     }
-    
-    $alert(t, m, a, d, i, f) {
-        if (a == null && this.$isArr(m)) {
-            a = m;
-            m = null;
-        }
-        if (m == null) {
-            m = t;
-            t = null;
-        }
+    get module() { return this._mod; }
+    get key() { return this._key; }
+    $alert(t, m, i, f) {
+        m == null && (m = t) && (t = null);
         if (f) this._err = 1;
-        f = f ? frappe.throw : frappe.msgprint;
-        f({
-            title: this._pfx + ': ' + __(this.$isStrVal(t) ? t : d),
-            indicator: i,
-            message: __('' + m, a),
-        });
+        t = {title: this.$isStrVal(t) ? t : this._mod, indicator: i};
+        this.$isDataObj(m) ? (t = this.$extend(m, t)) : (t.message = '' + m);
+        this.call('on_alert', t);
+        (f ? frappe.throw : frappe.msgprint)(t);
         return this;
     }
-    debug(t, m, a) { return this._prod ? this : this.$alert(t, m, a, 'Debug', 'gray'); }
-    log(t, m, a) { return this._prod ? this : this.$alert(t, m, a, 'Log', 'cyan'); }
-    info(t, m, a) { return this.$alert(t, m, a, 'Info', 'light-blue'); }
-    warn(t, m, a) { return this.$alert(t, m, a, 'Warning', 'orange'); }
-    error(t, m, a) { return this.$alert(t, m, a, 'Error', 'red'); }
-    fatal(t, m, a) { return this.$alert(t, m, a, 'Error', 'red', 1); }
-    
-    $console(fn, args) {
+    debug(t, m) { return this._prod ? this : this.$alert(t, m, 'gray'); }
+    log(t, m) { return this._prod ? this : this.$alert(t, m, 'cyan'); }
+    info(t, m) { return this.$alert(t, m, 'light-blue'); }
+    warn(t, m) { return this.$alert(t, m, 'orange'); }
+    error(t, m) { return this.$alert(t, m, 'red'); }
+    fatal(t, m) { return this.$alert(t, m, 'red', 1); }
+    $console(fn, a) {
         if (this._prod) return this;
-        if (!this.$isStr(args[0])) Array.prototype.unshift.call(args, this._pfx);
-        else args[0] = (this._pfx + ' ' + args[0]).trim();
-        (console[fn] || console.log).apply(null, args);
+        if (!this.$isStr(a[0])) Array.prototype.unshift.call(a, this._pfx);
+        else a[0] = (this._pfx + ' ' + a[0]).trim();
+        (console[fn] || console.log).apply(null, a);
         return this;
     }
     _debug() { return this.$console('debug', arguments); }
@@ -220,134 +169,160 @@ class LevelUpBase extends LevelUpCore {
     _info() { return this.$console('info', arguments); }
     _warn() { return this.$console('warn', arguments); }
     _error() { return this.$console('error', arguments); }
-    
-    get_method(v) { return this._ns + v; }
-    request(method, args, callback, error, _freeze) {
-        if (method.indexOf('.') < 0) method = this.get_method(method);
-        if (!this.$isFunc(callback)) callback = null;
-        if (!this.$isFunc(error)) error = null;
-        let opts = {
-            method: method,
-            freeze: _freeze != null,
-            callback: this.$fn(function(ret) {
-                if (this.$isDataObj(ret)) ret = ret.message || ret;
-                if (!this.$isDataObj(ret) || !ret.error) {
-                    callback && callback.call(this, ret);
-                    return;
-                }
-                if (this.$isDataObjVal(ret)) {
-                    if (this.$isStrVal(ret.message)) ret = ret.message;
-                    else if (this.$isStrVal(ret.error)) ret = ret.error;
-                }
-                if (!this.$isStrVal(ret)) ret = 'The request sent returned an invalid response.';
-                if (!error) this.error(ret, args);
-                else error.call(this, {message: __(ret, args)});
-            }),
-            error: this.$fn(function(ret, txt) {
-                if (this.$isStrVal(txt)) ret = txt;
-                else if (!this.$isStrVal(ret)) ret = 'The request sent raised an error.';
-                this._error(ret, method, args);
-                if (!error) this.error(ret);
-                else error.call(this, {message: __(ret, args)});
-            })
-        };
-        if (this.$isDataObjVal(args)) {
-            opts.type = 'POST';
-            opts.args = args;
-        }
-        try { frappe.call(opts); } catch(e) {
-            this._error(e.message, e.stack);
-            if (!error) this.error(e.message);
-            else error.call(this, e);
+    ajax(url, opts, success, error) {
+        opts = this.$extend({type: 'GET', headers: {}}, opts);
+        success = this.$isFunc(success) ? this.$fn(success) : null;
+        error = this.$isFunc(error) ? this.$fn(error) : null;
+        this.call('on_ajax', opts);
+        let obj = opts.type != 'get' && opts.type != 'head';
+        var xhr = new XMLHttpRequest();
+        xhr.open(opts.type.toUpperCase(), url, true, opts.username, opts.password);
+        xhr.responseType = opts.responseType || 'text';
+        opts.timeout && (xhr.timeout = opts.timeout);
+        opts.withCredentials && (xhr.withCredentials = t);
+        opts.mimeType && xhr.overrideMimeType(opts.mimeType);
+        xhr.setRequestHeader('Content-type', 'application/' + (obj ? 'json': 'x-www-form-urlencoded') + '; charset=UTF-8');
+        !opts.crossDomain && xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        for (let k in opts.headers) this.$hasProp(k, opts.headers) && xhr.setRequestHeader(k, opts.headers[k]);
+        xhr.onload = this.$fn(function() {
+            xhr.clear();
+            let c = xhr.status === 0 ? 200 : xhr.status;
+            if (c < 200 || c >= 300) return xhr.throw();
+            success && success(this.$parseJson(xhr.responseText, xhr.responseText), c);
+        });
+        xhr.throw = this.$fn(function() {
+            let m = this.$isStrVal(xhr.statusText) ? __(xhr.statusText) : __('The ajax request sent failed.');
+            error ? error({message: m, code: xhr.status === 0 ? 200 : xhr.status}) : this.error(m);
+        });
+        xhr.onabort = xhr.onerror = xhr.ontimeout = function() { xhr.clear(); xhr.abort(); xhr.throw(); };
+        try { xhr.send(this._ajax_data(opts.data, obj)); } catch(e) {
+            error ? error(e) : this.error(e.message);
             if (this._err) throw e;
         } finally { this._err = 0; }
         return this;
     }
-    
-    on(ev, fn, st)  { return this._on(ev, fn, 0, st); }
-    once(ev, fn, st) { return this._on(ev, fn, 1, st); }
-    real(ev, fn, st) { return this._on(ev, fn, 0, st, 1); }
-    off(ev, fn) {
-        if (ev == null) return this._off();
-        if (this.$isBoolLike(ev)) return this._off(0, 1);
-        if (!this.$isStrVal(ev)) return this;
-        if (!this.$isFunc(fn)) fn = null;
-        ev = ev.split(' ');
-        for (let i = 0, l = ev.length; i < l; i++)
-            this._events.list[ev[i]] && this._off(ev[i], fn);
+    _ajax_data(d, o) {
+        if (this.$isStr(d) || this.$isOf(d, 'FormData')) return d;
+        if (this.$isOf(d, 'HTMLFormElement')) return new FormData(d);
+        if (o || this.$isArr(d) || !this.$isBaseObj(d)) return this.$toJson(d);
+        let q = '', e = encodeURIComponent;
+        for (let k in d) {
+            if (!this.$hasProp(k, d)) continue;
+            if (!this.$isArr(d[k])) q = q + e(k) + '=' + e(d[k]) + '&';
+            else { for (let i = 0, l = d[k].length; i < l; i++) q = q + e(k) + (l > 1 ? '[' + i + ']=' : '=') + e(d[k][i]) + '&'; }
+        }
+        return q.substring(0, q.length - 1) || null;
+    }
+    get_method(v) { return this._ns + v; }
+    request(m, a, s, f) {
+        s = this.$isFunc(s) && this.$fn(s);
+        f = this.$isFunc(f) && this.$fn(f);
+        let d = {
+            method: m.includes('.') ? m : this.get_method(m),
+            callback: this.$fn(function(r) {
+                r = (this.$isObjLike(r) && r.message) || r;
+                if (!this.$isDataObj(r) || !r.error) return s && s(r);
+                r = this.$isDataObjVal(r) && ((this.$isStrVal(r.message) && __(r.message))
+                    || (this.$isStrVal(r.error) && __(r.error)))
+                    || __('The request sent returned an invalid response.');
+                f ? f({message: r}) : this.error(r, a);
+            }),
+            error: this.$fn(function(r, t) {
+                r = (this.$isStrVal(r) && __(r)) || (this.$isStrVal(t) && __(t))
+                    || __('The request sent raised an error.');
+                f ? f({message: r}) : this.error(r);
+            })
+        };
+        !this.$isDataObj(a) && (a = {});
+        this.call('on_request', a);
+        if (!this.$isEmptyObj(a)) this.$extend(d, {type: 'POST', args: a});
+        try { frappe.call(d); } catch(e) {
+            f ? f(e) : this.error(e.message);
+            if (this._err) throw e;
+        } finally { this._err = 0; }
         return this;
     }
-    emit(ev) {
-        if (!this.$isStrVal(ev)) return this;
-        let a = this.$toArr(arguments, 1);
-        if (a.length < 1) a = null;
-        ev = ev.split(' ');
-        for (let i = 0, l = ev.length; i < l; i++)
-            this._events.list[ev[i]] && this._emit(ev[i], a);
-        return this;
-    }
-    _on(ev, fn, nc, st, rl) {
-        if (!this.$isStrVal(ev) || !this.$isFunc(fn)) return this;
-        ev = ev.split(' ');
-        for (let es = this._events, i = 0, l = ev.length, e; i < l; i++) {
-            e = (rl ? this._real : '') + ev[i];
-            if (e === es.once[0] && this.is_ready) {
-                fn.call(this);
-                continue;
-            }
-            if (es.once.indexOf(e) >= 0) nc = 1;
-            if (!es.list[e]) {
-                es.list[e] = [];
-                if (es.con && (rl || e.indexOf(this._real) === 0))
-                    frappe.realtime.on(e, es.real[e] = this._rfn(e));
-            }
-            es.list[e].push({f: fn, o: nc, s: st});
+    on(e, fn)  { return this._on(e, fn); }
+    xon(e, fn)  { return this._on(e, fn, 0, 1); }
+    once(e, fn) { return this._on(e, fn, 1); }
+    xonce(e, fn) { return this._on(e, fn, 1, 1); }
+    real(e, fn, n) { return this._on(e, fn, n, 0, 1); }
+    xreal(e, fn, n) { return this._on(e, fn, n, 1, 1); }
+    off(e, fn, rl) {
+        if (e == null) return this._off();
+        if (this.$isBoolLike(e)) return this._off(0, 1);
+        if (!this.$isStrVal(e)) return this;
+        fn = this.$isFunc(fn) && fn;
+        e = e.split(' ');
+        for (let i = 0, l = e.length, ev; i < l; i++) {
+            ev = (rl ? this._real : '') + e[i];
+            this._events.list[ev] && this._off(ev, fn);
         }
         return this;
     }
+    emit(e) {
+        let a = this.$toArr(arguments, 1),
+        p = Promise.resolve();
+        e = e.split(' ');
+        for (let i = 0, l = e.length; i < l; i++)
+            this._events.list[e[i]] && this._emit(e[i], a, p);
+        return this;
+    }
+    call(e) {
+        let a = this.$toArr(arguments, 1);
+        e = e.split(' ');
+        for (let i = 0, l = e.length; i < l; i++)
+            this._events.list[e[i]] && this._emit(e[i], a);
+        return this;
+    }
+    _on(ev, fn, nc, st, rl) {
+        ev = ev.split(' ');
+        fn = this.$fn(fn);
+        let rd;
+        for (let es = this._events, i = 0, l = ev.length, e; i < l; i++) {
+            e = (rl ? this._real : '') + ev[i];
+            if (e === es.once[0] && this._is_ready) rd = es.once[0];
+            if (es.once.includes(e)) nc = 1;
+            if (!es.list[e]) {
+                es.list[e] = [];
+                if (rl && es.sock) frappe.realtime.on(e, (es.real[e] = this._rfn(e)));
+            }
+            es.list[e].push({f: fn, o: nc, s: st});
+        }
+        return rd ? this.emit(rd) : this;
+    }
     _rfn(e) {
         return this.$fn(function(ret) {
-            if (this.$isDataObj(ret)) ret = ret.message || ret;
-            if (ret != null) ret = [ret];
-            this._emit(
-                e, ret, ret == null || ret.delay == null
-                ? Promise.resolve() : Promise.wait(700)
-            );
+            ret = (this.$isObjLike(ret) && ret.message) || ret;
+            this._emit(e, ret != null ? [ret] : ret, Promise.wait(300));
         });
     }
     _off(e, fn) {
         if (e && fn) this._del(e, fn);
         else if (!e) {
-            for (let ev in this._events.list) {
-                if (fn) this._off(ev, fn);
-                else this._del(ev);
-            }
+            for (let ev in this._events.list) fn ? this._off(ev, fn) : this._del(ev);
         } else {
             let es = this._events;
             es.real[e] && frappe.realtime.off(e, es.real[e]);
             delete es.list[e];
             delete es.real[e];
         }
+        return this;
     }
     _del(e, fn) {
-        let ev = this._events.list[e].slice(),
-        ret = [];
-        for (let x = 0, i = 0, l = ev.length; i < l; i++) {
-            if (fn ? ev[i].f !== fn : ev[i].s) ret[x++] = ev[i];
-        }
-        if (!ret.length) this._off(e);
-        else this._events.list[e] = ret;
+        let ev = this._events.list[e].slice(), ret = [];
+        for (let x = 0, i = 0, l = ev.length; i < l; i++)
+            (fn ? ev[i].f !== fn : ev[i].s) && (ret[x++] = ev[i]);
+        !ret.length ? this._off(e) : (this._events.list[e] = ret);
     }
     _emit(e, a, p) {
-        let ev = this._events.list[e].slice(),
-        ret = [];
-        for (let x = 0, i = 0, l = ev.length, f; i < l; i++) {
-            f = a ? this.$afn(ev[i].f, a) : this.$fn(ev[i].f);
-            !p ? f() : p.then(f);
-            if (ev[i].s || !ev[i].o) ret[x++] = ev[i];
+        let ev = this._events.list[e].slice(), ret = [];
+        p && p.catch(this.$fn(function(e) { this._error('Events emit', e, a, e.message, e.stack); }));
+        for (let x = 0, i = 0, l = ev.length; i < l; i++) {
+            p ? p.then(this.$afn(ev[i].f, a)) : this.$call(ev[i].f, a);
+            !ev[i].o && (ret[x++] = ev[i]);
         }
-        if (!ret.length) this._off(e);
-        else this._events.list[e] = ret;
+        !ret.length ? this._off(e) : (this._events.list[e] = ret);
     }
 }
 
@@ -355,386 +330,413 @@ class LevelUpBase extends LevelUpCore {
 class LevelUp extends LevelUpBase {
     constructor(mod, key, doc, ns, prod) {
         super(mod, key, doc, ns, prod);
-        this._router = {obj: null, old: 0};
-        this._window = {
-            events: {
+        this.$xdef({is_enabled: true});
+        this._router = {obj: null, old: 0, val: ['app']};
+        this._win = {
+            e: {
                 unload: this.$fn(this.destroy),
-                popstate: this.$fn(function() {
-                    this._window.change.start(0);
-                    this._window.changed.start(0);
-                }),
-                change: this.$fn(function() {
-                    this._window.change.start(1);
-                    this._window.changed.start(1);
-                }),
+                popstate: this.$fn(function() { !this._win.c && this._win.fn.delay(); }),
+                change: this.$fn(function() { !this._win.c && this._win.fn.call(1); }),
             },
-            change: this.$delayed(function(n) {
+            c: 0,
+            fn: this.$proxy(function(n) {
+                this._win.c++;
+                this.is_self_list() && this.clean_list();
+                this.is_self_form() && this.clean_form();
+                this._routes();
                 this.emit(n ? 'page_change' : 'page_pop');
-            }, 600, 1),
-            changed: this.$delayed(function(n) {
-                n = n ? 'page_changed' : 'page_popped';
-                if (this.is_self_form()) this.emit(n);
-                else this.clean_form().emit(n).off();
-            }, 1200, 1),
+                this.$timeout(function() { this._win.c--; }, 1200);
+            }, 200),
         };
-        $(document).ready(this.$fn(function() {
-            window.addEventListener('beforeunload', this._window.events.unload);
-            window.addEventListener('popstate', this._window.events.popstate);
-            this._change_listener('on');
-        }));
+        addEventListener('beforeunload', this._win.e.unload);
+        addEventListener('popstate', this._win.e.popstate);
+        this._route_change('on');
     }
-    
-    options(opts) { return this.$extend(opts, 1); }
+    options(opts) { return this.$static(opts); }
     destroy() {
-        this._window.change.destroy();
-        this._window.changed.destroy();
-        window.removeEventListener('beforeunload', this._on_unload);
-        window.removeEventListener('popstate', this._state_popped);
-        this._change_listener('off');
-        this.clean_form();
+        this._win.fn.cancel();
+        removeEventListener('beforeunload', this._on_unload);
+        removeEventListener('popstate', this._state_popped);
+        this._route_change('off');
         this.emit('destroy').emit('after_destroy').off(1);
         super.destroy();
     }
-    _change_listener(fn) {
+    _route_change(fn) {
         if (!this._router.obj)
             for (let ks = ['router', 'route'], i = 0, l = ks.length; i < l; i++) {
                 if (!frappe[ks[i]]) continue;
                 this._router.obj = frappe[ks[i]];
-                this._router.old = i < 1;
+                this._router.old = i > 1;
                 break;
             }
-        if (this._router.obj && this.$isFunc(this._router.obj[fn]))
-            this._router.obj[fn]('change', this._window.events.change);
+        if (this._router.obj && this._router.obj[fn])
+            this._router.obj[fn]('change', this._win.e.change);
     }
-    
-    _route(i, l) {
-        if (this._router.obj)
-            try {
-                let v;
-                if (this._router.old) v = this._router.obj.parse()[i];
-                else v = (frappe.get_route() || this._router.obj.parse())[i];
-                if (v) return l ? v.toLowerCase() : v;
-            } catch(_) {}
-        return 'app';
+    _routes() {
+        let v;
+        try { this._router.obj && (v = !this._router.old ? frappe.get_route() : this._router.obj.parse()); } catch(_) {}
+        if (this.$isArrVal(v)) this._router.val = v;
     }
-    
-    get is_form() { return this._route(0, 1) === 'form'; }
-    is_doctype(v) { return this._route(1) === v; }
-    
-    is_self_form(frm) {
-        if (!this.is_form) return false;
-        frm = this._get_form(frm);
-        return this._doc.test(frm && this.$isStrVal(frm.doctype)
-            ? frm.doctype.toLowerCase() : this._route(1, 1));
-    }
-    _get_form(frm) {
-        frm = frm || window.cur_frm;
-        return this.$isObjLike(frm) ? frm : null;
-    }
-    
-    init_form(frm) {
-        this._window.changed.cancel();
-        this.off();
-        frm = this._get_form(frm);
-        if (!frm) return this;
-        delete frm[this._tmp];
-        frm[this._tmp] = {
-            is_ready: 0,
-            app_disabled: 0,
-            form_disabled: 0,
-            has_intro: 0,
-            fields_disabled: [],
-        };
-        return this;
-    }
-    clean_form(frm) {
-        this._window.changed.cancel();
-        frm = this._get_form(frm);
-        if (frm) delete frm[this._tmp];
-        return this;
-    }
-    
-    setup_form(frm, workflow) {
-        this.init_form(frm);
-        if (!this.is_self_form(frm)) return this;
-        try {
-            frm[this._tmp].app_disabled = this.is_enabled;
-            if (this.is_enabled) this.enable_form(frm, workflow);
-            else this.disable_form(frm, '{0} app is disabled.', [this._mod], workflow);
-        } catch(e) {
-            this._error('Setup form error', e.message, e.stack);
+    route(i) { return this._router.val[i] || this._router.val[0]; }
+    get is_list() { return this.route(0).toLowerCase() === 'list'; }
+    get is_form() { return this.route(0).toLowerCase() === 'form'; }
+    get is_self() { return this._doc.test(this.route(1)); }
+    is_doctype(v) { return this.route(1) === v; }
+    _is_self_view(o) { return this._doc.test((o && o.doctype) || this.route(1)); }
+    get_list(o) { return (o = o || cur_list) && this.$isObjLike(o) ? o : null; }
+    get_form(o) { return (o = o || cur_frm) && this.$isObjLike(o) ? o : null; }
+    is_self_list(o) { return this.is_list && this._is_self_view(this.get_list(o)); }
+    setup_list(o) {
+        if (!(o = this.get_list(o)) || !this.is_self_list(o)) return this;
+        o[this._tmp] = {disabled: 0};
+        let k = 'toggle_actions_menu_button';
+        if (this._is_enabled) {
+            o[this._tmp].disabled = 0;
+            o['_' + k] && (o[k] = o['_' + k]);
+            delete o['_' + k];
+            o.page.clear_inner_toolbar();
+            o.set_primary_action();
+        } else if (!o[this._tmp].disabled) {
+            o[this._tmp].disabled = 1;
+            o.page.hide_actions_menu();
+            o.page.clear_primary_action();
+            o.page.add_inner_message(__('{0} app is disabled.', [this._mod]))
+                .removeClass('text-muted').addClass('text-danger');
+            o['_' + k] = o[k];
+            o[k] = function() {};
         }
         return this;
     }
-    enable_form(frm, workflow) {
-        frm = this._get_form(frm);
-        if (!frm) return this;
-        let self = this.is_self_form(frm);
+    clean_list(o) {
+        if (!(o = this.get_list(o))) return this;
+        delete o[this._tmp];
+        let k = 'toggle_actions_menu_button';
+        o['_' + k] && (o[k] = o['_' + k]);
+        delete o['_' + k];
+        return this;
+    }
+    is_self_form(o) { return this.is_form && this._is_self_view(this.get_form(o)); }
+    clean_form(frm) {
+        if ((frm = this.get_form(frm))) {
+            try { (!frm[this._tmp] || frm[this._tmp].disabled) && this.enable_form(frm); }
+            finally { delete frm[this._tmp]; }
+        }
+        return this;
+    }
+    setup_form(frm, wf) {
+        if (!(frm = this.get_form(frm)) || !this.is_self_form(frm)) return this;
+        frm[this._tmp] = {disabled: 0, intro: 0, workflow: 0, fields: []};
         try {
-            if (self) {
-                if (!frm[this._tmp].form_disabled) return this.emit('form_enabled');
-                let fields = frm[this._tmp].fields_disabled;
-                if (!fields.length) return this;
-            }
+            if (this._is_enabled) this.enable_form(frm, wf);
+            else this.disable_form(frm, __('{0} app is disabled.', [this._mod]), wf);
+        } catch(e) { this._error('Setup form error', e.message, e.stack); }
+        return this;
+    }
+    enable_form(frm, wf) {
+        if (!(frm = this.get_form(frm))) return this;
+        let obj;
+        try {
+            obj = this.is_self_form(frm) && frm[this._tmp];
+            let dfs = obj && obj.disabled ? obj.fields : null;
+            if ((obj && !obj.disabled) || (dfs && !dfs.length)) return this;
             for (let i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i];
-                if (f && fields.indexOf(f.df.fieldname) < 0) continue;
-                if (f.df.fieldtype === 'Table') this.enable_table(frm, f.df.fieldname);
-                else this.enable_field(frm, f.df.fieldname);
+                if (dfs && !dfs.includes(f.df.fieldname)) continue;
+                if (f.df.fieldtype === 'Table') this._enable_table(frm, f.df.fieldname);
+                else this._enable_field(frm, f.df.fieldname);
             }
-            if (this._no_workflow(frm, workflow)) frm.enable_save();
-            else frm.page.show_actions_menu();
-            if (self && frm[this._tmp].has_intro) {
-                frm[this._tmp].has_intro = 0;
+            wf == null && obj && (wf = obj.workflow);
+            if (!!frm.is_new() || !this._has_flow(frm, wf)) frm.enable_save();
+            else (!obj || (obj.workflow = 1)) && frm.page.show_actions_menu();
+            if (obj && obj.intro) {
+                obj.intro = 0;
                 frm.set_intro();
             }
         } catch(e) { this._error('Enable form', e.message, e.stack); }
         finally {
-            if (self)
-                try {
-                    frm[this._tmp].form_disabled = 0;
-                    if (frm[this._tmp].fields_disabled.length)
-                        frm[this._tmp].fields_disabled = [];
-                } catch(_) {}
-            this.emit('form_enabled');
+            try { if (obj) this.$extend(obj, {disabled: 0, fields: []}); } catch(_) {}
+            this.emit('form_enabled', frm);
         }
         return this;
     }
-    disable_form(frm, msg, args, workflow, color) {
-        frm = this._get_form(frm);
-        if (!frm) return this;
-        let self = this.is_self_form(frm);
+    disable_form(frm, msg, wf, color) {
+        if (!(frm = this.get_form(frm))) return this;
+        if (color == null && this.$isStr(wf)) {
+            color = wf;
+            wf = 0;
+        }
+        let obj;
         try {
-            if (self && frm[this._tmp].form_disabled) return this.emit('form_disabled');
-            if (color == null && this.$isStr(workflow)) {
-                if (workflow.length) color = workflow;
-                workflow = null;
-            }
-            if (!this.$isStrVal(msg)) msg = null;
-            else if (this.$isBoolLike(args)) {
-                workflow = !!args;
-                args = null;
-            } else if (!this.$isArrVal(args) && !this.$isDataObjVal(args)) {
-                args = null;
-            }
+            obj = this.is_self_form(frm) && frm[this._tmp];
+            if (obj && obj.disabled) return this;
             for (let i = 0, l = frm.fields.length, f; i < l; i++) {
                 f = frm.fields[i].df;
-                this[f.fieldtype === 'Table' ? 'disable_table' : 'disable_field'](frm, f.fieldname);
+                if (f.fieldtype === 'Table') this._disable_table(frm, f.fieldname);
+                else this._disable_field(frm, f.fieldname);
             }
-            if (this._no_workflow(frm, workflow)) frm.disable_save();
-            else frm.page.hide_actions_menu();
-            if (msg) {
-                if (self) frm[this._tmp].has_intro = 1;
-                frm.set_intro(__(msg, args), color || 'red');
-            }
+            wf == null && obj && (wf = obj.workflow);
+            if (!!frm.is_new() || !this._has_flow(frm, wf)) frm.disable_save();
+            else (!obj || (obj.workflow = 1)) && frm.page.hide_actions_menu();
         } catch(e) { this._error('Disable form', e.message, e.stack); }
         finally {
-            if (self)
-                try { frm[this._tmp].form_disabled = 1; } catch(_) {}
-            this.emit('form_disabled');
+            try {
+                if (this.$isStrVal(msg)) {
+                    obj && (obj.intro = 1);
+                    frm.set_intro(msg, color || 'red');
+                }
+            } catch(_) {}
+            try { obj && (obj.disabled = 1); } catch(_) {}
+            this.emit('form_disabled', frm);
         }
         return this;
     }
-    _no_workflow(frm, workflow) {
+    _has_flow(frm, wf) {
+        try { return frm && wf && frm.states && frm.states.get_state(); } catch(_) {}
+    }
+    get_field(frm, k, n, ck, g) {
+        return (frm = this.get_form(frm)) ? this._get_field(frm, k, n, ck, g) : null;
+    }
+    _get_field(frm, k, n, ck, g) {
+        let f = frm.get_field(k);
+        f && n != null && (f = f.grid && f.grid.get_row(n));
+        f && ck != null && (f = !g ? f.get_field(ck) : f.grid_form && (f.grid_form.fields_dict || {})[ck]);
+        if (f) return f;
+    }
+    _reload_field(frm, k, n, ck) {
+        n != null && (frm = this._get_field(frm, k, n));
+        frm && frm.refresh_field && frm.refresh_field(n == null ? k : ck);
+    }
+    _toggle_translatable(f, s) {
+        if (!cint(f.df.translatable) || !f.$wrapper) return;
+        f = f.$wrapper.find('.clearfix .btn-translation');
+        f.length && f.hidden(!s);
+    }
+    enable_field(frm, key, cdn, ckey) {
+        (frm = this.get_form(frm)) && this._enable_field(frm, key, cdn, ckey);
+        return this;
+    }
+    _enable_field(frm, k, n, ck) {
         try {
-            return !frm || !!frm.is_new() || !workflow
-                || !frm.states || !frm.states.get_state();
+            let o = this.is_self_form(frm) && frm[this._tmp],
+            fk = n == null ? k : [k, n, ck].join('-');
+            if (o && !o.fields.includes(fk)) return;
+            let f = this._get_field(frm, k, n, ck);
+            if (!f || !f.df || !!cint(f.df.hidden) || !this._is_field(f.df.fieldtype)) return;
+            o && (fk = o.fields.indexOf(fk)) >= 0 && o.fields.splice(fk, 1);
+            n == null && frm.set_df_property(k, 'read_only', 0);
+            if (n == null) return this._toggle_translatable(f, 1);
+            f = this._get_field(frm, k, n);
+            f && f.set_field_property(ck, 'read_only', 0);
+            f = this._get_field(frm, k, n, ck, 1);
+            f && f.df && this._toggle_translatable(f, 1);
         } catch(_) {}
-        return true;
     }
-    
-    enable_field(frm, key) {
-        frm = this._get_form(frm);
-        if (!frm) return this;
-        try {
-            let self = this.is_self_form(frm),
-            obj = self ? frm[this._tmp] : null;
-            if (self && obj.fields_disabled.indexOf(key) < 0) return this;
-            let field = frm.get_field(key);
-            if (
-                !field || !field.df || !field.df.fieldtype
-                || !this._is_field(field.df.fieldtype)
-            ) return this;
-            if (self)
-                obj.fields_disabled.splice(obj.fields_disabled.indexOf(key), 1);
-            frm.set_df_property(key, 'read_only', 0);
-            if (!!cint(field.df.translatable) && field.$wrapper) {
-                let $btn = field.$wrapper.find('.clearfix .btn-translation');
-                if ($btn.length) $btn.show();
-            }
-        } catch(e) { this._error('Enable field', e.message, e.stack); }
+    disable_field(frm, k, n, ck) {
+        (frm = this.get_form(frm)) && this._disable_field(frm, k, n, ck);
         return this;
     }
-    disable_field(frm, key) {
-        frm = this._get_form(frm);
-        if (!frm) return this;
-        let self = this.is_self_form(frm);
+    _disable_field(frm, k, n, ck) {
         try {
-            if (self && frm[this._tmp].fields_disabled.indexOf(key) >= 0) return this;
-            let field = frm.get_field(key);
-            if (
-                !field || !field.df || !field.df.fieldtype
-                || !this._is_field(field.df.fieldtype)
-            ) return this;
-            if (self) frm[this._tmp].fields_disabled.push(key);
-            frm.set_df_property(key, 'read_only', 1);
-            if (!!cint(field.df.translatable) && field.$wrapper) {
-                let $btn = field.$wrapper.find('.clearfix .btn-translation');
-                if ($btn.length) $btn.hide();
-            }
-        } catch(e) { this._error('Disable field', e.message, e.stack); }
-        return this;
+            let fs = this.is_self_form(frm) && frm[this._tmp].fields,
+            fk = n == null ? k : [k, n, ck].join('-');
+            if (fs && fs.includes(fk)) return;
+            let f = this._get_field(frm, k, n, ck);
+            if (!f || !f.df || !!cint(f.df.hidden) || !this._is_field(f.df.fieldtype)) return;
+            fs && fs.push(fk);
+            n == null && frm.set_df_property(k, 'read_only', 1);
+            if (n == null) return this._toggle_translatable(f, 0);
+            f = this._get_field(frm, k, n);
+            f && f.set_field_property(ck, 'read_only', 1);
+            f = this._get_field(frm, k, n, ck, 1);
+            f && f.df && this._toggle_translatable(f, 0);
+        } catch(_) {}
     }
-    _is_field(type) {
-        return ['Tab Break', 'Section Break', 'Column Break', 'Table'].indexOf(type) < 0;
-    }
-    
+    _is_field(v) { return v && !/^((Tab|Section|Column) Break|Table)$/.test(v); }
     enable_table(frm, key) {
-        frm = this._get_form(frm);
-        if (!frm) return this;
-        try {
-            let self = this.is_self_form(frm),
-            obj = self ? frm[this._tmp] : null;
-            if (self && obj.fields_disabled.indexOf(key) < 0) return this;
-            let grid = frm.get_field(key).grid;
-            if (self)
-                obj.fields_disabled.splice(obj.fields_disabled.indexOf(key), 1);
-            if (grid.meta && grid.meta._editable_grid != null) {
-                grid.meta.editable_grid = grid.meta._editable_grid;
-                delete grid.meta._editable_grid;
-            }
-            if (grid._static_rows != null) {
-                grid.static_rows = grid._static_rows;
-                delete grid._static_rows;
-            }
-            if (grid._sortable_status != null) {
-                grid.sortable_status = grid._sortable_status;
-                delete grid._sortable_status;
-            }
-            if (grid._header_row != null) {
-                grid.header_row.configure_columns_button.show();
-                delete grid._header_row;
-            }
-            if (grid._header_search != null) {
-                grid.header_search.wrapper.show();
-                delete grid._header_search;
-            }
-            if (grid.wrapper) this._toggle_buttons(grid, 1, self);
-            frm.refresh_field(key);
-        } catch(e) { this._error('Enable table', e.message, e.stack); }
+        (frm = this.get_form(frm)) && this._enable_table(frm, key);
         return this;
     }
-    disable_table(frm, key) {
-        frm = this._get_form(frm);
-        if (!frm) return this;
+    _enable_table(frm, k) {
         try {
-            let self = this.is_self_form(frm),
-            obj = self ? frm[this._tmp] : null;
-            if (self && obj.fields_disabled.indexOf(key) >= 0) return this;
-            let field = frm.get_field(key);
-            if (!field || !field.df || !field.df.fieldtype || field.df.fieldtype !== 'Table') return this;
-            let grid = field.grid;
-            if (!grid) return this;
-            if (self) obj.fields_disabled.push(key);
-            if (grid.meta) {
-                grid.meta._editable_grid = grid.meta.editable_grid;
-                grid.meta.editable_grid = true;
-            }
-            grid._static_rows = grid.static_rows;
-            grid.static_rows = 1;
-            grid._sortable_status = grid.sortable_status;
-            grid.sortable_status = 0;
-            if (
-                grid.header_row && grid.header_row.configure_columns_button
-                && grid.header_row.configure_columns_button.is(':visible')
-            ) {
-                grid._header_row = 1;
-                grid.header_row.configure_columns_button.hide();
-            }
-            if (
-                grid.header_search && grid.header_search.wrapper
-                && grid.header_search.wrapper.is(':visible')
-            ) {
-                grid._header_search = 1;
-                grid.header_row.wrapper.hide();
-            }
-            if (grid.wrapper) this._toggle_buttons(grid, 0, self);
-            frm.refresh_field(key);
-        } catch(e) { this._error('Disable table', e.message, e.stack); }
-        return this;
-    }
-    _toggle_buttons(grid, show, self) {
-        let btns = {
-            _add_row: '.grid-add-row',
-            _add_multi_row: '.grid-add-multiple-rows',
-            _download: '.grid-download', _upload: '.grid-upload',
-        },
-        $btn;
-        for (let k in btns) {
-            if (show && self && grid[k] == null) continue;
-            $btn = grid.wrapper.find(btns[k]);
-            if ($btn.length)
-                if (show) {
-                    delete grid[k];
-                    $btn.show();
-                } else {
-                    grid[k] = 1;
-                    $btn.hide();
+            let fs = this.is_self_form(frm) && (frm[this._tmp] || {}).fields, t;
+            if (fs && !fs.includes(k)) return;
+            fs && (t = fs.indexOf(k)) >= 0 && fs.splice(t, 1);
+            let f = frm.get_field(k);
+            if (!f || !f.df || !!cint(f.df.hidden) || f.df.fieldtype !== 'Table' || !f.grid) return;
+            f.df.__cannot_add_rows != null && (f.df.cannot_add_rows = f.df.__cannot_add_rows);
+            delete f.df.__cannot_add_rows;
+            f.df.__cannot_delete_rows != null && (f.df.cannot_delete_rows = f.df.__cannot_delete_rows);
+            delete f.df.__cannot_delete_rows;
+            f.df.__in_place_edit != null && (f.df.in_place_edit = f.df.__in_place_edit);
+            delete f.df.__in_place_edit;
+            f = f.grid;
+            f.meta && f.__editable_grid != null && (f.meta.editable_grid = f.__editable_grid);
+            delete f.__editable_grid;
+            f.__static_rows != null && (f.static_rows = f.__static_rows);
+            delete f.__static_rows;
+            f.__sortable_status != null && (f.sortable_status = f.__sortable_status);
+            delete f.__sortable_status;
+            this._reload_field(frm, k);
+            f.toggle_checkboxes(1);
+            f.__header_row != null && f.header_row.configure_columns_button.hidden(0).children().hidden(0);
+            delete f.__header_row;
+            f.__header_search != null && f.header_search.wrapper.hidden(0);
+            delete f.__header_search;
+            if (f.__editable && this.$isArrVal(f.grid_rows))
+                for (let i = 0, l = f.grid_rows.length; i < l; i++) {
+                    f.grid_rows[i].open_form_button.hidden(0).children().hidden(0);
+                    f.grid_rows[i].refresh();
                 }
+            delete f.__editable;
+        } catch(_) {}
+    }
+    disable_table(frm, key, opts) {
+        !this.$isDataObj(opts) && (opts = null);
+        (frm = this.get_form(frm)) && this._disable_table(frm, key, opts);
+        return this;
+    }
+    _disable_table(frm, k, o) {
+        try {
+            let fs = this.is_self_form(frm) && (frm[this._tmp] || {}).fields,
+            f = frm.get_field(k);
+            if (!f || !f.df || !!cint(f.df.hidden) || f.df.fieldtype !== 'Table' || !f.grid) return;
+            fs && !fs.includes(k) && fs.push(k);
+            if (!o || !o.add) {
+                f.df.__cannot_add_rows !== true && (f.df.__cannot_add_rows = !!f.df.cannot_add_rows);
+                f.df.cannot_add_rows = true;
+            }
+            if (!o || !o.del) {
+                f.df.__cannot_delete_rows !== true && (f.df.__cannot_delete_rows = !!f.df.cannot_delete_rows);
+                f.df.cannot_delete_rows = true;
+            }
+            if (!o || !o.edit) {
+                f.df.__in_place_edit !== false && (f.df.__in_place_edit = !!f.df.in_place_edit);
+                f.df.in_place_edit = false;
+            }
+            f = f.grid;
+            if (f.meta && (!o || !o.edit)) {
+                f.__editable_grid !== true && (f.__editable_grid = !!f.meta.editable_grid);
+                f.meta.editable_grid = true;
+            }
+            if (!o || !o.edit) {
+                f.__static_rows !== true && (f.__static_rows = !!f.static_rows);
+                f.static_rows = true;
+            }
+            if (!o || !o.sort) {
+                f.__sortable_status !== false && (f.__sortable_status = !!f.sortable_status);
+                f.sortable_status = false;
+            }
+            this._reload_field(frm, k);
+            f.toggle_checkboxes(0);
+            if (
+                (!o || !o.config)
+                && f.header_row && f.header_row.configure_columns_button
+                && !f.header_row.configure_columns_button.isHidden()
+            ) {
+                f.__header_row = 1;
+                f.header_row.configure_columns_button.hidden(1).children().hidden(1);
+                f.header_row.configure_columns_button.off('click');
+            }
+            if (
+                f.header_search && f.header_search.wrapper
+                && !f.header_search.wrapper.isHidden()
+            ) {
+                f.__header_search = 1;
+                f.header_search.wrapper.hidden(1);
+            }
+            if ((!o || !o.edit) && this.$isArrVal(f.grid_rows)) {
+                f.__editable = 1;
+                for (let i = 0, l = f.grid_rows.length, r; i < l; i++) {
+                    r = f.grid_rows[i];
+                    if (r.open_form_button.isHidden()) continue;
+                    r.open_form_button.hidden(1).children().hidden(1);
+                    r.row.off('click') && r.row_index.off('click') && r.open_form_button.off('click') && r.hide_form();
+                }
+            }
+        } catch(_) {}
+    }
+    toggle_table_buttons(frm, key, show, btns) {
+        if (!(frm = this.get_form(frm))) return this;
+        !this.$isArrVal(btns) && (btns = null);
+        try {
+            let f = frm.get_field(key);
+            if (!f || !f.df || f.df.fieldtype !== 'Table' || !f.grid) return this;
+            f.wrapper && this._toggle_buttons(f.grid, show, 0, btns);
+        } catch(_) {}
+        return this;
+    }
+    _toggle_buttons(g, s, m, o) {
+        let d = {
+            add: '.grid-add-row', multi_add: '.grid-add-multiple-rows',
+            download: '.grid-download', upload: '.grid-upload',
+        }, x, b;
+        for (let k in d) {
+            if (o && !o.includes(k)) continue;
+            x = '__' + k;
+            b = g.wrapper.find(d[k]);
+            if (b.length && b.isHidden() != s) b.hidden(!s);
         }
     }
-    
-    valid_field(frm, key) {
-        frm = this._get_form(frm);
-        if (!frm) return this;
+    _set_field_desc(f, m) {
+        let c = 0;
+        if (m && f.set_new_description) c++ && f.set_new_description(m);
+        else if (f.set_description) {
+            if (f.df && m) f.df.__description = f.df.description;
+            if (f.df && !m) {
+                m = f.df.__description;
+                delete f.df.__description;
+            }
+            c++ && f.set_description(m);
+        }
+        c && f.toggle_description && f.toggle_description(f, !!m);
+        return c;
+    }
+    set_field_desc(frm, key, cdn, ckey, msg) {
+        if (!(frm = this.get_form(frm))) return this;
+        if (msg == null && cstr(cdn).length && ckey == null) {
+            msg = cdn;
+            cdn = null;
+        }
         try {
-            let field = frm.get_field(key);
-            if (!field) return this;
-            let change = 0;
-            if (field.df && field.df.invalid) {
-                field.df.invalid = 0;
-                if (this.$isFunc(field.set_invalid))
-                    field.set_invalid();
-                change++;
-            }
-            if (this.$isFunc(field.set_description)) {
-                if (field.df && field.df.old_description) {
-                    field.df.description = field.df.old_description;
-                    delete field.df.old_description;
-                }
-                field.set_description();
-                change++;
-            }
-            if (change && frm.refresh_field) frm.refresh_field(key);
-        } catch(e) { this._error('Valid field', e.message, e.stack); }
+            let f = this._get_field(frm, key, cdn, ckey, 1);
+            f && this._set_field_desc(f, msg);
+        } catch(_) {}
         return this;
     }
-    invalid_field(frm, key, error, args) {
-        frm = this._get_form(frm);
-        if (!frm) return this;
+    valid_field(frm, key, cdn, ckey) {
+        if (!(frm = this.get_form(frm))) return this;
         try {
-            let field = frm.get_field(key);
-            if (!field) return this;
-            let change = 0;
-            if (field.df && !field.df.invalid) {
-                field.df.invalid = 1;
-                if (this.$isFunc(field.set_invalid))
-                    field.set_invalid();
-                change++;
+            let f = this._get_field(frm, key, cdn, ckey, 1);
+            if (!f) return this;
+            let c = 0;
+            if (f.df && f.df.invalid) {
+                f.df.invalid = 0;
+                if (f.set_invalid) f.set_invalid();
+                c++;
             }
-            if (this.$isStrVal(error)) {
-                if (this.$isFunc(field.set_new_description)) {
-                    field.set_new_description(__(error, args));
-                    change++;
-                } else if (this.$isFunc(field.set_description)) {
-                    if (field.df && field.df.description)
-                        field.df.old_description = field.df.description;
-                    field.set_description(__(error, args));
-                    change++;
-                }
+            if (this._set_field_desc(f)) c++;
+            c && this._reload_field(frm, key, cdn, ckey);
+        } catch(_) {}
+        return this;
+    }
+    invalid_field(frm, key, cdn, ckey, msg) {
+        if (!(frm = this.get_form(frm))) return this;
+        if (msg == null && cstr(cdn).length && ckey == null) {
+            msg = cdn;
+            cdn = null;
+        }
+        try {
+            let f = this._get_field(frm, key, cdn, ckey, 1);
+            if (!f) return this;
+            let c = 0;
+            if (f.df && !f.df.invalid) {
+                f.df.invalid = 1;
+                if (f.set_invalid) f.set_invalid();
+                c++;
             }
-            if (change && frm.refresh_field) frm.refresh_field(key);
-        } catch(e) { this._error('Invalid field', e.message, e.stack); }
+            if (this.$isStrVal(msg) && this._set_field_desc(f, msg)) c++;
+            c && this._reload_field(frm, key, cdn, ckey);
+        } catch(_) {}
         return this;
     }
 }
@@ -742,14 +744,9 @@ class LevelUp extends LevelUpBase {
 
 class Alerts extends LevelUp {
     constructor() {
-        super(
-            'Alerts', 'alerts', 'Alert',
-            'alerts.utils', false
-        );
-        
+        super(__('Alerts'), 'alerts', 'Alert', 'alerts.utils', 0);
         this.$getter('_id', frappe.utils.get_random(5), 1);
-        this.$extend({is_ready: false, is_enabled: false});
-        
+        this.$xdef({is_ready: false, is_enabled: false});
         this._dialog = null;
         this._init = 0;
         this._in_req = 0;
@@ -775,16 +772,16 @@ class Alerts extends LevelUp {
     _setup(ret) {
         this._is_ready = true;
         this._is_enabled = !!ret;
-        this.on('page_change page_pop', function() {
+        this.xon('page_change page_pop', function() {
             if (this._is_enabled) {
                 if (this.has_alerts) this.show();
                 else this._get_alerts();
             }
-        }, 1)
-        .real('app_status_changed', function(ret) {
+        })
+        .xreal('app_status_changed', function(ret) {
             this._debug('real app_status_changed', ret);
             var old = this._is_enabled;
-            this.$extend(ret);
+            this.$xdef(ret);
             if (this._is_enabled === old) return;
             this.emit('change');
             if (this._is_enabled) {
@@ -794,8 +791,8 @@ class Alerts extends LevelUp {
                     this._get_alerts();
                 } else this.show();
             }
-        }, 1)
-        .real('type_changed', function(ret) {
+        })
+        .xreal('type_changed', function(ret) {
             this._debug('real type_changed', ret);
             if (!this.$isDataObjVal(ret)) return;
             var name = cstr(ret.name);
@@ -811,12 +808,12 @@ class Alerts extends LevelUp {
                     ret.dark_title_color, ret.dark_content_color
                 );
             }
-        }, 1)
-        .real('show_alert', function(ret) {
+        })
+        .xreal('show_alert', function(ret) {
             this._debug('real show_alert', ret);
             if (this._is_enabled && this._is_valid(ret))
                 this._queue(ret);
-        }, 1);
+        });
         this.emit('ready');
         if (this._is_enabled) {
             this._init = 1;
@@ -853,13 +850,10 @@ class Alerts extends LevelUp {
     }
     _is_valid(data) {
         if (!this.$isDataObjVal(data)) return false;
-        if (this._seen.indexOf(data.name) >= 0) return false;
+        if (this._seen.includes(data.name)) return false;
         var user = frappe.session.user,
         score = 0;
-        if (
-            this.$isArrVal(data.users)
-            && data.users.indexOf(user) >= 0
-        ) score++;
+        if (this.$isArrVal(data.users) && data.users.includes(user)) score++;
         if (
             !score
             && this.$isArrVal(data.roles)
@@ -868,7 +862,7 @@ class Alerts extends LevelUp {
         if (!score) return false;
         if (
             this.$isArrVal(data.seen_today)
-            && data.seen_today.indexOf(user) >= 0
+            && data.seen_today.includes(user)
         ) return false;
         var seen_by = this.$isDataObj(data.seen_by) ? data.seen_by : {},
         seen = seen_by[user] != null ? cint(seen_by[user]) : -1;
@@ -1054,7 +1048,7 @@ class AlertsDialog extends LevelUpCore {
         return this;
     }
     setTimeout(sec) {
-        if (this.$isNumVal(sec)) this._timeout = sec * 1000;
+        if (this.$isNum(sec) && sec > 0) this._timeout = sec * 1000;
         return this;
     }
     setSound(file, fallback) {
@@ -1092,7 +1086,7 @@ class AlertsDialog extends LevelUpCore {
     }
     onShow(fn, delay) {
         if (this.$isFunc(fn)) {
-            if (!this.$isNumVal(delay)) this._on_show = this.$fn(fn);
+            if (!this.$isNum(delay) || delay < 1) this._on_show = this.$fn(fn);
             else this._on_show = this.$fn(function() {
                 this.$timeout(fn, delay);
             });
@@ -1101,7 +1095,7 @@ class AlertsDialog extends LevelUpCore {
     }
     onHide(fn, delay) {
         if (this.$isFunc(fn)) {
-            if (!this.$isNumVal(delay)) this._on_hide = this.$fn(fn);
+            if (!this.$isNum(delay) || delay < 1) this._on_hide = this.$fn(fn);
             else this._on_hide = this.$fn(function() {
                 this.$timeout(fn, delay);
             });
@@ -1245,5 +1239,37 @@ class AlertsStyle extends LevelUpCore {
 
 
 $(document).ready(function() {
+    let $isOb = function(v) { return v != null && typeof v === 'object'; };
+    if (!$isOb(frappe)) throw new Error('Frappe framework is required.');
+    let $isFn = function(v) { return typeof v === 'function'; };
+    let id = 'core-polyfill';
+    function $onload() {
+        Promise.wait = function(ms) { return new Promise(function(resolve) { setTimeout(resolve, ms); }); };
+        Promise.prototype.timeout = function(ms) {
+            return Promise.race([this, Promise.wait(ms).then(function() { throw new Error('Time out'); })]);
+        };
+    }
+    if (
+        $isFn(Promise) && $isFn(id.trim) && $isFn(id.includes)
+        && $isFn(id.startsWith) && $isFn(id.endsWith)
+        && $isFn([].includes) && $isFn($isFn.bind)
+    ) $onload();
+    else if (!!document.getElementById(id)) $onload();
+    else {
+        let $el = document.createElement('script');
+        $el.id = id;
+        $el.src = 'https://polyfill.io/v3/polyfill.min.js?features=String.prototype.trim%2CString.prototype.includes%2CString.prototype.startsWith%2CString.prototype.endsWith%2CArray.prototype.includes%2CFunction.prototype.bind%2CPromise';
+        $el.type = 'text/javascript';
+        $el.async = true;
+        $el.onload = $onload;
+        document.getElementsByTagName('head')[0].appendChild($el);
+    }
+    XMLHttpRequest.prototype.clear = function() {
+        this.onload = this.onerror = this.onabort = this.ontimeout = null;
+    };
+    $.fn.hidden = function(s) { return this.toggleClass('lu-hidden', !!s); };
+    $.fn.isHidden = function() { return this.hasClass('lu-hidden'); };
+    !$('#lu-style').length && $('head').append('<style id="lu-style">.lu-hidden { display: none; }</style>');
+    
     frappe.alerts = new Alerts();
 });
