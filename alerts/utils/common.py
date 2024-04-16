@@ -21,12 +21,9 @@ def log_error(msg):
         frappe.log_error(__module__, msg)
 
 
-# []
-def error(msg, throw=True):
-    if not throw:
-        log_error(msg)
-    else:
-        frappe.throw(msg, title=__module__)
+# [Alerts Alert, Alert Type, Alerts Settings]
+def error(msg):
+    frappe.throw(msg, title=__module__)
 
 
 # [Alert, Alerts Settings, Update]

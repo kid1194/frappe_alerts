@@ -30,7 +30,7 @@ def del_cache(dt, key=None):
 
 # [Alerts Alert, Alert Type, Alert, Internal]
 def clear_doc_cache(dt, name=None):
-    del_cache(dt)
+    frappe.cache().delete_keys(dt)
     frappe.clear_cache(doctype=dt)
     if name is None:
         name = dt

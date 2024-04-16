@@ -68,14 +68,10 @@ def after_sync():
     doc = settings()
     managers = get_system_managers(only_name=True)
     if managers:
-        idx = 0
         if "Administrator" in managers:
-            idx = managers.index("Administrator")
-        
-        doc.update_notification_sender = managers[idx]
-        
-        if doc.update_notification_receivers:
-            doc.update_notification_receivers.clear()
+            doc.update_notification_sender = "Administrator"
+        else:
+            doc.update_notification_sender = managers.pop(0)
         
         for manager in managers:
             doc.append(
@@ -87,7 +83,7 @@ def after_sync():
             doc.send_update_notification = 0
         else:
             doc.send_update_notification = 1
-            
+    
     else:
         doc.send_update_notification = 0
     

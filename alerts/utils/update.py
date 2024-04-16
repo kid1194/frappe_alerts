@@ -10,7 +10,7 @@ from frappe.utils import cint
 from .settings import settings
 
 
-## [Hooks]
+# [Hooks]
 def auto_check_for_update():
     doc = settings()
     if cint(doc.is_enabled) and cint(doc.auto_check_for_update):
@@ -45,7 +45,7 @@ def update_check(doc):
             "GET",
             "https://api.github.com/repos/kid1194/frappe_alerts/releases/latest"
         )
-        status_code = request.status_code
+        status_code = cint(request.status_code)
         data = request.json()
     except Exception as exc:
         from .common import log_error
@@ -108,7 +108,7 @@ def update_check(doc):
     return 1 if has_update else 0
 
 
-## [Internal]
+# [Internal]
 def compare_versions(verA, verB):
     verA = verA.split(".")
     lenA = len(verA)

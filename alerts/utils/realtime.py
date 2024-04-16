@@ -7,6 +7,12 @@
 import frappe
 
 
+# [Alerts JS]
+@frappe.whitelist()
+def use_realtime():
+    emit_event("alerts_use_realtime", {"status": 1})
+
+
 # [Internal]
 def emit_event(event: str, data):
     frappe.publish_realtime(event=event, message=data)

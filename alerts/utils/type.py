@@ -8,7 +8,7 @@ import frappe
 
 
 # [Internal]
-_type_dt_ = "Alert Type")
+_type_dt_ = "Alert Type"
 
 
 # [Access]

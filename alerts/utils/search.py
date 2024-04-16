@@ -9,13 +9,13 @@ import frappe
 
 # [Query]
 def filter_search(doc, qry, doctype, search, relevance, filter_column=None):
-    from pypika.enums import Order
-    from pypika.terms import Criterion
-    
-    from frappe.query_builder.functions import Locate
-    
     meta = frappe.get_meta(doctype)
     if txt:
+        from pypika.enums import Order
+        from pypika.terms import Criterion
+        
+        from frappe.query_builder.functions import Locate
+        
         qry = qry.select(Locate(search, relevance).as_("_relevance"))
         qry = qry.orderby("_relevance", doc.modified, doc.idx, order=Order.desc)
         

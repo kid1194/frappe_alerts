@@ -7,6 +7,7 @@
 from frappe import __version__
 
 
+# [Internal]
 __frappe_version__ = int(__version__.split(".")[0])
 
 
@@ -18,7 +19,3 @@ def is_version_gt(num: int):
 # [Common]
 def is_version_lt(num: int):
     return __frappe_version__ < num
-
-
-def is_version(num: int):
-    return __frappe_version__ == num

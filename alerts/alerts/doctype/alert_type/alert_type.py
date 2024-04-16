@@ -4,11 +4,11 @@
 # Licence: Please refer to LICENSE file
 
 
-from frappe import _, throw
+from frappe import _
 from frappe.utils import cint
 from frappe.model.document import Document
 
-from alerts.utils import clear_doc_cache
+from alerts.utils import error, clear_doc_cache
 
 
 class AlertType(Document):
@@ -22,17 +22,17 @@ class AlertType(Document):
     
     def validate(self):
         if not self.name:
-            throw(_("A valid alert type name is required."))
+            error(_("A valid alert type name is required."))
         if self.is_new():
             from alerts.utils import doc_count
             
             if doc_count(self.doctype, {"name": self.name}) > 0:
-                throw(_("The alert type \"{0}\" already exists.").format(self.name))
+                error(_("The alert type \"{0}\" already exists.").format(self.name))
         if (
             self.display_sound == "Custom" and
             not self.custom_display_sound
         ):
-            throw(_("A valid alert type custom display sound is required."))
+            error(_("A valid alert type custom display sound is required."))
     
     
     def before_save(self):
@@ -65,7 +65,7 @@ class AlertType(Document):
         from alerts.utils import type_alerts_exists
         
         if type_alerts_exists(self.name):
-            throw(_("An alert type with existing linked alerts cannot be removed."))
+            error(_("An alert type with existing linked alerts cannot be removed."))
         
         if self.custom_display_sound:
             from alerts.utils import delete_files

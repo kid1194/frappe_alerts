@@ -4,11 +4,11 @@
 # Licence: Please refer to LICENSE file
 
 
-from frappe import _, _dict, throw
+from frappe import _
 from frappe.utils import cint, getdate
 from frappe.model.document import Document
 
-from alerts.utils import clear_doc_cache
+from alerts.utils import error, clear_doc_cache
 
 
 class Alert(Document):
@@ -24,19 +24,19 @@ class Alert(Document):
     def validate(self):
         if self.docstatus.is_draft():
             if not self.title:
-                throw(_("A valid alert title is required."))
+                error(_("A valid alert title is required."))
             if not self.alert_type:
-                throw(_("A valid alert type is required."))
+                error(_("A valid alert type is required."))
             if not self.from_date:
-                throw(_("A valid alert from date is required."))
+                error(_("A valid alert from date is required."))
             if not self.until_date:
-                throw(_("A valid alert until date is required."))
+                error(_("A valid alert until date is required."))
             if getdate(self.from_date) > getdate(self.until_date):
-                throw(_("The alert until date must be equal to or after the from date."))
+                error(_("The alert until date must be equal to or after the from date."))
             if not self.message:
-                throw(_("A valid alert message is required."))
+                error(_("A valid alert message is required."))
             if not self.for_roles and not self.for_users:
-                throw(_("At least one recipient role or user is required."))
+                error(_("At least one recipient role or user is required."))
     
     
     def before_save(self):
@@ -94,7 +94,7 @@ class Alert(Document):
             from alerts.utils import send_alert
             
             self.flags.pop("send_alert")
-            data = _dict({
+            data = {
                 "name": self.name,
                 "title": self.title,
                 "alert_type": self.alert_type,
@@ -105,18 +105,18 @@ class Alert(Document):
                 "roles": [v.role for v in self.for_roles],
                 "seen_by": {},
                 "seen_today": []
-            })
+            }
             
             if self.seen_by:
                 from frappe.utils import nowdate
                 
                 today = nowdate()
                 for v in self.seen_by:
-                    if v.user not in data.seen_by:
-                        data.seen_by[v.user] = 1
+                    if v.user not in data["seen_by"]:
+                        data["seen_by"][v.user] = 1
                     else:
-                        data.seen_by[v.user] += 1
-                    if v.user not in data.seen_today and v.date == today:
-                        data.seen_today.append(v.user)
+                        data["seen_by"][v.user] += 1
+                    if v.user not in data["seen_today"] and v.date == today:
+                        data["seen_today"].append(v.user)
             
             send_alert(data)

@@ -4,9 +4,11 @@
 # Licence: Please refer to LICENSE file
 
 
-from frappe import _, throw
+from frappe import _
 from frappe.utils import cint
 from frappe.model.document import Document
+
+from alerts.utils import error
 
 
 class AlertsSettings(Document):
@@ -41,17 +43,17 @@ class AlertsSettings(Document):
     
     def _check_sender(self):
         if not self.update_notification_sender:
-            throw(_("A valid update notification sender is required."))
+            error(_("A valid update notification sender is required."))
         
         from alerts.utils import is_doc_exists
         
         if not is_doc_exists("User", self.update_notification_sender):
-            throw(_("The update notification sender selected does not exist."))
+            error(_("The update notification sender selected does not exist."))
     
     
     def _check_receivers(self):
         if not self.update_notification_receivers:
-            throw(_("At least one enabled update notification receiver is required."))
+            error(_("At least one enabled update notification receiver is required."))
         
         from alerts.utils import doc_count
         
@@ -59,6 +61,6 @@ class AlertsSettings(Document):
         total = len(users)
         if doc_count("User", {"name": ["in", users]}) != total:
             if total > 1:
-                throw(_("Some of the selected update notification receivers does not exist."))
+                error(_("Some of the selected update notification receivers does not exist."))
             else:
-                throw(_("The selected update notification receiver does not exist."))
+                error(_("The selected update notification receiver does not exist."))

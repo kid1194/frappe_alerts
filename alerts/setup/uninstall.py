@@ -7,7 +7,7 @@
 import frappe
 
 
-# [Hooks, Install]
+# [Hooks]
 def after_uninstall():
     from frappe.model.delete_doc import delete_doc
     
