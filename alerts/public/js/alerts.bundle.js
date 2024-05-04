@@ -213,7 +213,7 @@ class LevelUpBase extends LevelUpCore {
     ajax(u, o, s, f) {
         f = this.$isFunc(f) && this.$fn(f);
         o = this.$extend(1, {
-            url: u, method: 'GET', data: d, cache: false, 'async': true, crossDomain: true,
+            url: u, method: 'GET', cache: false, 'async': true, crossDomain: true,
             headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
             success: this.$isFunc(s) ? this.$fn(s) : null,
             error: this.$fn(function(r, t) {
@@ -535,13 +535,14 @@ class LevelUp extends LevelUpBase {
     _enable_field(frm, k, n, ck) {
         try {
             let o = this.is_self_form(frm) && frm[this._tmp],
-            fk = n == null ? k : [k, n, ck].join('-');
+            fk = ck == null ? (n == null ? k : [k, n].join('-')) : [k, n, ck].join('-');
             if (o && !o.fields.includes(fk)) return;
             let f = this._get_field(frm, k, n, ck);
             if (!f || !f.df || !!cint(f.df.hidden) || !this._is_field(f.df.fieldtype)) return;
             o && (fk = o.fields.indexOf(fk)) >= 0 && o.fields.splice(fk, 1);
             n == null && frm.set_df_property(k, 'read_only', 0);
             if (n == null) return this._toggle_translatable(f, 1);
+            if (ck == null) return f.grid && f.grid.toggle_enable(n, 1);
             f = this._get_field(frm, k, n);
             f && f.set_field_property(ck, 'read_only', 0);
             f = this._get_field(frm, k, n, ck, 1);
@@ -555,13 +556,14 @@ class LevelUp extends LevelUpBase {
     _disable_field(frm, k, n, ck) {
         try {
             let fs = this.is_self_form(frm) && frm[this._tmp].fields,
-            fk = n == null ? k : [k, n, ck].join('-');
+            fk = ck == null ? (n == null ? k : [k, n].join('-')) : [k, n, ck].join('-');
             if (fs && fs.includes(fk)) return;
             let f = this._get_field(frm, k, n, ck);
             if (!f || !f.df || !!cint(f.df.hidden) || !this._is_field(f.df.fieldtype)) return;
             fs && fs.push(fk);
             n == null && frm.set_df_property(k, 'read_only', 1);
             if (n == null) return this._toggle_translatable(f, 0);
+            if (ck == null) return f.grid && f.grid.toggle_enable(n, 0);
             f = this._get_field(frm, k, n);
             f && f.set_field_property(ck, 'read_only', 1);
             f = this._get_field(frm, k, n, ck, 1);
@@ -738,7 +740,7 @@ class Alerts extends LevelUp {
         this.$xdef({
             id: frappe.utils.get_random(5),
             is_ready: false,
-            is_enabled: false
+            is_enabled: false,
         });
         this._dialog = null;
         this._init = 0;
@@ -911,7 +913,7 @@ class Alerts extends LevelUp {
                     this._seen.push.apply(this._seen, seen);
                     this._error('Marking alerts as seen error.', ret, seen);
                     this._retry_mark_seens();
-                } else if (!!ret.error) {
+                } else if (ret.error) {
                     this._seen.push.apply(this._seen, seen);
                     this._error('Marking alerts as seen error.', ret, seen);
                     this._retry_mark_seens();
@@ -953,11 +955,12 @@ class Alerts extends LevelUp {
     }
     _slug(v) { return v.toLowerCase().replace(/ /g, '-'); }
     destroy() {
-        frappe.alerts = null;
-        this._destroy_types();
-        if (this._dialog) try { this._dialog.destroy(); } catch(_) {}
+        //frappe.alerts = null;
+        //this._destroy_types();
+        //if (this._dialog) try { this._dialog.destroy(); } catch(_) {}
         if (this._mock) try { this._mock.destroy(); } catch(_) {}
-        super.destroy();
+        this._mock = null;
+        //super.destroy();
     }
 }
 
@@ -1236,7 +1239,7 @@ class AlertsStyle extends LevelUpCore {
 
 
 $(document).ready(function() {
-    if (frappe == null || typeof frappe !== 'object')
+   if (frappe == null || typeof frappe !== 'object')
         throw new Error('Frappe framework is required.');
     let app = new LevelUpCore(),
     id = 'core-polyfill';
@@ -1250,7 +1253,7 @@ $(document).ready(function() {
         app.$isFunc(Promise) && app.$isFunc(id.trim)
         && app.$isFunc(id.includes) && app.$isFunc(id.startsWith)
         && app.$isFunc(id.endsWith) && app.$isFunc([].includes)
-        && app.$isFunc($isFn.bind)
+        && app.$isFunc(app.$isFunc.bind)
     ) $onload();
     else if (app.$hasElem(id)) $onload();
     else app.$loadJs(
@@ -1259,7 +1262,7 @@ $(document).ready(function() {
     );
     $.fn.hidden = function(s) { return this.toggleClass('lu-hidden', !!s); };
     $.fn.isHidden = function() { return this.hasClass('lu-hidden'); };
-    !app.$hasElem('lu-style') && app.$loadStyle('.lu-hidden { display: none; }', {id: 'lu-style'});
+    !app.$hasElem('lu-style') && app.$load('.lu-hidden { display: none; }', {id: 'lu-style'});
     
     frappe.alerts = new Alerts();
 });

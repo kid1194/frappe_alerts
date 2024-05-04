@@ -31,7 +31,7 @@ frappe.ui.form.on('Alerts Settings', {
             frm.set_value(key, keep);
             frappe.alerts.invalid_field(
                 frm, key,
-                __('The update notification receiver "{0}" has already been selected.', [val])
+                __('The update notification receiver has already been selected.')
             );
         }
     },

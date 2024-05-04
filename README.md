@@ -2,7 +2,7 @@
 
 A small **Frappe** module that displays custom alerts to specific recipients after login.
 
-![v1.0.4](https://img.shields.io/badge/v1.0.4-2024/03/14-green?style=plastic)
+![v1.0.5](https://img.shields.io/badge/v1.0.5-2024/05/04-green?style=plastic)
 
 **Apologies in advance for any problem or bug you face with this module.**
 **Please report any problem or bug you face so it can be fixed.**
@@ -26,6 +26,7 @@ A small **Frappe** module that displays custom alerts to specific recipients aft
 - [![avc](https://img.shields.io/badge/avc-Debug_%7C_Test-red?style=plastic)](https://github.com/git-avc)
 - [![lan9635](https://img.shields.io/badge/lan9635-Debug_%7C_Test-blue?style=plastic)](https://github.com/lan9635)
 - [![satishkakani](https://img.shields.io/badge/satishkakani-Debug-green?style=plastic)](https://github.com/satishkakani)
+- [![neomrx](https://img.shields.io/badge/neomrx-Debug-orange?style=plastic)](https://github.com/neomrx)
 
 ---
 
