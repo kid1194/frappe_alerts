@@ -101,7 +101,7 @@ def send_alert(data):
     from .realtime import emit_show_alert
     from .type import add_type_data
     
-    add_type_data(data.alert_type, data)
+    add_type_data(data["alert_type"], data)
     emit_show_alert(data)
 
 
