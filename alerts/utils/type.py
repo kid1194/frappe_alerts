@@ -72,7 +72,7 @@ def type_join_query(qry, join_column):
     doc = frappe.qb.DocType(_type_dt_)
     return (
         qry.select(
-            doc.display_priority._as("priority"),
+            doc.display_priority.as_("priority"),
             doc.display_timeout,
             doc.display_sound,
             doc.custom_display_sound
