@@ -144,7 +144,7 @@ def send_notification(version, sender, receivers, message):
     if not is_doc_exists("User", {"name": sender, "enabled": 1}):
         return 0
     
-    receivers = filter_receivers(receivers);
+    receivers = filter_receivers(receivers)
     if not receivers:
         return 0
     

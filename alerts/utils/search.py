@@ -10,7 +10,7 @@ import frappe
 # [Query]
 def filter_search(doc, qry, doctype, search, relevance, filter_column=None):
     meta = frappe.get_meta(doctype)
-    if txt:
+    if search:
         from pypika.enums import Order
         from pypika.terms import Criterion
         
@@ -64,24 +64,24 @@ def filter_search(doc, qry, doctype, search, relevance, filter_column=None):
 
 
 # [Query]
-def prepare_data(data, dt, column, txt, as_dict):
+def prepare_data(data, dt, column, search, as_dict):
     from frappe import _
     from frappe.utils import cstr
     
-    if txt and dt in get_translated_doctypes():
+    if search and dt in get_translated_doctypes():
         import re
         
         data = [
             v
             for v in data
             if re.search(
-                re.escape(txt) + ".*",
+                re.escape(search) + ".*",
                 _(v.get(column) if as_dict else v[0]),
                 re.IGNORECASE
             )
         ]
     
-    args = [txt, as_dict]
+    args = [search, as_dict]
     def relevance_sorter(key):
         value = _(key.name if args[1] else key[0])
         return (cstr(value).lower().startswith(args[0].lower()) is not True, value)

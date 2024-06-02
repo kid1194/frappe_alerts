@@ -92,6 +92,8 @@ class AlertType(Document):
             "name": self.name
         }
         if not trash:
+            from frappe.utils import cstr
+            
             data.update({
                 "background": cstr(self.background),
                 "border_color": cstr(self.border_color),
