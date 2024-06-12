@@ -2,7 +2,7 @@
 
 A small **Frappe** module that displays custom alerts to specific recipients after login.
 
-![v1.0.5](https://img.shields.io/badge/v1.0.5-2024/05/30-green?style=plastic)
+![v1.0.6](https://img.shields.io/badge/v1.0.6-2024/06/12-green?style=plastic)
 
 **Apologies in advance for any problem or bug you face with this module.**
 **Please report any problem or bug you face so it can be fixed.**
@@ -174,6 +174,14 @@ bench restart
 - After submitting the alert:
   - The `Seen By` table will be visible and  will include all the reached users and datetime of reach
 - In list view, check the total number of unique users the alert has `Reached`
+
+### Alerts Settings
+- Go to `Alerts Settings` to enable or disable the module
+- If realtime events isn't working for some reason:
+  - Check `Use Fallback Sync Method` field to enable using the fallback method
+  - Set the `Fallback Sync Delay` field with the number of minutes to wait between sync requests
+
+⚠️ *Note:* When using the fallback sync method, the lower the `Fallback Sync Delay`, the more sync requests sent to server.
 
 ---
 

@@ -7,79 +7,72 @@
 
 
 frappe.ui.form.on('Alerts Settings', {
-    refresh: function(frm) {
-        frm.trigger('setup_update_note');
+    onload: function(frm) {
+        frappe.alerts.on('on_alert', function(d, t) {
+            frm._sets.errs.includes(t) && (d.title = __(frm.doctype));
+        });
+        frm._sets = {
+            errs: ['fatal', 'error'],
+            update: 0,
+        };
     },
-    update_notification_receivers: function(frm) {
-        var key = 'update_notification_receivers',
-        field = frm.get_field(key);
-        if (!field || !frappe.alerts.$isArrVal(field._rows_list)) return;
-        var rows = field._rows_list.slice(),
-        exist = [],
-        keep = [],
-        i = 0,
-        l = rows.length;
-        for (; i < l; i++) {
-            if (!exist.includes(rows[i])) {
-                exist.push(rows[i]);
-                keep.push(field.rows[i]);
-            }
-        }
-        if (!keep.length || keep.length === field.rows.length)
-            frappe.alerts.valid_field(frm, key);
-        else {
-            frm.set_value(key, keep);
-            frappe.alerts.invalid_field(
-                frm, key,
-                __('The update notification receiver has already been selected.')
-            );
-        }
+    refresh: function(frm) {
+        !frm._sets.update && frm.events.setup_update_note(frm);
     },
     check_for_update: function(frm) {
-        frappe.alerts.request(
-            'check_for_update',
-            null,
-            function(ret) {
-                if (ret) frm.reload_doc();
-            }
-        );
+        frappe.alerts.request('check_for_update', null, function(ret) {
+            if (!ret) return;
+            frm._sets.update = 0;
+            frm.reload_doc();
+        });
     },
     validate: function(frm) {
-        if (!!cint(frm.doc.send_update_notification)) {
-            if (!cstr(frm.doc.update_notification_sender).length) {
-                frappe.throw(__('A valid update notification sender is required.'));
-                return false;
-            }
-            if (!(frm.doc.update_notification_receivers || []).length) {
-                frappe.throw(__('At least one valid update notification receiver is required.'));
-                return false;
-            }
+        let err = [];
+        if (cint(frm.doc.use_fallback_sync)) {
+            if (cint(frm.doc.fallback_sync_delay) < 1)
+                err.push(__('Fallback sync delay must be greater than or equals to 1 minute.'));
+        }
+        if (cint(frm.doc.send_update_notification)) {
+            if (!frappe.alerts.$isStrVal(frm.doc.update_notification_sender))
+                err.push(__('A valid update notification sender is required.'));
+            if (!frappe.alerts.$isArrVal(frm.doc.update_notification_receivers))
+                err.push(__('At least one valid update notification receiver is required.'));
+        }
+        if (err.length) {
+            frappe.alerts.fatal(err);
+            return false;
         }
     },
     setup_update_note: function(frm) {
-        var status;
-        if (cint(frm.doc.has_update) > 0)
-            status = '<dd class="col-9 col-sm-7 text-danger">\
-                ' + __('A new version is available') + '\
-            </dd>\
-            <dt class="col-3 col-sm-5">' + __('Latest Version') + ':</dt>\
-            <dd class="col-9 col-sm-7 text-danger">' + cstr(frm.doc.latest_version) + '</dd>';
-        else
-            status = '<dd class="col-9 col-sm-7">\
-                ' + __('App is up to date') + '\
-            </dd>';
-        
+        frm._sets.update = 1;
         frm.get_field('update_note').$wrapper.empty().append('\
-        <dl class="row">\
-            <dt class="col-3 col-sm-5">' + __('Status') + ':</dt>\
-            ' + status + '\
-            <dt class="col-3 col-sm-5">' + __('Current Version') + ':</dt>\
-            <dd class="col-9 col-sm-7">' + cstr(frm.doc.current_version) + '</dd>\
-            <dt class="col-3 col-sm-5">' + __('Latest Check') + ':</dt>\
-            <dd class="col-9 col-sm-7">\
-                ' + frappe.datetime.convert_to_system_tz(frm.doc.latest_check) + '\
-            </dd>\
-        </dl>\
+<ul class="list-unstyled">\
+    ' + (cint(frm.doc.has_update) > 0
+        ? '\
+    <li>\
+        <strong>' + __('Status') + ':</strong> \
+        <span class="text-danger">' + __('New version available') + '</span>\
+    </li>\
+    <li>\
+        <strong>' + __('Latest Version') + ':</strong> \
+        <span class="text-danger">' + frm.doc.latest_version + '</span>\
+    </li>\
+            '
+        : '\
+    <li>\
+        <strong>' + __('Status') + ':</strong> \
+        ' + __('App is up to date') + '\
+    </li>\
+    ') + '\
+    <li>\
+        <strong>' + __('Current Version') + ':</strong> \
+        ' + frm.doc.current_version + '\
+    </li>\
+    <li>\
+        <strong>' + __('Latest Check') + ':</strong> \
+        ' + frappe.datetime.user_to_str(frm.doc.latest_check) + '\
+    </li>\
+</ul>\
         ');
     },
 });

@@ -5,155 +5,228 @@
 
 
 import frappe
-from frappe.utils import cint, nowdate
+from frappe import _
+from frappe.utils import cint
+
+
+# [A Alert, Internal]
+AlertStatus = frappe._dict({
+    "d": "Draft",
+    "p": "Pending",
+    "a": "Active",
+    "f": "Finished",
+    "c": "Cancelled"
+})
 
 
 # [Internal]
-_alert_dt_ = "Alert"
+_ALERT_DT_ = "Alert"
 
 
 # [Hooks]
 def update_alerts():
     from pypika.terms import Criterion
     
+    from frappe.utils import nowdate
+    
     today = nowdate()
-    doc = frappe.qb.DocType(_alert_dt_)
+    doc = frappe.qb.DocType(_ALERT_DT_)
     data = (
         frappe.qb.from_(doc)
-        .select(doc.name)
+        .select(doc.name, doc.status)
         .where(doc.docstatus == 1)
         .where(Criterion.any([
             Criterion.all([
                 doc.until_date.lt(today),
-                doc.status == "Active"
+                doc.status == AlertStatus.a
             ]),
             Criterion.all([
                 doc.from_date.lte(today),
                 doc.until_date.gte(today),
-                doc.status == "Pending"
+                doc.status == AlertStatus.p
             ])
         ]))
     ).run(as_dict=True)
     if data and isinstance(data, list):
-        (
-            frappe.qb.update(doc)
-            .set(doc.status, "Finished")
-            .where(doc.until_date.lt(today))
-            .where(doc.status == "Active")
-            .where(doc.docstatus == 1)
-        ).run()
-        
-        (
-            frappe.qb.update(doc)
-            .set(doc.status, "Active")
-            .where(doc.from_date.lte(today))
-            .where(doc.until_date.gte(today))
-            .where(doc.status == "Pending")
-            .where(doc.docstatus == 1)
-        ).run()
-        
         from .cache import clear_doc_cache
         
-        for v in data:
-            clear_doc_cache(_alert_dt_, v["name"])
+        names = [
+            [[], AlertStatus.f],
+            [[], AlertStatus.a]
+        ]
+        for i in range(len(data)):
+            v = data.pop(0)
+            clear_doc_cache(_ALERT_DT_, v["name"])
+            x = 1 if v["status"] == AlertStatus.p else 0
+            names[x][0].append(v["name"])
+        
+        for i in range(len(names)):
+            v = names.pop(0)
+            if v[0]:
+                (
+                    frappe.qb.update(doc)
+                    .set(doc.status, v[1])
+                    .where(doc.name.isin(v[0]))
+                ).run()
+                if v[1] == AlertStatus.a:
+                    from .system import use_fallback_sync
+                    
+                    if use_fallback_sync():
+                        continue
+                    
+                    from .background import uuid_key, is_job_running
+                    
+                    job_id = uuid_key(v[0])
+                    job_id = f"send-alerts-{job_id}"
+                    if not is_job_running(job_id):
+                        from .background import enqueue_job
+                        
+                        enqueue_job(
+                            "alerts.utils.alert.send_alerts",
+                            job_id,
+                            names=v[0]
+                        )
 
 
-# [Alert Type]
-def type_alerts_exists(alert_type):
-    from .common import is_doc_exists
+# [A Alert Type]
+def type_alerts_exist(alert_type):
+    from .common import doc_count
     
-    return is_doc_exists(_alert_dt_, {"alert_type": alert_type})
+    return doc_count(_ALERT_DT_, {"alert_type": alert_type}) > 0
 
 
 # [Access]
 def enqueue_alerts(user: str):
-    from .background import is_job_running, enqueue_job
+    from .cache import get_cache
     
-    job_name = f"show-user-alerts-for-{user}"
-    if not is_job_running(job_name):
-        enqueue_job(
-            "alerts.utils.alert.get_user_alerts",
-            job_name,
-            user=user
-        )
+    cache = get_cache(_ALERT_DT_, f"{user}-alerts", True)
+    if not cache or not isinstance(cache, list):
+        from .background import is_job_running
+        
+        job_id = f"alerts-cache-for-{user}"
+        if not is_job_running(job_id):
+            from .background import enqueue_job
+            
+            enqueue_job(
+                "alerts.utils.alert.get_user_alerts",
+                job_id,
+                user=user
+            )
 
 
 # [Alerts Js]
 @frappe.whitelist()
-def user_alerts(init=None):
-    from .settings import is_enabled
+def sync_alerts(init=None):
+    from .system import get_settings
     
-    data = {"is_enabled": 1 if is_enabled() else 0}
-    if data["is_enabled"]:
+    doc = get_settings()
+    data = {}
+    if doc["use_fallback_sync"]:
+        data["system"] = doc
+    
+    if not doc["is_enabled"]:
+        return data
+    
+    if doc["use_fallback_sync"] or init:
         data["alerts"] = get_user_alerts(frappe.session.user)
-        if init:
-            from .type import get_types
-            
-            data["types"] = get_types()
-    else:
-        data["alerts"] = []
+    
+    if init:
+        from .type import get_types
+        
+        data["types"] = get_types()
+    
+    if doc["use_fallback_sync"]:
+        from .realtime import get_events
+        
+        data["events"] = get_events()
     
     return data
 
 
-# [Alerts Alert]
-def send_alert(data):
-    from .realtime import emit_show_alert
-    from .type import add_type_data
+# [A Alert]
+def send_alert(data: dict):
+    from .type import is_enabled_type
     
-    add_type_data(data["alert_type"], data)
-    emit_show_alert(data)
+    if is_enabled_type(data["alert_type"]):
+        from .realtime import emit_show_alert
+        
+        emit_show_alert(data)
 
 
 # [Alerts Js]
 @frappe.whitelist(methods=["POST"])
-def mark_seens(names):
+def sync_seen(names):
     if names and isinstance(names, str):
         from .common import parse_json
         
-        names = parse_json(names)
+        names = parse_json(names, names)
     
     if not names or not isinstance(names, list):
-        return {
-            "error": 1,
-            "message": "Invalid arguments"
-        }
+        return {"error": _("Arguments required to sync seen alerts are invalid.")}
+    
+    names = list(set(names))
+    tmp = names.copy()
+    for i in range(len(tmp)):
+        v = tmp.pop(0)
+        if not v or not isinstance(v, str):
+            names.remove(v)
+    
+    if not names:
+        return {"error": _("Arguments required to sync seen alerts are invalid.")}
+    
+    from .background import uuid_key, is_job_running
     
     user = frappe.session.user
-    for v in names:
-        if v and isinstance(v, str):
-            mark_as_seen(v, user)
+    job_id = uuid_key(names)
+    job_id = f"alerts-sync-seen-{user}-{job_id}"
+    if not is_job_running(job_id):
+        from frappe.utils import nowdate, nowtime
+        
+        from .background import enqueue_job
+        
+        enqueue_job(
+            "alerts.utils.alert.mark_as_seen",
+            job_id,
+            timeout=len(names) * 200,
+            user=user,
+            names=names,
+            date=nowdate(),
+            time=nowtime()
+        )
     
-    return {"success": 1}
+    return 1
 
 
 # [Internal]
 def get_user_alerts(user: str):
-    from .cache import get_cache, set_cache
+    from .cache import get_cache
     
     key = f"{user}-alerts"
-    data = get_cache(_alert_dt_, key, True)
+    data = get_cache(_ALERT_DT_, key, True)
     if isinstance(data, list):
         return data
     
-    tmp = []
-    expiry = seconds_left_for_day()
+    from frappe.utils import nowdate
+    
     today = nowdate()
+    expiry = seconds_left_for_day()
     alerts = get_daily_alerts(today)
+    tmp = []
     if not alerts:
-        set_cache(_alert_dt_, key, tmp, expiry)
+        _set_cache(key, tmp, expiry)
         return tmp
     
     parents = []
     get_alerts_for_user(user, alerts, parents)
     get_alerts_for_roles(user, alerts, parents)
     if not parents:
-        set_cache(_alert_dt_, key, tmp, expiry)
+        _set_cache(key, tmp, expiry)
         return tmp
     
     from .type import type_join_query
     
-    doc = frappe.qb.DocType(_alert_dt_)
+    parents = list(set(parents))
+    doc = frappe.qb.DocType(_ALERT_DT_)
     qry = (
         frappe.qb.from_(doc)
         .select(
@@ -169,27 +242,27 @@ def get_user_alerts(user: str):
     qry = type_join_query(qry, doc.alert_type)
     data = qry.run(as_dict=True)
     if not data or not isinstance(data, list):
-        set_cache(_alert_dt_, key, tmp, expiry)
+        _set_cache(key, tmp, expiry)
         return tmp
     
     data = filter_seen_alerts(data, user, parents, today)
     if not data:
         data = tmp
     
-    set_cache(_alert_dt_, key, data, expiry)
+    _set_cache(key, data, expiry)
     return data
 
 
 # [Internal]
 def get_daily_alerts(date: str):
     return frappe.get_all(
-        _alert_dt_,
+        _ALERT_DT_,
         fields=["name"],
         filters=[
-            [_alert_dt_, "from_date", "<=", date],
-            [_alert_dt_, "until_date", ">=", date],
-            [_alert_dt_, "status", "=", "Active"],
-            [_alert_dt_, "docstatus", "=", 1]
+            [_ALERT_DT_, "from_date", "<=", date],
+            [_ALERT_DT_, "until_date", ">=", date],
+            [_ALERT_DT_, "status", "=", AlertStatus.a],
+            [_ALERT_DT_, "docstatus", "=", 1]
         ],
         pluck="name",
         ignore_permissions=True,
@@ -199,56 +272,53 @@ def get_daily_alerts(date: str):
 
 # [Internal]
 def get_alerts_for_user(user: str, alerts: list, parents: list):
-    dt = f"{_alert_dt_} For User"
+    dt = f"{_ALERT_DT_} For User"
     doc = frappe.qb.DocType(dt)
     data = (
         frappe.qb.from_(doc)
         .select(doc.parent)
-        .where(doc.parenttype == _alert_dt_)
+        .distinct()
+        .where(doc.parenttype == _ALERT_DT_)
         .where(doc.parentfield == "for_users")
         .where(doc.parent.isin(alerts))
         .where(doc.user == user)
     ).run(as_dict=True)
     if data and isinstance(data, list):
-        data = list(set([
-            v["parent"] for v in data
-            if v["parent"] not in parents
-        ]))
-        parents.extend(data)
+        parents.extend([v["parent"] for v in data])
 
 
 # [Internal]
 def get_alerts_for_roles(user: str, alerts: list, parents: list):
-    dt = f"{_alert_dt_} For Role"
+    dt = f"{_ALERT_DT_} For Role"
     doc = frappe.qb.DocType(dt)
     data = (
         frappe.qb.from_(doc)
         .select(doc.parent)
-        .where(doc.parenttype == _alert_dt_)
+        .distinct()
+        .where(doc.parenttype == _ALERT_DT_)
         .where(doc.parentfield == "for_roles")
         .where(doc.parent.isin(alerts))
         .where(doc.role.isin(frappe.get_roles(user)))
     ).run(as_dict=True)
     if data and isinstance(data, list):
-        data = list(set([
-            v["parent"] for v in data
-            if v["parent"] not in parents
-        ]))
-        parents.extend(data)
+        parents.extend([v["parent"] for v in data])
 
 
 # [Internal]
-def get_alerts_seen_by(user: str, alerts: list):
-    dt = f"{_alert_dt_} Seen By"
+def get_alerts_seen_by(alerts: list, user: str=None):
+    dt = f"{_ALERT_DT_} Seen By"
     doc = frappe.qb.DocType(dt)
-    data = (
+    qry = (
         frappe.qb.from_(doc)
-        .select(doc.parent, doc.date)
-        .where(doc.parenttype == _alert_dt_)
+        .select(doc.parent, doc.user, doc.date)
+        .where(doc.parenttype == _ALERT_DT_)
         .where(doc.parentfield == "seen_by")
         .where(doc.parent.isin(alerts))
-        .where(doc.user == user)
-    ).run(as_dict=True)
+    )
+    if user:
+        qry = qry.where(doc.user == user)
+    
+    data = qry.run(as_dict=True)
     if not isinstance(data, list):
         return None
     
@@ -261,71 +331,69 @@ def filter_seen_alerts(data: list, user: str, alerts: list, today: str):
     if not seen_by:
         return data
     
-    data = {v["name"]:v for v in data}
-    totals = {}
-    for v in seen_by:
-        if v["date"] == today:
-            data.pop(v["parent"], None)
+    dates = {}
+    seen = {}
+    for i in range(len(seen_by)):
+        v = seen_by.pop(0)
+        k = v["parent"]
+        seen[k] = seen.get(k, 0) + 1
+        if k not in dates:
+            dates[k] = [v["date"]]
         else:
-            if v["parent"] not in totals:
-                totals[v["parent"]] = 0
-            totals[v["parent"]] += 1
-            d = data.get(v["parent"], None)
-            if (
-                d and (
-                    not cint(d["is_repeatable"]) or
-                    cint(d["number_of_repeats"]) <= totals[v["parent"]]
-                )
-            ):
-                data.pop(v["parent"], None)
+            dates[k].append(v["date"])
     
-    return list(data.values())
+    for v in data:
+        k = v["name"]
+        if (
+            (k in dates and today in dates[k]) or
+            (not cint(v["is_repeatable"]) and seen.get(k, 0) > 0) or
+            cint(v["number_of_repeats"]) <= seen.get(k, 0)
+        ):
+            data.remove(v)
+    
+    return data
 
 
 # [Internal]
-def mark_as_seen(name: str, user: str):
+def mark_as_seen(user: str, names: list, date: str, time: str):
+    from frappe import _
+    
     from .cache import get_cached_doc
+    from .common import log_error
     
-    doc = get_cached_doc(_alert_dt_, name)
-    if (
-        not doc or cint(doc.docstatus) != 1 or
-        doc.status != "Active"
-    ):
-        from frappe import _
+    updates = []
+    user_roles = frappe.get_roles(user)
+    for i in range(len(names)):
+        name = names.pop(0)
+        doc = get_cached_doc(_ALERT_DT_, name)
+        if not doc or not doc._is_submitted or not doc._is_active:
+            log_error(_("Seen alert \"{0}\" isn't active or doesn't exist.").format(name))
+            continue
         
-        from .common import log_error
-        
-        log_error(_(
-            "The seen alert lert \"{0}\" "
-            + "doesn't exist, is draft, "
-            + "is cancelled or isn't active."
-        ).format(name))
-        return 0
-    
-    today = nowdate()
-    if is_valid_user(doc, user, today):
-        from frappe.utils import nowtime
-        
-        from .realtime import emit_alert_seen
+        if not is_valid_user(doc, user, user_roles, date):
+            continue
         
         doc.append("seen_by", {
             "user": user,
-            "date": today,
-            "time": nowtime()
+            "date": date,
+            "time": time
         })
-        seen = list(set([v.user for v in doc.seen_by]))
-        doc.reached = len(seen)
+        seen = len(list(set([v.user for v in doc.seen_by])))
+        doc.reached = seen
         doc.save(ignore_permissions=True)
+        updates.append(doc.name)
+    
+    if updates:
+        from .realtime import emit_alert_seen
+        
         emit_alert_seen({
-            "alert": doc.name,
+            "alerts": updates,
             "delay": 1
         })
-    
-    return 1
 
 
 # [Internal]
-def is_valid_user(doc, user, today):
+def is_valid_user(doc, user, user_roles, today):
     valid = 0
     if doc.for_users:
         for v in doc.for_users:
@@ -337,7 +405,7 @@ def is_valid_user(doc, user, today):
         from frappe.utils import has_common
         
         roles = [v.role for v in doc.for_roles]
-        if has_common(roles, frappe.get_roles(user)):
+        if has_common(roles, user_roles):
             valid = 1
     
     if not valid:
@@ -347,15 +415,14 @@ def is_valid_user(doc, user, today):
     if doc.seen_by:
         for v in doc.seen_by:
             if v.user == user:
+                seen += 1
                 if v.date == today:
                     return False
-                
-                seen += 1
     
-    if not cint(doc.is_repeatable):
+    if not doc._is_repeatable:
         return seen < 1
     
-    return cint(doc.number_of_repeats) > seen
+    return doc._number_of_repeats > seen
 
 
 # [Internal]
@@ -367,3 +434,117 @@ def seconds_left_for_day():
     sec = sec + ((60 - dt.minute - 1) * 60)
     sec = sec + (60 - dt.second)
     return sec
+
+
+# [Internal]
+def send_alerts(names: list):
+    from .type import type_join_query
+    
+    doc = frappe.qb.DocType(_ALERT_DT_)
+    qry = (
+        frappe.qb.from_(doc)
+        .select(
+            doc.name,
+            doc.title,
+            doc.alert_type,
+            doc.message,
+            doc.is_repeatable,
+            doc.number_of_repeats
+        )
+        .where(doc.name.isin(names))
+    )
+    qry = type_join_query(qry, doc.alert_type)
+    data = qry.run(as_dict=True)
+    if not data or not isinstance(data, list):
+        return 0
+    
+    dt = f"{_ALERT_DT_} For User"
+    doc = frappe.qb.DocType(dt)
+    for_users = (
+        frappe.qb.from_(doc)
+        .select(doc.parent, doc.user)
+        .where(doc.parenttype == _ALERT_DT_)
+        .where(doc.parentfield == "for_users")
+        .where(doc.parent.isin(names))
+    ).run(as_dict=True)
+    if not for_users or not isinstance(for_users, list):
+        for_users = {}
+    else:
+        tmp = for_users
+        for_users = {}
+        for i in range(len(tmp)):
+            v = tmp.pop(0)
+            k = v["parent"]
+            if k not in for_users:
+                for_users[k] = [v["user"]]
+            else:
+                for_users[k].append(v["user"])
+    
+    dt = f"{_ALERT_DT_} For Role"
+    doc = frappe.qb.DocType(dt)
+    for_roles = (
+        frappe.qb.from_(doc)
+        .select(doc.parent, doc.role)
+        .where(doc.parenttype == _ALERT_DT_)
+        .where(doc.parentfield == "for_roles")
+        .where(doc.parent.isin(names))
+    ).run(as_dict=True)
+    if not for_roles or not isinstance(for_roles, list):
+        for_roles = {}
+    else:
+        tmp = for_roles
+        for_roles = {}
+        for i in range(len(tmp)):
+            v = tmp.pop(0)
+            k = v["parent"]
+            if k not in for_roles:
+                for_roles[k] = [v["role"]]
+            else:
+                for_roles[k].append(v["role"])
+    
+    seen_by = get_alerts_seen_by(names)
+    if not seen_by:
+        seen_by = {}
+    else:
+        tmp = seen_by
+        seen_by = {}
+        for i in range(len(tmp)):
+            v = tmp.pop(0)
+            k = v["parent"]
+            if k not in seen_by:
+                seen_by[k] = [v]
+            else:
+                seen_by[k].append(v)
+    
+    from frappe.utils import nowdate
+    
+    from .realtime import emit_show_alert
+                
+    today = nowdate()
+    for i in range(len(data)):
+        v = data.pop(0)
+        k = v["name"]
+        v["is_repeatable"] = 1 if cint(v["is_repeatable"]) > 0 else 0
+        v["number_of_repeats"] = cint(v["number_of_repeats"])
+        v["users"] = for_users.pop(k, [])
+        v["roles"] = for_roles.pop(k, [])
+        v["seen_by"] = {}
+        v["seen_today"] = []
+        if k in seen_by:
+            for y in seen_by.pop(k):
+                x = y["user"]
+                if x not in v["seen_by"]:
+                    v["seen_by"][x] = 1
+                else:
+                    v["seen_by"][x] += 1
+                if x not in v["seen_today"] and y["date"] == today:
+                    v["seen_today"].append(x)
+        
+        emit_show_alert(v)
+
+
+# [Internal]
+def _set_cache(key, data, expiry=None):
+    from .cache import set_cache
+    
+    set_cache(_ALERT_DT_, key, data, expiry)

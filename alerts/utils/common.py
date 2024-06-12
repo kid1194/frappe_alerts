@@ -8,11 +8,11 @@ import json
 
 import frappe
 
-from alerts import __module__
 
-
-# [Access, Alert, Update]
+# [Alert, Update]
 def log_error(msg):
+    from alerts import __module__
+    
     from alerts.version import is_version_lt
     
     if is_version_lt(14):
@@ -21,12 +21,20 @@ def log_error(msg):
         frappe.log_error(__module__, msg)
 
 
-# [Alerts Alert, Alert Type, Alerts Settings]
-def error(msg):
-    frappe.throw(msg, title=__module__)
+# [A Alert, A Type, A Settings]
+def error(text: str|list, title: str= None):
+    as_list = True if isinstance(text, list) else False
+    if not title:
+        from frappe import _
+        
+        from alerts import __module__
+        
+        title = _(__module__)
+    
+    frappe.throw(text, title=title, as_list=as_list)
 
 
-# [Alert, Alerts Settings, Update]
+# [Update]
 def is_doc_exists(dt, name=None):
     params = {"doctype": dt}
     if name is None:
@@ -35,10 +43,10 @@ def is_doc_exists(dt, name=None):
         params["name"] = name
     elif isinstance(name, dict):
         params.update(name)
-    return frappe.db.exists(params) != None
+    return not (frappe.db.exists(params) is None)
 
 
-# [Alert Type, Alerts Settings]
+# [Alert]
 def doc_count(dt, filters: dict):
     return frappe.db.count(dt, filters)
 
@@ -75,13 +83,28 @@ def filter_docs(dt, fields: (str | list)=None, filters: dict=None):
         strict=False
     )
     
-    if not data or not isinstance(data, list):
+    if not isinstance(data, list):
         return None
     
     return data
 
 
-# [Alert, Files, Query, Update]
+# [Background]
+def to_json(data, default=None):
+    if (
+        data and isinstance(data, str) and (
+            (data.startswith("{") and data.endswith("}")) or
+            (data.startswith("[") and data.endswith("]"))
+        )
+    ):
+        return data
+    try:
+        return json.dumps(data)
+    except Exception:
+        return default
+
+
+# [Alert, Query, Update]
 def parse_json(data, default=None):
     if not isinstance(data, str):
         return data

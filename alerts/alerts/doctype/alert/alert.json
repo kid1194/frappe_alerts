@@ -128,7 +128,7 @@
    "fieldname": "is_repeatable",
    "fieldtype": "Check",
    "label": "Is Repeatable",
-   "description": "Display alert more than once for each recipient",
+   "description": "Display alert more than one time for each recipient",
    "in_list_view": 1
   },
   {
@@ -178,7 +178,7 @@
  ],
  "icon": "fa fa-bell",
  "is_submittable": 1,
- "modified": "2024-02-17 04:04:04.119400",
+ "modified": "2024-06-12 04:04:04.119400",
  "modified_by": "Administrator",
  "module": "Alerts",
  "name": "Alert",

@@ -6,14 +6,14 @@
 
 # [Hooks]
 def after_migrate():
-    from frappe.utils import now
-    
     from alerts import __version__
     
-    from alerts.utils.settings import settings
+    from alerts.utils.system import settings
     
     doc = settings()
     if doc.current_version != __version__:
+        from frappe.utils import now
+        
         doc.current_version = __version__
         doc.latest_version = __version__
         doc.latest_check = now()

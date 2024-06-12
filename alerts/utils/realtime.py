@@ -7,23 +7,36 @@
 import frappe
 
 
-# [Alerts JS]
-@frappe.whitelist()
-def use_realtime():
-    emit_event("alerts_use_realtime", {"status": 1})
+# [Internal]
+_CACHE_KEY_ = "realtime-events"
 
 
 # [Internal]
 def emit_event(event: str, data):
-    frappe.publish_realtime(event=event, message=data)
+    from .system import use_fallback_sync
+    
+    if not use_fallback_sync():
+        frappe.publish_realtime(event=event, message=data)
+    elif event != "alerts_status_changed":
+        events = frappe.cache().get_value(_CACHE_KEY_)
+        if not events:
+            events = {}
+        events[event] = data
+        frappe.cache().set_value(_CACHE_KEY_, events)
 
 
-# [Alerts Settings]
-def emit_app_status_changed(data):
-    emit_event("alerts_app_status_changed", data)
+# [Alert, Internal]
+def get_events():
+    data = frappe.cache().get_value(_CACHE_KEY_)
+    return data if data and isinstance(data, dict) else 0
 
 
-# [Alerts Type]
+# [A Alerts Settings]
+def emit_status_changed(data):
+    emit_event("alerts_status_changed", data)
+
+
+# [A Alerts Type]
 def emit_type_changed(data):
     emit_event("alerts_type_changed", data)
 

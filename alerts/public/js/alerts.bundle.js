@@ -6,1263 +6,1329 @@
 */
 
 
-class LevelUpCore {
-    destroy() {
-        for (let k in this) { if (this.$hasProp(k)) delete this[k]; }
-    }
-    $type(v) {
-        if (v == null) return v === null ? 'Null' : 'Undefined';
-        let t = Object.prototype.toString.call(v).slice(8, -1);
-        return t === 'Number' && isNaN(v) ? 'NaN' : t;
-    }
-    $hasProp(k, o) { return Object.prototype.hasOwnProperty.call(o || this, k); }
-    $is(v, t) { return v != null && this.$type(v) === t; }
-    $of(v, t) { return typeof v === t; }
-    $isObjLike(v) { return v != null && this.$of(v, 'object'); }
-    $isStr(v) { return this.$is(v, 'String'); }
-    $isStrVal(v) { return this.$isStr(v) && v.length; }
-    $isNum(v) { return this.$is(v, 'Number') && isFinite(v); }
-    $isBool(v) { return v === true || v === false; }
-    $isBoolLike(v) { return this.$isBool(v) || v === 0 || v === 1; }
-    $isFunc(v) { return this.$of(v, 'function') || /(Function|^Proxy)$/.test(this.$type(v)); }
-    $isArr(v) { return this.$is(v, 'Array'); }
-    $isArrVal(v) { return this.$isArr(v) && v.length; }
-    $isArgs(v) { return this.$is(v, 'Arguments'); }
-    $isArgsVal(v) { return this.$isArgs(v) && v.length; }
-    $isArrLike(v) {
-        return this.$isObjLike(v) && !this.$isStr(v) && this.$isNum(v.length)
-            && (v.length === 0 || v[v.length - 1] != null);
-    }
-    $isBaseObj(v) { return this.$is(v, 'Object'); }
-    $isObj(v, d) {
-        return this.$isObjLike(v) && (!(v = Object.getPrototypeOf(v))
-            || (this.$hasProp('constructor', v) && this.$isFunc(v.constructor)
-                && (!d || this.$fnStr(v.constructor) === this.$fnStr(Object))));
-    }
-    $fnStr(v) { return Function.prototype.toString.call(v); }
-    $isEmptyObj(v) {
-        if (this.$isObjLike(v)) for (let k in v) { if (this.$hasProp(k, v)) return false; }
-        return true;
-    }
-    $isDataObj(v) { return this.$isObj(v, 1); }
-    $isDataObjVal(v) { return this.$isDataObj(v) && !this.$isEmptyObj(v); }
-    $isEmpty(v) {
-        return v == null || v === '' || v === 0 || v === false
-            || (this.$isArrLike(v) && v.length === 0) || this.$isEmptyObj(v);
-    }
-    $ext(v, o, s, e) {
-        if (this.$isDataObj(v)) for (let k in v) this.$getter(k, v[k], s, e, o);
-        return this;
-    }
-    $def(v, o) { return this.$ext(v, o, 0); }
-    $xdef(v, o) { return this.$ext(v, o, 0, 1); }
-    $static(v, o) { return this.$ext(v, o, 1); }
-    $getter(k, v, s, e, o) {
-        o = o || this;
-        if (!s) o[(k[0] !== '_' ? '_' : '') + k] = v;
-        if (s || (e && o[k] == null))
-            Object.defineProperty(o, k, s ? {value: v} : {get() { return this['_' + k]; }});
-        return this;
-    }
-    $extend() {
-        let a = this.$toArr(arguments),
-        d = this.$isBool(a[0]) && a.shift(),
-        v = this.$isBaseObj(a[0]) ? a.shift() : {};
-        for (let i = 0, l = a.length; i < l; i++) {
-            if (!this.$isBaseObj(a[i])) continue;
-            for (let k in a[i]) {
-                if (!this.$hasProp(k, a[i]) || a[i][k] == null) continue;
-                if (!d || !this.$isBaseObj(v[k]) || !this.$isBaseObj(a[i][k])) v[k] = a[i][k];
-                else this.$extend(d, v[k], a[i][k]);
-            }
-        }
-        return v;
-    }
-    $toArr(v, s, e) { try { return Array.prototype.slice.call(v, s, e); } catch(_) { return []; } }
-    $toJson(v, d) { try { return JSON.stringify(v); } catch(_) { return d; } }
-    $parseJson(v, d) { try { return JSON.parse(v); } catch(_) { return d; } }
-    $fn(fn, o) { return fn.bind(o || this); }
-    $afn(fn, a, o) {
-        if (a == null) return this.$fn(fn, o);
-        a = !this.$isArr(a) ? [a] : a.slice();
-        a.unshift(o || this);
-        return fn.bind.apply(fn, a);
-    }
-    $call(fn, a, o) {
-        if (a != null && !this.$isArrLike(a)) a = [a];
-        o = o || this;
-        switch ((a || '').length) {
-            case 0: return fn.call(o);
-            case 1: return fn.call(o, a[0]);
-            case 2: return fn.call(o, a[0], a[1]);
-            case 3: return fn.call(o, a[0], a[1], a[2]);
-            case 4: return fn.call(o, a[0], a[1], a[2], a[3]);
-            case 5: return fn.call(o, a[0], a[1], a[2], a[3], a[4]);
-            default: return fn.apply(o, a);
-        }
-    }
-    $try(fn, a, o) {
-        try { return this.$call(fn, a, o); } catch(e) { console.error(e.message, e.stack); }
-    }
-    $xtry(fn, a, o) { return this.$fn(function() { return this.$try(fn, a, o); }); }
-    $timeout(fn, tm, a) {
-        if (tm == null) return (fn && clearTimeout(fn)) || this;
-        return setTimeout(this.$afn(fn, a), tm || 0);
-    }
-    $proxy(fn, tm) {
-        fn = this.$fn(fn);
-        return {
-            _r: null,
-            _fn: function(a, d) {
-                this.cancel();
-                let f = function() { a.length ? fn.apply(null, a) : fn(); };
-                this._r = d ? setTimeout(f, tm) : f();
-            },
-            call: function() { this._fn(arguments); },
-            delay: function() { this._fn(arguments, 1); },
-            cancel: function() { this._r && (this._r = clearTimeout(this._r)); },
-        };
-    }
-    $hasElem(id) { return !!document.getElementById(id); }
-    $loadJs(src, opt) {
-        let $el = document.createElement('script');
-        $el.src = src;
-        $el.type = 'text/javascript';
-        $el.async = true;
-        if (opt) for (let k in opt) $el[k] = opt[k];
-        document.getElementsByTagName('body')[0].appendChild($el);
-        return this;
-    }
-    $loadCss(href, opt) {
-        let $el = document.createElement('link');
-        $el.href = href;
-        $el.type = 'text/css';
-        $el.rel = 'stylesheet';
-        $el.async = true;
-        if (opt) for (let k in opt) $el[k] = opt[k];
-        document.getElementsByTagName('head')[0].appendChild($el);
-        return this;
-    }
-    $load(css, opt) {
-        let $el = document.createElement('style');
-        $el.innerHTML = css;
-        $el.type = 'text/css';
-        if (opt) for (let k in opt) $el[k] = opt[k];
-        document.getElementsByTagName('head')[0].appendChild($el);
-        return this;
-    }
-}
-
-
-class LevelUpBase extends LevelUpCore {
-    constructor(mod, key, doc, ns, prod) {
-        super();
-        this._mod = mod;
-        this._key = key;
-        this._tmp = '_' + this._key;
-        this._doc = new RegExp('^' + doc);
-        this._real = this._key + '_';
-        this._pfx = '[' + this._key.toUpperCase() + ']';
-        this._ns = ns + (ns.slice(-1) !== '.' ? '.' : '');
-        this._prod = !!prod;
-        this.$xdef({is_ready: true});
-        this._events = {
-            sock: !!frappe.socketio.socket,
-            list: {},
-            real: {},
-            once: 'ready page_clean page_change page_pop destroy after_destroy'.split(' ')
-        };
-    }
-    get module() { return this._mod; }
-    get key() { return this._key; }
-    $alert(t, m, i, f) {
-        m == null && (m = t) && (t = null);
-        f && (this._err = 1);
-        t = {title: this.$isStrVal(t) ? t : this._mod, indicator: i};
-        this.$isDataObj(m) ? (t = this.$extend(m, t)) : (t.message = '' + m);
-        this.call('on_alert', t);
-        (f ? frappe.throw : frappe.msgprint)(t);
-        return this;
-    }
-    debug(t, m) { return this._prod ? this : this.$alert(t, m, 'gray'); }
-    log(t, m) { return this._prod ? this : this.$alert(t, m, 'cyan'); }
-    info(t, m) { return this.$alert(t, m, 'light-blue'); }
-    warn(t, m) { return this.$alert(t, m, 'orange'); }
-    error(t, m) { return this.$alert(t, m, 'red'); }
-    fatal(t, m) { return this.$alert(t, m, 'red', 1); }
-    $toast(m, i) {
-        frappe.show_alert({message: m, indicator: i});
-        return this;
-    }
-    success_(m) { return this.$toast(m, 'green'); }
-    info_(m) { return this.$toast(m, 'blue'); }
-    warn_(m) { return this.$toast(m, 'orange'); }
-    error_(m) { return this.$toast(m, 'red'); }
-    $console(fn, a) {
-        if (this._prod) return this;
-        if (!this.$isStr(a[0])) Array.prototype.unshift.call(a, this._pfx);
-        else a[0] = (this._pfx + ' ' + a[0]).trim();
-        (console[fn] || console.log).apply(null, a);
-        return this;
-    }
-    _debug() { return this.$console('debug', arguments); }
-    _log() { return this.$console('log', arguments); }
-    _info() { return this.$console('info', arguments); }
-    _warn() { return this.$console('warn', arguments); }
-    _error() { return this.$console('error', arguments); }
-    ajax(u, o, s, f) {
-        f = this.$isFunc(f) && this.$fn(f);
-        o = this.$extend(1, {
-            url: u, method: 'GET', cache: false, 'async': true, crossDomain: true,
-            headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-            success: this.$isFunc(s) ? this.$fn(s) : null,
-            error: this.$fn(function(r, t) {
-                r = (this.$isStrVal(r) && __(r)) || (this.$isStrVal(t) && __(t))
-                    || __('The ajax request sent raised an error.');
-                f ? f({message: r}) : this.error(r);
-            })
-        }, o);
-        o.contentType == null && (o.contentType = (o.method == 'post' ? 'application/json' : 'application/x-www-form-urlencoded') + '; charset=utf-8');
-        this.call('on_ajax', o);
-        try { $.ajax(o); } catch(e) {
-            f ? f(e) : this.error(e.message);
-            if (this._err) throw e;
-        } finally { this._err = 0; }
-        return this;
-    }
-    get_method(v) { return this._ns + v; }
-    request(m, a, s, f) {
-        s = this.$isFunc(s) && this.$fn(s);
-        f = this.$isFunc(f) && this.$fn(f);
-        let d = {
-            method: m.includes('.') ? m : this.get_method(m),
-            callback: this.$fn(function(r) {
-                r = (this.$isObjLike(r) && r.message) || r;
-                if (!this.$isDataObj(r) || !r.error) return s && s(r);
-                r = this.$isDataObjVal(r) && ((this.$isStrVal(r.message) && __(r.message))
-                    || (this.$isStrVal(r.error) && __(r.error)))
-                    || __('The request sent returned an invalid response.');
-                f ? f({message: r}) : this.error(r);
-            }),
-            error: this.$fn(function(r, t) {
-                r = (this.$isStrVal(r) && __(r)) || (this.$isStrVal(t) && __(t))
-                    || __('The request sent raised an error.');
-                f ? f({message: r}) : this.error(r);
-            })
-        };
-        !this.$isDataObj(a) && (a = {});
-        this.call('on_request', a);
-        if (!this.$isEmptyObj(a)) this.$extend(d, {type: 'POST', args: a});
-        try { frappe.call(d); } catch(e) {
-            f ? f(e) : this.error(e.message);
-            if (this._err) throw e;
-        } finally { this._err = 0; }
-        return this;
-    }
-    on(e, fn)  { return this._on(e, fn); }
-    xon(e, fn)  { return this._on(e, fn, 0, 1); }
-    once(e, fn) { return this._on(e, fn, 1); }
-    xonce(e, fn) { return this._on(e, fn, 1, 1); }
-    real(e, fn, n) { return this._on(e, fn, n, 0, 1); }
-    xreal(e, fn, n) { return this._on(e, fn, n, 1, 1); }
-    off(e, fn, rl) {
-        if (e == null) return this._off();
-        if (this.$isBoolLike(e)) return this._off(0, 1);
-        if (!this.$isStrVal(e)) return this;
-        fn = this.$isFunc(fn) && fn;
-        e = e.split(' ');
-        for (let i = 0, l = e.length, ev; i < l; i++) {
-            ev = (rl ? this._real : '') + e[i];
-            this._events.list[ev] && this._off(ev, fn);
-        }
-        return this;
-    }
-    emit(e) {
-        let a = this.$toArr(arguments, 1),
-        p = Promise.resolve();
-        e = e.split(' ');
-        for (let i = 0, l = e.length; i < l; i++)
-            this._events.list[e[i]] && this._emit(e[i], a, p);
-        return this;
-    }
-    call(e) {
-        let a = this.$toArr(arguments, 1);
-        e = e.split(' ');
-        for (let i = 0, l = e.length; i < l; i++)
-            this._events.list[e[i]] && this._emit(e[i], a);
-        return this;
-    }
-    _on(ev, fn, nc, st, rl) {
-        ev = ev.split(' ');
-        fn = this.$fn(fn);
-        let rd;
-        for (let es = this._events, i = 0, l = ev.length, e; i < l; i++) {
-            if (rl && !es.sock) continue;
-            e = (rl ? this._real : '') + ev[i];
-            if (e === es.once[0] && this._is_ready) rd = es.once[0];
-            if (es.once.includes(e)) nc = 1;
-            if (!es.list[e]) {
-                es.list[e] = [];
-                rl && frappe.realtime.on(e, (es.real[e] = this._rfn(e)));
-            }
-            es.list[e].push({f: fn, o: nc, s: st});
-        }
-        return rd ? this.emit(rd) : this;
-    }
-    _rfn(e) {
-        return this.$fn(function(ret) {
-            ret = (this.$isObjLike(ret) && ret.message) || ret;
-            this._emit(e, ret != null ? [ret] : ret, Promise.wait(300));
-        });
-    }
-    _off(e, fn) {
-        if (e && fn) this._del(e, fn);
-        else if (!e) {
-            for (let ev in this._events.list) fn ? this._off(ev, fn) : this._del(ev);
-        } else {
-            let es = this._events;
-            es.real[e] && frappe.realtime.off(e, es.real[e]);
-            delete es.list[e];
-            delete es.real[e];
-        }
-        return this;
-    }
-    _del(e, fn) {
-        let ev = this._events.list[e].slice(), ret = [];
-        for (let x = 0, i = 0, l = ev.length; i < l; i++)
-            (fn ? ev[i].f !== fn : ev[i].s) && (ret[x++] = ev[i]);
-        !ret.length ? this._off(e) : (this._events.list[e] = ret);
-    }
-    _emit(e, a, p) {
-        let ev = this._events.list[e].slice(), ret = [];
-        p && p.catch(this.$fn(function(e) { this._error('Events emit', e, a, e.message, e.stack); }));
-        for (let x = 0, i = 0, l = ev.length; i < l; i++) {
-            p ? p.then(this.$xtry(ev[i].f, a)) : this.$try(ev[i].f, a);
-            !ev[i].o && (ret[x++] = ev[i]);
-        }
-        !ret.length ? this._off(e) : (this._events.list[e] = ret);
-    }
-    stop_realtime() {
-        this._events.sock = null;
-        for (let e in this._events.real) this._off(e);
-        this.info_(__('Frappe realtime events is unavailable.'));
-    }
-}
-
-
-class LevelUp extends LevelUpBase {
-    constructor(mod, key, doc, ns, prod) {
-        super(mod, key, doc, ns, prod);
-        this.$xdef({is_enabled: true});
-        this._router = {obj: null, old: 0, val: ['app']};
-        this._win = {
-            e: {
-                unload: this.$fn(this.destroy),
-                popstate: this.$fn(function() { !this._win.c && this._win.fn.delay(); }),
-                change: this.$fn(function() { !this._win.c && this._win.fn.call(1); }),
-            },
-            c: 0,
-            fn: this.$proxy(function(n) {
-                this._win.c++;
-                this._routes();
-                this.emit('page_clean ' + (n ? 'page_change' : 'page_pop'));
-                this.$timeout(function() { this._win.c--; }, n ? 2000 : 1200);
-            }, 200),
-        };
-        addEventListener('beforeunload', this._win.e.unload);
-        addEventListener('popstate', this._win.e.popstate);
-        this._route_change('on');
-    }
-    options(opts) { return this.$static(opts); }
-    destroy() {
-        this._win.fn.cancel();
-        removeEventListener('beforeunload', this._on_unload);
-        removeEventListener('popstate', this._state_popped);
-        this._route_change('off');
-        this.emit('page_clean destroy after_destroy').off(1);
-        super.destroy();
-    }
-    _route_change(fn) {
-        if (!this._router.obj)
-            for (let ks = ['router', 'route'], i = 0, l = ks.length; i < l; i++) {
-                if (!frappe[ks[i]]) continue;
-                this._router.obj = frappe[ks[i]];
-                this._router.old = i > 1;
-                break;
-            }
-        if (this._router.obj && this._router.obj[fn])
-            this._router.obj[fn]('change', this._win.e.change);
-    }
-    _routes() {
-        let v;
-        try { this._router.obj && (v = !this._router.old ? frappe.get_route() : this._router.obj.parse()); } catch(_) {}
-        if (this.$isArrVal(v)) this._router.val = v;
-    }
-    route(i) { return this._router.val[i] || this._router.val[0]; }
-    get is_list() { return this.route(0).toLowerCase() === 'list'; }
-    get is_form() { return this.route(0).toLowerCase() === 'form'; }
-    get is_self() { return this._doc.test(this.route(1)); }
-    is_doctype(v) { return this.route(1) === v; }
-    _is_self_view(o) { return this._doc.test((o && o.doctype) || this.route(1)); }
-    get_list(o) { return (o = o || cur_list) && this.$isObjLike(o) ? o : null; }
-    get_form(o) { return (o = o || cur_frm) && this.$isObjLike(o) ? o : null; }
-    is_self_list(o) { return this.is_list && this._is_self_view(this.get_list(o)); }
-    setup_list(o) {
-        if (!(o = this.get_list(o)) || !this.is_self_list(o)) return this;
-        o[this._tmp] = {disabled: 0};
-        let k = 'toggle_actions_menu_button';
-        if (this._is_enabled) {
-            o[this._tmp].disabled = 0;
-            o['_' + k] && (o[k] = o['_' + k]);
-            delete o['_' + k];
-            o.page.clear_inner_toolbar();
-            o.set_primary_action();
-            this.off('page_clean');
-        } else if (!o[this._tmp].disabled) {
-            o[this._tmp].disabled = 1;
-            o.page.hide_actions_menu();
-            o.page.clear_primary_action();
-            o.page.add_inner_message(__('{0} app is disabled.', [this._mod]))
-                .removeClass('text-muted').addClass('text-danger');
-            o['_' + k] = o[k];
-            o[k] = function() {};
-            this.once('page_clean', this.clean_list);
-        }
-        return this;
-    }
-    clean_list(o) {
-        if (!(o = this.get_list(o))) return this;
-        delete o[this._tmp];
-        let k = 'toggle_actions_menu_button';
-        o['_' + k] && (o[k] = o['_' + k]);
-        delete o['_' + k];
-        return this;
-    }
-    is_self_form(o) { return this.is_form && this._is_self_view(this.get_form(o)); }
-    clean_form(frm) {
-        if ((frm = this.get_form(frm))) {
-            try { (!frm[this._tmp] || frm[this._tmp].disabled) && this.enable_form(frm); }
-            finally { delete frm[this._tmp]; }
-        }
-        return this;
-    }
-    setup_form(frm, wf) {
-        if (!(frm = this.get_form(frm)) || !this.is_self_form(frm)) return this;
-        frm[this._tmp] = {disabled: 0, intro: 0, workflow: 0, fields: []};
-        try {
-            if (this._is_enabled) this.enable_form(frm, wf);
-            else this.disable_form(frm, __('{0} app is disabled.', [this._mod]), wf);
-        } catch(e) { this._error('Setup form error', e.message, e.stack); }
-        return this;
-    }
-    enable_form(frm, wf) {
-        if (!(frm = this.get_form(frm))) return this;
-        let obj;
-        try {
-            obj = this.is_self_form(frm) && frm[this._tmp];
-            let dfs = obj && obj.disabled ? obj.fields : null;
-            if ((obj && !obj.disabled) || (dfs && !dfs.length)) return this;
-            for (let i = 0, l = frm.fields.length, f; i < l; i++) {
-                f = frm.fields[i];
-                if (dfs && !dfs.includes(f.df.fieldname)) continue;
-                if (f.df.fieldtype === 'Table') this._enable_table(frm, f.df.fieldname);
-                else this._enable_field(frm, f.df.fieldname);
-            }
-            wf == null && obj && (wf = obj.workflow);
-            if (!!frm.is_new() || !this._has_flow(frm, wf)) frm.enable_save();
-            else (!obj || (obj.workflow = 1)) && frm.page.show_actions_menu();
-            if (obj && obj.intro) frm.set_intro() && (obj.intro = 0);
-        } catch(e) { this._error('Enable form', e.message, e.stack); }
-        finally {
-            try { if (obj) this.$extend(obj, {disabled: 0, fields: []}); } catch(_) {}
-            this.off('page_clean').emit('form_enabled', frm);
-        }
-        return this;
-    }
-    disable_form(frm, msg, wf, color) {
-        if (!(frm = this.get_form(frm))) return this;
-        if (color == null && this.$isStr(wf)) (color = wf) && (wf = 0);
-        let obj;
-        try {
-            obj = this.is_self_form(frm) && frm[this._tmp];
-            if (obj && obj.disabled) return this;
-            for (let i = 0, l = frm.fields.length, f; i < l; i++) {
-                f = frm.fields[i].df;
-                if (f.fieldtype === 'Table') this._disable_table(frm, f.fieldname);
-                else this._disable_field(frm, f.fieldname);
-            }
-            wf == null && obj && (wf = obj.workflow);
-            if (!!frm.is_new() || !this._has_flow(frm, wf)) frm.disable_save();
-            else (!obj || (obj.workflow = 1)) && frm.page.hide_actions_menu();
-        } catch(e) { this._error('Disable form', e.message, e.stack); }
-        finally {
-            try {
-                if (this.$isStrVal(msg)) {
-                    obj && (obj.intro = 1);
-                    frm.set_intro(msg, color || 'red');
+(function() {
+    var LU = {
+        $type(v) {
+            if (v == null) return v === null ? 'Null' : 'Undefined';
+            var t = Object.prototype.toString.call(v).slice(8, -1);
+            return t === 'Number' && isNaN(v) ? 'NaN' : t;
+        },
+        $hasProp(k, o) { return Object.prototype.hasOwnProperty.call(o || this, k); },
+        $is(v, t) { return v != null && this.$type(v) === t; },
+        $of(v, t) { return typeof v === t; },
+        $isObjLike(v) { return v != null && this.$of(v, 'object'); },
+        $isStr(v) { return this.$is(v, 'String'); },
+        $isStrVal(v) { return this.$isStr(v) && v.length; },
+        $isNum(v) { return this.$is(v, 'Number') && isFinite(v); },
+        $isBool(v) { return v === true || v === false; },
+        $isBoolLike(v) { return this.$isBool(v) || v === 0 || v === 1; },
+        $isFunc(v) { return this.$of(v, 'function') || /(Function|^Proxy)$/.test(this.$type(v)); },
+        $isArr(v) { return this.$is(v, 'Array'); },
+        $isArrVal(v) { return this.$isArr(v) && v.length; },
+        $isArgs(v) { return this.$is(v, 'Arguments'); },
+        $isArgsVal(v) { return this.$isArgs(v) && v.length; },
+        $isArrLike(v) { return this.$isArr(v) || this.$isArgs(v); },
+        $isArrLikeVal(v) { return this.$isArrLike(v) && v.length; },
+        $isEmptyObj(v) {
+            if (this.$isObjLike(v)) for (var k in v) { if (this.$hasProp(k, v)) return false; }
+            return true;
+        },
+        $isBaseObj(v) { return !this.$isArgs(v) && this.$is(v, 'Object'); },
+        $isBaseObjVal(v) { return this.$isBaseObj(v) && !this.$isEmptyObj(v); },
+        $fnStr(v) { return Function.prototype.toString.call(v); },
+        $isObj(v, _) {
+            if (!this.$isObjLike(v)) return false;
+            var k = 'constructor';
+            v = Object.getPrototypeOf(v);
+            return this.$hasProp(k, v) && this.$isFunc(v[k])
+                && (!_ || this.$fnStr(v[k]) === this.$fnStr(Object));
+        },
+        $isObjVal(v) { return this.$isObj(v) && !this.$isEmptyObj(v); },
+        $isDataObj(v) { return this.$isObj(v, 1); },
+        $isDataObjVal(v) { return this.$isDataObj(v) && !this.$isEmptyObj(v); },
+        $isIter(v) { return this.$isBaseObj(v) || this.$isArrLike(v); },
+        $isEmpty(v) {
+            return v == null || v === '' || v === 0 || v === false
+                || (this.$isArrLike(v) && v.length < 1) || this.$isEmptyObj(v);
+        },
+        $toArr(v, s, e) { try { return Array.prototype.slice.call(v, s, e); } catch(_) { return []; } },
+        $toJson(v, d) { try { return JSON.stringify(v); } catch(_) { return d; } },
+        $parseJson(v, d) { try { return JSON.parse(v); } catch(_) { return d; } },
+        $clone(v) { return this.$parseJson(this.$toJson(v)); },
+        $filter(v, fn) {
+            fn = this.$fn(fn) || function(v) { return v != null; };
+            var o = this.$isBaseObj(v), r = o ? {} : [];
+            if (o) for (var k in v) { if (this.$hasProp(k, v) && fn(v[k], k) !== false) r[k] = v[k]; }
+            else for (var i = 0, x = 0, l = v.length; i < l; i++) { if (fn(v[i], i) !== false) r[x++] = v[i]; }
+            return r;
+        },
+        $map(v, fn) {
+            if (!(fn = this.$fn(fn))) return this.$clone(v);
+            var o = this.$isBaseObj(v), r = o ? {} : [];
+            if (o) for (var k in v) { if (this.$hasProp(k, v)) r[k] = fn(v[k], k); }
+            else for (var i = 0, x = 0, l = v.length; i < l; i++) { r[x++] = fn(v[i], i); }
+            return r;
+        },
+        $reduce(v, fn, r) {
+            if (!(fn = this.$fn(fn))) return r;
+            if (this.$isBaseObj(v)) for (var k in v) { this.$hasProp(k, v) && fn(v[k], k, r); }
+            else for (var i = 0, x = 0, l = v.length; i < l; i++) { fn(v[i], i, r); }
+            return r;
+        },
+        $assign() {
+            var a = arguments.length && this.$filter(arguments, this.$isBaseObj);
+            if (!a || !a.length) return {};
+            a.length > 1 && Object.assign.apply(null, a);
+            return a[0];
+        },
+        $extend() {
+            var a = arguments.length && this.$filter(arguments, this.$isBaseObj);
+            if (!a || a.length < 2) return a && a.length ? a[0] : {};
+            var d = this.$isBoolLike(arguments[0]) && arguments[0],
+            t = this.$map(a[0], this.$isBaseObj);
+            for (var i = 1, l = a.length; i < l; i++)
+                for (var k in a[i]) {
+                    if (!this.$hasProp(k, a[i]) || a[i][k] == null) continue;
+                    d && t[k] && this.$isBaseObj(a[i][k]) ? this.$extend(d, a[0][k], a[i][k]) : (a[0][k] = a[i][k]);
                 }
-            } catch(_) {}
-            try { obj && (obj.disabled = 1); } catch(_) {}
-            this.once('page_clean', this.clean_form).emit('form_disabled', frm);
-        }
-        return this;
-    }
-    _has_flow(frm, wf) {
-        try { return frm && wf && frm.states && frm.states.get_state(); } catch(_) {}
-    }
-    get_field(frm, k, n, ck, g) {
-        return (frm = this.get_form(frm)) ? this._get_field(frm, k, n, ck, g) : null;
-    }
-    _get_field(frm, k, n, ck, g) {
-        let f = frm.get_field(k);
-        f && n != null && (f = f.grid && f.grid.get_row(n));
-        f && ck != null && (f = !g ? f.get_field(ck) : f.grid_form && (f.grid_form.fields_dict || {})[ck]);
-        if (f) return f;
-    }
-    _reload_field(frm, k, n, ck) {
-        n != null && (frm = this._get_field(frm, k, n));
-        frm && frm.refresh_field && frm.refresh_field(n == null ? k : ck);
-    }
-    _toggle_translatable(f, s) {
-        if (!f.df || !cint(f.df.translatable) || !f.$wrapper) return;
-        f = f.$wrapper.find('.clearfix .btn-translation');
-        f.length && f.hidden(!s);
-    }
-    enable_field(frm, key, cdn, ckey) {
-        (frm = this.get_form(frm)) && this._enable_field(frm, key, cdn, ckey);
-        return this;
-    }
-    _enable_field(frm, k, n, ck) {
-        try {
-            let o = this.is_self_form(frm) && frm[this._tmp],
-            fk = ck == null ? (n == null ? k : [k, n].join('-')) : [k, n, ck].join('-');
-            if (o && !o.fields.includes(fk)) return;
-            let f = this._get_field(frm, k, n, ck);
-            if (!f || !f.df || !!cint(f.df.hidden) || !this._is_field(f.df.fieldtype)) return;
-            o && (fk = o.fields.indexOf(fk)) >= 0 && o.fields.splice(fk, 1);
-            n == null && frm.set_df_property(k, 'read_only', 0);
-            if (n == null) return this._toggle_translatable(f, 1);
-            if (ck == null) return f.grid && f.grid.toggle_enable(n, 1);
-            f = this._get_field(frm, k, n);
-            f && f.set_field_property(ck, 'read_only', 0);
-            f = this._get_field(frm, k, n, ck, 1);
-            f && this._toggle_translatable(f, 1);
-        } catch(_) {}
-    }
-    disable_field(frm, k, n, ck) {
-        (frm = this.get_form(frm)) && this._disable_field(frm, k, n, ck);
-        return this;
-    }
-    _disable_field(frm, k, n, ck) {
-        try {
-            let fs = this.is_self_form(frm) && frm[this._tmp].fields,
-            fk = ck == null ? (n == null ? k : [k, n].join('-')) : [k, n, ck].join('-');
-            if (fs && fs.includes(fk)) return;
-            let f = this._get_field(frm, k, n, ck);
-            if (!f || !f.df || !!cint(f.df.hidden) || !this._is_field(f.df.fieldtype)) return;
-            fs && fs.push(fk);
-            n == null && frm.set_df_property(k, 'read_only', 1);
-            if (n == null) return this._toggle_translatable(f, 0);
-            if (ck == null) return f.grid && f.grid.toggle_enable(n, 0);
-            f = this._get_field(frm, k, n);
-            f && f.set_field_property(ck, 'read_only', 1);
-            f = this._get_field(frm, k, n, ck, 1);
-            f && this._toggle_translatable(f, 0);
-        } catch(_) {}
-    }
-    _is_field(v) { return v && !/^((Tab|Section|Column) Break|Table)$/.test(v); }
-    enable_table(frm, key) {
-        (frm = this.get_form(frm)) && this._enable_table(frm, key);
-        return this;
-    }
-    _enable_table(frm, k) {
-        try {
-            let fs = this.is_self_form(frm) && (frm[this._tmp] || {}).fields, t;
-            if (fs && !fs.includes(k)) return;
-            fs && (t = fs.indexOf(k)) >= 0 && fs.splice(t, 1);
-            let f = frm.get_field(k);
-            if (!f || !f.df || !!cint(f.df.hidden) || f.df.fieldtype !== 'Table' || !f.grid) return;
-            f.of && f.of.add != null && (f.df.cannot_add_rows = f.of.add);
-            f.of && f.of.del != null && (f.df.cannot_delete_rows = f.of.del);
-            delete f.of;
-            f = f.grid;
-            if (!f.of) return;
-            f.of.edit != null && (f.df.in_place_edit = f.of.edit);
-            f.meta && f.of.grid != null && (f.meta.editable_grid = f.of.grid);
-            f.of.static != null && (f.static_rows = f.of.static);
-            f.of.sort != null && (f.sortable_status = f.of.sort);
-            if (f.of.read) {
-                let ds = [];
-                if (this.$isArrVal(f.grid_rows))
-                    for (let i = 0, l = f.grid_rows.length, r; i < l; i++) {
-                        (r = f.grid_rows[i]) && this.$isArrVal(r.docfields) && ds.push(r.docfields);
-                    }
-                if (this.$isArrVal(f.docfields)) ds.push(f.docfields);
-                for (let i = 0, l = ds.length; i < l; i++) {
-                    for (let x = 0, z = ds[i].length, d; x < z; x++)
-                        (d = ds[i][x]) && f.of.read.includes(d.fieldname) && (d.read_only = 0);
-                }
-            }
-            this._reload_field(frm, k);
-            f.of.checkbox && f.toggle_checkboxes(1);
-            delete f.of;
-        } catch(_) {}
-    }
-    disable_table(frm, key, opts) {
-        !this.$isDataObj(opts) && (opts = null);
-        (frm = this.get_form(frm)) && this._disable_table(frm, key, opts);
-        return this;
-    }
-    _disable_table(frm, k, o) {
-        try {
-            let fs = this.is_self_form(frm) && (frm[this._tmp] || {}).fields,
-            f = frm.get_field(k);
-            if (!f || !f.df || !!cint(f.df.hidden) || f.df.fieldtype !== 'Table' || !f.grid) return;
-            fs && !fs.includes(k) && fs.push(k);
-            let y = true, n = false;
-            !f.of && (f.of = {});
-            let x;
-            if (!o || !o.add) {
-                (x = 'add') && f.of[x] !== y && (f.of[x] = !!f.df.cannot_add_rows);
-                f.df.cannot_add_rows = y;
-            }
-            if (!o || !o.del) {
-                (x = 'del') && f.of[x] !== y && (f.of[x] = !!f.df.cannot_delete_rows);
-                f.df.cannot_delete_rows = y;
-            }
-            f = f.grid;
-            !f.of && (f.of = {});
-            if (!o || !o.edit) {
-                (x = 'edit') && f.of[x] !== n && (f.of[x] = !!f.df.in_place_edit);
-                f.df.in_place_edit = n;
-                if (f.meta) {
-                    (x = 'grid') && f.of[x] !== n && (f.of[x] = !!f.meta.editable_grid);
-                    f.meta.editable_grid = n;
-                }
-            }
-            if (!o || !o.edit || !o.keep) {
-                (x = 'static') && f.of[x] !== y && (f.of[x] = !!f.static_rows);
-                f.static_rows = y;
-            }
-            if (!o || !o.sort) {
-                (x = 'sort') && f.of[x] !== n && (f.of[x] = !!f.sortable_status);
-                f.sortable_status = n;
-            }
-            if (!o || !o.edit) {
-                f.of.read = [];
-                let ds = [];
-                if (this.$isArrVal(f.grid_rows))
-                    for (let i = 0, l = f.grid_rows.length, r; i < l; i++) {
-                        (r = f.grid_rows[i]) && this.$isArrVal(r.docfields) && ds.push(r.docfields);
-                    }
-                if (this.$isArrVal(f.docfields)) ds.push(f.docfields);
-                for (let i = 0, l = ds.length; i < l; i++) {
-                    for (let x = 0, z = ds[i].length, d; x < z; x++)
-                        (d = ds[i][x]) && !d.read_only && (!o || !(o.keep || '').includes(d.fieldname))
-                            && (d.read_only = 1) && f.of.read.push(d.fieldname);
-                }
-            }
-            this._reload_field(frm, k);
-            (!o || !o.del) && (f.of.checkbox = 1) && f.toggle_checkboxes(0);
-        } catch(_) {}
-    }
-    _set_field_desc(f, m) {
-        let c = 0;
-        f.df && !f.df.__description && (f.df.__description = f.df.description);
-        if (m && f.set_new_description) c++ && f.set_new_description(m);
-        else if (f.set_description) {
-            f.df && !m && (m = f.df.__description) && delete f.df.__description;
-            c++ && f.set_description(m);
-        }
-        c && f.toggle_description && f.toggle_description(f, !!m);
-        return c;
-    }
-    set_field_desc(frm, key, cdn, ckey, msg) {
-        if (!(frm = this.get_form(frm))) return this;
-        msg == null && cstr(cdn).length && ckey == null && (msg = cdn) && (cdn = null);
-        try {
-            let f = this._get_field(frm, key, cdn, ckey, 1);
-            f && this._set_field_desc(f, msg);
-        } catch(_) {}
-        return this;
-    }
-    get_field_desc(frm, key, cdn, ckey, bk) {
-        if (!(frm = this.get_form(frm))) return '';
-        bk == null && this.$isBoolLike(cdn) && ckey == null && (bk = cdn) && (cdn = null);
-        try {
-            let f = this._get_field(frm, key, cdn, ckey, 1);
-            return (f && f.fd && ((bk && f.fd.__description) || f.df.description)) || '';
-        } catch(_) {}
-        return '';
-    }
-    valid_field(frm, key, cdn, ckey) {
-        if (!(frm = this.get_form(frm))) return this;
-        try {
-            let f = this._get_field(frm, key, cdn, ckey, 1);
-            if (!f) return this;
-            let c = 0;
-            if (f.df && f.df.invalid) {
-                f.df.invalid = 0;
-                f.set_invalid && f.set_invalid();
-                c++;
-            }
-            this._set_field_desc(f) && c++;
-            c && this._reload_field(frm, key, cdn, ckey);
-        } catch(_) {}
-        return this;
-    }
-    invalid_field(frm, key, cdn, ckey, msg) {
-        if (!(frm = this.get_form(frm))) return this;
-        if (msg == null && cstr(cdn).length && ckey == null) {
-            msg = cdn;
-            cdn = null;
-        }
-        try {
-            let f = this._get_field(frm, key, cdn, ckey, 1);
-            if (!f) return this;
-            let c = 0;
-            if (f.df && !f.df.invalid) {
-                f.df.invalid = 1;
-                f.set_invalid && f.set_invalid();
-                c++;
-            }
-            this.$isStrVal(msg) && this._set_field_desc(f, msg) && c++;
-            c && this._reload_field(frm, key, cdn, ckey);
-        } catch(_) {}
-        return this;
-    }
-}
-
-
-class Alerts extends LevelUp {
-    constructor() {
-        super(__('Alerts'), 'alerts', 'Alert', 'alerts.utils', 0);
-        this.$xdef({
-            id: frappe.utils.get_random(5),
-            is_ready: false,
-            is_enabled: false,
-        });
-        this._dialog = null;
-        this._init = 0;
-        this._in_req = 0;
-        this._styles = {};
-        this._list = [];
-        this._seen = [];
-        this._seen_retry = 0;
-        this._mock = null;
-        
-        this.real('use_realtime', function() { this.$timeout(this._realtime_tm); }, 1);
-        this._realtime_tm = this.$timeout(this.stop_realtime, 60000);
-        this.$timeout(function() { delete this._realtime_tm; }, 65000);
-        this.request('use_realtime');
-        
-        this.request('is_enabled', null, this._setup);
-    }
-    get has_alerts() { return !!this._list.length; }
-    mock() {
-        if (!this._mock) this._mock = new AlertsMock();
-        return this._mock;
-    }
-    show() { return this.has_alerts ? this._render() : this; }
-    setup_list() {
-        if (!this._is_enabled)
-            this.error(__(this._mod + ' app has been disabled.'));
-    }
-    _setup(ret) {
-        this._is_ready = true;
-        this._is_enabled = !!ret;
-        this.xon('page_change page_pop', function() {
-            if (this._is_enabled) {
-                if (this.has_alerts) this.show();
-                else this._get_alerts();
-            }
-        })
-        .xreal('app_status_changed', function(ret) {
-            this._debug('real app_status_changed', ret);
-            var old = this._is_enabled;
-            this.$xdef(ret);
-            if (this._is_enabled === old) return;
-            this.emit('change');
-            if (this._is_enabled) {
-                if (!this._init) {
-                    this._first = 1;
-                    this._init = 1;
-                    this._get_alerts();
-                } else this.show();
-            }
-        })
-        .xreal('type_changed', function(ret) {
-            this._debug('real type_changed', ret);
-            if (!this.$isDataObjVal(ret)) return;
-            var name = cstr(ret.name);
-            if (cstr(ret.action) === 'trash')
-                delete this._styles[name];
-            else {
-                if (!this._styles[name])
-                    this._styles[name] = new AlertsStyle(this._id, this._slug(name));
-                this._styles[name].build(
-                    ret.background, ret.border_color,
-                    ret.title_color, ret.content_color,
-                    ret.dark_background, ret.dark_border_color,
-                    ret.dark_title_color, ret.dark_content_color
-                );
-            }
-        })
-        .xreal('show_alert', function(ret) {
-            this._debug('real show_alert', ret);
-            if (this._is_enabled && this._is_valid(ret))
-                this._queue(ret);
-        });
-        this.emit('ready');
-        if (this._is_enabled) {
-            this._init = 1;
-            this._first = 1;
-            this.$timeout(this._get_alerts, 700);
-        }
-    }
-    _get_alerts() {
-        if (this._in_req) return;
-        this._in_req = 1;
-        this.request(
-            'user_alerts',
-            this._first ? {init: 1} : null,
-            function(ret) {
-                this._first = 0;
-                this._in_req = 0;
-                this._debug('Getting user alerts.', ret);
-                if (!this.$isDataObjVal(ret)) this._init = 0;
-                else {
-                    this._is_enabled = !!ret.is_enabled;
-                    if (this._is_enabled) {
-                        if (this.$isArrVal(ret.types)) this._build_types(ret.types);
-                        if (this.$isArrVal(ret.alerts)) this._queue(ret.alerts);
-                    }
-                }
-            },
-            function(e) {
-                this._first = 0;
-                this._init = 0;
-                this._in_req = 0;
-                this._error('Getting user alerts failed.', e.message);
-            }
-        );
-    }
-    _is_valid(data) {
-        if (!this.$isDataObjVal(data)) return false;
-        if (this._seen.includes(data.name)) return false;
-        var user = frappe.session.user,
-        score = 0;
-        if (this.$isArrVal(data.users) && data.users.includes(user)) score++;
-        if (
-            !score
-            && this.$isArrVal(data.roles)
-            && frappe.user.has_role(data.roles)
-        ) score++;
-        if (!score) return false;
-        if (
-            this.$isArrVal(data.seen_today)
-            && data.seen_today.includes(user)
-        ) return false;
-        var seen_by = this.$isDataObj(data.seen_by) ? data.seen_by : {},
-        seen = seen_by[user] != null ? cint(seen_by[user]) : -1;
-        if (cint(data.is_repeatable) < 1 && seen > 0) return false;
-        if (seen >= cint(data.number_of_repeats)) return false;
-        return true;
-    }
-    _queue(data) {
-        if (!this.$isArr(data)) this._list.push(data);
-        else this._list.push.apply(this._list, data);
-        this._list.sort(function(a, b) {
-            return cint(b.priority) - cint(a.priority);
-        });
-        this.show();
-    }
-    _render() {
-        if (this._list.length) this._render_dialog();
-        else if (this._seen.length) this._mmark_seens();
-        return this;
-    }
-    _render_dialog() {
-        if (!this._dialog)
-            this._dialog = new AlertsDialog(this._id, 'alerts-' + this._id);
-        
-        var data = this._list.shift();
-        this._dialog
-            .setName(data.name)
-            .setTitle(data.title)
-            .setMessage(data.message)
-            .setTimeout(data.display_timeout)
-            .setSound(
-                data.display_sound,
-                data.custom_display_sound
-            )
-            .onShow(this.$fn(function() {
-                this._seen.push(this._dialog.name);
-            }))
-            .onHide(this.$fn(this._render), 200)
-            .render(this._slug(data.alert_type))
-            .show();
-    }
-    _mmark_seens() {
-        var seen = this._seen.splice(0, this._seen.length);
-        this.request(
-            'mark_seens',
-            {names: seen},
-            function(ret) {
-                if (!this.$isDataObjVal(ret)) {
-                    this._seen.push.apply(this._seen, seen);
-                    this._error('Marking alerts as seen error.', ret, seen);
-                    this._retry_mark_seens();
-                } else if (ret.error) {
-                    this._seen.push.apply(this._seen, seen);
-                    this._error('Marking alerts as seen error.', ret, seen);
-                    this._retry_mark_seens();
-                }
-            },
-            function(e) {
-                this._seen.push.apply(this._seen, seen);
-                this._error('Marking alerts as seen error.', seen, e && e.message);
-                this._retry_mark_seens();
-            }
-        );
-    }
-    _retry_mark_seens() {
-        if (!this._seen_retry) {
-            this._seen_retry++;
-            this.$timeout(this._mmark_seens, 2000);
-        } else {
-            this._seen_retry = 0;
-            this.error(this.name + ' app is currently facing a problem.');
-        }
-    }
-    _build_types(data) {
-        this._destroy_types();
-        for (var i = 0, l = data.length; i < l; i++)
-            this._styles[data[i].name] = (
-                new AlertsStyle(this._id, this._slug(data[i].name))
-            ).build(
-                data[i].background, data[i].border_color,
-                data[i].title_color, data[i].content_color,
-                data[i].dark_background, data[i].dark_border_color,
-                data[i].dark_title_color, data[i].dark_content_color
-            );
-    }
-    _destroy_types() {
-        for (var k in this._styles) {
-            try { this._styles[k].destroy(); } catch(_) {}
-            delete this._styles[k];
-        }
-    }
-    _slug(v) { return v.toLowerCase().replace(/ /g, '-'); }
-    destroy() {
-        //frappe.alerts = null;
-        //this._destroy_types();
-        //if (this._dialog) try { this._dialog.destroy(); } catch(_) {}
-        if (this._mock) try { this._mock.destroy(); } catch(_) {}
-        this._mock = null;
-        //super.destroy();
-    }
-}
-
-
-class AlertsMock extends LevelUpCore {
-    constructor() {
-        super();
-        this._id = frappe.utils.get_random(5);
-    }
-    build(data) {
-        if (!this.$isDataObjVal(data)) return this;
-        if (!this._dialog)
-            this._dialog = new AlertsDialog(this._id, 'alerts-mock-' + this._id);
-        this._dialog
-            .setTitle('Mock Alert')
-            .setMessage(data.message || 'This is a mock alert message.');
-        if (data.display_timeout)
-            this._dialog.setTimeout(data.display_timeout);
-        if (data.display_sound)
-            this._dialog.setSound(data.display_sound, data.custom_display_sound);
-        if (data.alert_type)
-            this._dialog.render(this._slug(data.alert_type));
-        else
-            this._dialog
-                .setStyle(
-                    data.background, data.border_color,
-                    data.title_color, data.content_color,
-                    data.dark_background, data.dark_border_color,
-                    data.dark_title_color, data.dark_content_color
-                )
-                .render();
-        this._dialog.show();
-        return this;
-    }
-    show() {
-        this._dialog && this._dialog.show();
-        return this;
-    }
-    hide() {
-        this._dialog && this._dialog.hide();
-        return this;
-    }
-    _slug(v) { return v.toLowerCase().replace(/ /g, '-'); }
-    destroy() {
-        this._dialog && this._dialog.destroy();
-        super.destroy();
-    }
-}
-
-
-class AlertsDialog extends LevelUpCore {
-    constructor(id, _class) {
-        super();
-        this._id = id;
-        this._class = _class;
-        this._def_class = _class;
-        this._body = null;
-        this._opts = {};
-        this._sound = {loaded: 0, playing: 0, timeout: null};
-        this.$getter('name', '');
-    }
-    setName(text) {
-        if (this.$isStrVal(text)) this._name = text;
-        return this;
-    }
-    setTitle(text, args) {
-        if (this.$isStrVal(text))
-            this._opts.title = __(text, args);
-        return this;
-    }
-    setMessage(text, args) {
-        if (this.$isStrVal(text))
-            this._message = __(text, args);
-        return this;
-    }
-    setStyle(
-        background, border, title, content,
-        dark_background, dark_border, dark_title, dark_content
-    ) {
-        if (!this._style) this._style = new AlertsStyle(this._id, this._class);
-        this._style.build(
-            background, border, title, content,
-            dark_background, dark_border, dark_title, dark_content
-        );
-        return this;
-    }
-    setTimeout(sec) {
-        if (this.$isNum(sec) && sec > 0) this._timeout = sec * 1000;
-        return this;
-    }
-    setSound(file, fallback) {
-        this.stopSound();
-        this._sound.loaded = 0;
-        if (!this.$isStrVal(file) || file === 'None') return this;
-        if (file === 'Custom') file = fallback;
-        else file = '/assets/frappe/sounds/' + file.toLowerCase() + '.mp3';
-        if (!this.$isStrVal(file)) return this;
-        if (!this.$sound) {
-            this.$sound = $('<audio>')
-                .attr({
-                    id: 'sound-' + this._id,
-                    volume: '0.2',
-                    preload: 'auto',
-                })
-                .click(function(e) {
-                    try { $(e.target).play(); } catch(_) {}
-                })
-                .hide();
-            $('body').append(this.$sound);
-        }
-        this.$sound
-            .attr('src', file)
-            .off('canplaythrough')
-            .on('canplaythrough', this.$fn(function() {
-                this._sound.loaded = 1;
-            }));
-        this.$sound[0].load();
-        return this;
-    }
-    beforeShow(fn) {
-        if (this.$isFunc(fn)) this._pre_show = this.$fn(fn);
-        return this;
-    }
-    onShow(fn, delay) {
-        if (this.$isFunc(fn)) {
-            if (!this.$isNum(delay) || delay < 1) this._on_show = this.$fn(fn);
-            else this._on_show = this.$fn(function() {
-                this.$timeout(fn, delay);
-            });
-        }
-        return this;
-    }
-    onHide(fn, delay) {
-        if (this.$isFunc(fn)) {
-            if (!this.$isNum(delay) || delay < 1) this._on_hide = this.$fn(fn);
-            else this._on_hide = this.$fn(function() {
-                this.$timeout(fn, delay);
-            });
-        }
-        return this;
-    }
-    render(clss) {
-        if (!this._dialog) {
-            this._dialog = new frappe.ui.Dialog(this._opts);
-            this._container = this._dialog.$wrapper.find('.modal-dialog').first();
-            this._container.attr('id', this._class);
-            this._body = $('<div class="alerts-message">');
-            this._dialog.modal_body.append(this._body);
-        }
-        if (!clss && this._class !== this._def_class) clss = this._def_class;
-        if (clss) {
-            this._class = clss;
-            this._container.attr('id', this._class);
-        }
-        this._body.html(this._message || '');
-        if (this._on_hide) this._dialog.onhide = this._on_hide;
-        if (this._on_show) this._dialog.on_page_show = this._on_show;
-        return this;
-    }
-    show() {
-        if (!this._dialog) return this;
-        if (this._pre_show) this._pre_show();
-        this.playSound();
-        this._dialog.show();
-        if (this._timeout)
-            this.$timeout(this.hide, this._timeout);
-        return this;
-    }
-    hide() {
-        this.stopSound();
-        this._dialog && this._dialog.hide();
-        return this;
-    }
-    playSound() {
-        if (!this.$sound) return this;
-        if (this._sound.loaded) {
-            this._sound.playing = 1;
-            this.$sound.click();
+            return a[0];
+        },
+        $fn(fn, o) { if (this.$isFunc(fn)) return fn.bind(o || this); },
+        $afn(fn, a, o) {
+            if (!this.$isFunc(fn)) return;
+            a = this.$isArrLike(a) ? this.$toArr(a) : (a != null ? [a] : a);
+            return a && a.unshift(o || this) ? fn.bind.apply(fn, a) : fn.bind(o || this);
+        },
+        $call(fn, a, o) {
+            if (!this.$isFunc(fn)) return;
+            a = a == null || this.$isArrLike(a) ? a : [a];
+            o = o || this;
+            var l = a != null && a.length;
+            return !l ? fn.call(o) : (l < 2 ? fn.call(o, a[0]) : (l < 3 ? fn.call(o, a[0], a[1])
+                : (l < 4 ? fn.call(o, a[0], a[1], a[2]) : fn.apply(o, a))));
+        },
+        $try(fn, a, o) { try { return this.$call(fn, a, o); } catch(e) { console.error(e.message, e.stack); } },
+        $xtry(fn, a, o) { return this.$afn(this.$try, [fn, a, o]); },
+        $timeout(fn, tm, a, o) {
+            return tm != null ? setTimeout(this.$afn(fn, a, o), tm) : ((fn && clearTimeout(fn)) || this);
+        },
+        $proxy(fn, tm) {
+            return {
+                _fn(a, d) { this.cancel() || (d ? (this._r = LU.$timeout(fn, tm, a)) : LU.$call(fn, a)); },
+                call() { this._fn(arguments); },
+                delay() { this._fn(arguments, 1); },
+                cancel() { LU.$timeout(this._r); delete this._r; },
+            };
+        },
+        $def(v, o) { return this.$ext(v, o, 0); },
+        $xdef(v, o) { return this.$ext(v, o, 0, 1); },
+        $static(v, o) { return this.$ext(v, o, 1); },
+        $ext(v, o, s, e) {
+            for (var k in v) { this.$hasProp(k, v) && this.$getter(k, v[k], s, e, o); }
+            return this;
+        },
+        $getter(k, v, s, e, o) {
+            o = o || this;
+            if (!s && k[0] === '_') k = k.substring(1);
+            if (!s) o['_' + k] = v;
+            if (s || (e && o[k] == null)) Object.defineProperty(o, k, s ? {value: v} : {get() { return this['_' + k]; }});
+            return this;
+        },
+        $getElem(k) { return document.getElementById(k); },
+        $makeElem(t, o) {
+            t = document.createElement(t);
+            if (o) for (var k in o) { if (this.$hasProp(k, o)) t[k] = o[k]; }
+            return t;
+        },
+        $loadJs(s, o) {
+            o = this.$assign(o || {}, {src: s, type: 'text/javascript', 'async': true});
+            document.getElementsByTagName('body')[0].appendChild(this.$makeElem('script', o));
+            return this;
+        },
+        $loadCss(h, o) {
+            o = this.$assign(o || {}, {href: h, type: 'text/css', rel: 'stylesheet', 'async': true});
+            document.getElementsByTagName('head')[0].appendChild(this.$makeElem('link', o));
+            return this;
+        },
+        $load(c, o) {
+            o = this.$assign(o || {}, {innerHTML: c, type: 'text/css'});
+            document.getElementsByTagName('head')[0].appendChild(this.$makeElem('style', o));
             return this;
         }
-        this.stopSound();
-        this._sound.timeout = this.$timeout(this.playSound, 200);
-        return this;
+    };
+    
+    
+    class LevelUpCore {
+        destroy() { for (var k in this) { if (this.$hasProp(k)) delete this[k]; } }
     }
-    stopSound() {
-        if (this._sound.timeout) this.$timeout(this._sound.timeout);
-        this._sound.timeout = null;
-        if (this.$sound && this._sound.playing)
-            try { this.$sound[0].stop(); } catch(_) {}
-        this._sound.playing = 0;
-        return this;
-    }
-    reset() {
-        this.hide();
-        this.$sound && this.$sound.off('canplaythrough');
-        this._sound.loaded = this._sound.playing = 0;
-    }
-    destroy() {
-        this.reset();
-        if (this._dialog) {
-            this._body.remove();
-            try { this._dialog.$wrapper.modal('destroy'); } catch(_) {}
-            this._dialog.$wrapper.remove();
+    LU.$extend(LevelUpCore.prototype, LU);
+    frappe.LevelUpCore = LevelUpCore;
+    
+    
+    class LevelUpBase extends LevelUpCore {
+        constructor(mod, key, doc, ns, prod) {
+            super();
+            this._mod = mod;
+            this._key = key;
+            this._tmp = '_' + this._key;
+            this._doc = new RegExp('^' + doc);
+            this._real = this._key + '_';
+            this._pfx = '[' + this._key.toUpperCase() + ']';
+            this._ns = ns + (!ns.endsWith('.') ? '.' : '');
+            this._prod = prod;
+            this._events = {
+                list: {},
+                real: {},
+                once: 'ready page_change page_clean destroy after_destroy'.split(' ')
+            };
         }
-        if (this._style) this._style.destroy();
-        if (this.$sound) this.$sound.remove();
-        super.destroy();
+        get module() { return this._mod; }
+        get key() { return this._key; }
+        $alert(t, m, i, x) {
+            m == null && (m = t) && (t = this._mod);
+            t = this.$assign({title: t, indicator: i}, this.$isBaseObj(m) ? m : {message: m, as_list: this.$isArr(m)});
+            this.call('on_alert', t, x);
+            (x === 'fatal' && (this._err = 1) ? frappe.throw : frappe.msgprint)(t);
+            return this;
+        }
+        debug(t, m) { return this._prod ? this : this.$alert(t, m, 'gray', 'debug'); }
+        log(t, m) { return this._prod ? this : this.$alert(t, m, 'cyan', 'log'); }
+        info(t, m) { return this.$alert(t, m, 'light-blue', 'info'); }
+        warn(t, m) { return this.$alert(t, m, 'orange', 'warn'); }
+        error(t, m) { return this.$alert(t, m, 'red', 'error'); }
+        fatal(t, m) { return this.$alert(t, m, 'red', 'fatal'); }
+        $toast(m, i, s, a) {
+            this.$isBaseObj(s) && (a = s) && (s = 0);
+            frappe.show_alert(this.$assign({indicator: i}, this.$isBaseObj(m) ? m : {message: m}), s || 4, a);
+            return this;
+        }
+        success_(m, s, a) { return this.$toast(m, 'green', s, a); }
+        info_(m, s, a) { return this.$toast(m, 'blue', s, a); }
+        warn_(m, s, a) { return this.$toast(m, 'orange', s, a); }
+        error_(m, s, a) { return this.$toast(m, 'red', s, a); }
+        $console(fn, a) {
+            if (this._prod) return this;
+            !this.$isStr(a[0]) ? Array.prototype.unshift.call(a, this._pfx)
+                : (a[0] = (this._pfx + ' ' + a[0]).trim());
+            (console[fn] || console.log).apply(null, a);
+            return this;
+        }
+        _debug() { return this.$console('debug', arguments); }
+        _log() { return this.$console('log', arguments); }
+        _info() { return this.$console('info', arguments); }
+        _warn() { return this.$console('warn', arguments); }
+        _error() { return this.$console('error', arguments); }
+        ajax(u, o, s, f) {
+            o = this.$extend(1, {
+                url: u, method: 'GET', cache: false, 'async': true, crossDomain: true,
+                headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                success: this.$fn(s),
+                error: this.$fn(function(r, t) {
+                    r = this.$isStrVal(r) ? __(r) : (this.$isStrVal(t) ? __(t)
+                        : __('The ajax request sent raised an error.'));
+                    (f = this.$fn(f)) ? f({message: r}) : this._error(r);
+                })
+            }, o);
+            if (o.contentType == null)
+                o.contentType = 'application/' + (o.method == 'post' ? 'json' : 'x-www-form-urlencoded') + '; charset=utf-8';
+            this.call('on_ajax', o);
+            try { $.ajax(o); } catch(e) {
+                (f = this.$fn(f)) ? f(e) : this._error(e.message);
+                if (this._err) throw e;
+            } finally { this._err = 0; }
+            return this;
+        }
+        get_method(v) { return this._ns + v; }
+        request(m, a, s, f) {
+            s = this.$fn(s);
+            f = this.$fn(f);
+            var d = {
+                method: m.includes('.') ? m : this.get_method(m),
+                callback: this.$fn(function(r) {
+                    r = (this.$isBaseObj(r) && r.message) || r;
+                    if (!this.$isBaseObj(r) || !r.error) return s && s(r);
+                    if (!this.$isBaseObj(r)) r = {};
+                    var k = ['list', 'message', 'error', 'self'],
+                    m = (this.$isArrVal(r[k[0]]) ? this.$map(r[k[0]], function(v) { return __(v); }).join('\n')
+                        : (this.$isStrVal(r[k[1]]) ? __(r[k[1]])
+                        : (this.$isStrVal(r[k[2]]) ? __(r[k[2]]) : '')));
+                    if (!m.trim().length) m = __('The request sent returned an invalid response.');
+                    if (f) r = this.$assign({message: m, self: 1}, this.$filter(r, function(_, x) { return !k.includes(x); }));
+                    f ? f(r) : this._error(m);
+                }),
+                error: this.$fn(function(r, t) {
+                    r = this.$isStrVal(r) ? __(r) : (this.$isStrVal(t) ? __(t) : __('The request sent raised an error.'));
+                    f ? f({message: r}) : this._error(r);
+                })
+            };
+            this.$isBaseObj(a) && this.call('on_request', a);
+            this.$isBaseObjVal(a) && this.$assign(d, {type: 'POST', args: a});
+            try { frappe.call(d); } catch(e) {
+                f ? f(e) : this._error(e.message);
+                if (this._err) throw e;
+            } finally { this._err = 0; }
+            return this;
+        }
+        on(e, fn)  { return this._on(e, fn); }
+        xon(e, fn)  { return this._on(e, fn, 0, 1); }
+        once(e, fn) { return this._on(e, fn, 1); }
+        xonce(e, fn) { return this._on(e, fn, 1, 1); }
+        real(e, fn, n) { return this._on(e, fn, n, 0, 1); }
+        xreal(e, fn, n) { return this._on(e, fn, n, 1, 1); }
+        off(e, fn, rl) {
+            if (e == null) return this._off();
+            if (this.$isBoolLike(e)) return this._off(0, 1);
+            e = e.trim().split(' ');
+            for (var i = 0, l = e.length, ev; i < l; i++)
+                (ev = (rl ? this._real : '') + e[i]) && this._events.list[ev] && this._off(ev, fn);
+            return this;
+        }
+        emit(e) {
+            e = e.trim().split(' ');
+            for (var a = this.$toArr(arguments, 1), p = Promise.resolve(), i = 0, l = e.length; i < l; i++)
+                this._events.list[e[i]] && this._emit(e[i], a, p);
+            return this;
+        }
+        call(e) {
+            e = e.trim().split(' ');
+            for (var a = this.$toArr(arguments, 1), i = 0, l = e.length; i < l; i++)
+                this._events.list[e[i]] && this._emit(e[i], a);
+            return this;
+        }
+        _on(ev, fn, o, s, r) {
+            ev = ev.trim().split(' ');
+            var rd = [];
+            for (var es = this._events, i = 0, l = ev.length, e; i < l; i++) {
+                e = (r ? this._real : '') + ev[i];
+                e === es.once[0] && this._is_ready && rd.push(es.once[0]);
+                es.once.includes(e) && (o = 1);
+                !es.list[e] && (es.list[e] = []) && (!r || frappe.realtime.on(e, (es.real[e] = this._rfn(e))));
+                es.list[e].push({f: fn, o, s});
+            }
+            return rd.length ? this.emit(rd.join(' ')) : this;
+        }
+        _rfn(e) {
+            return this.$fn(function(r) {
+                (r = (this.$isBaseObj(r) && r.message) || r) && this._emit(e, r != null ? [r] : r, Promise.wait(300));
+            });
+        }
+        _off(e, fn) {
+            if (e && fn) this._del(e, fn);
+            else if (!e && fn) for (var ev in this._events.list) { this._del(ev); }
+            else {
+                var es = this._events;
+                es.real[e] && frappe.realtime.off(e, es.real[e]);
+                delete es.list[e];
+                delete es.real[e];
+            }
+            return this;
+        }
+        _del(e, fn) {
+            var ev = this._events.list[e].slice(), ret = [];
+            for (var x = 0, i = 0, l = ev.length; i < l; i++)
+                (fn ? ev[i].f !== fn : ev[i].s) && (ret[x++] = ev[i]);
+            !ret.length ? this._off(e) : (this._events.list[e] = ret);
+        }
+        _emit(e, a, p) {
+            var ev = this._events.list[e].slice(), ret = [];
+            p && p.catch(this.$fn(function(z) { this._error('Events emit', e, a, z.message); }));
+            for (var x = 0, i = 0, l = ev.length; i < l; i++) {
+                p ? p.then(this.$xtry(ev[i].f, a)) : this.$try(ev[i].f, a);
+                !ev[i].o && (ret[x++] = ev[i]);
+            }
+            !ret.length ? this._off(e) : (this._events.list[e] = ret);
+        }
     }
-}
+    
+    
+    var LUR = {
+        on(o) {
+            for (var k = ['router', 'route'], i = 0, l = k.length; i < l; i++)
+                (o._router.obj = frappe[k[i]]) && (i < 1 || (o._router.old = 1));
+            this._reg(o, 'on');
+            this.get(o);
+        },
+        off(o) { this._reg(o, 'off'); o._router.obj = o._router.old = null; },
+        get(o) {
+            var d = ['app'], v;
+            try { v = !o._router.old ? frappe.get_route() : (o._router.obj ? o._router.obj.parse() : null); } catch(_) {}
+            v = LU.$isArrVal(v) ? LU.$filter(LU.$map(v, function(z) { return (z = cstr(z).trim()).length && !/(\#|\?|\&)$/.test(z) ? z : null; })) : d;
+            if (v.length) v[0] = v[0].toLowerCase();
+            var r = 0;
+            for (var i = 0, l = v.length; i < l; i++)
+                if ((!o._router.val || o._router.val.indexOf(v[i]) !== i) && ++r) break;
+            if (r) o._router.val = v;
+            return r > 0;
+        },
+        _reg(o, a) {
+            o._router.obj && LU.$isFunc(o._router.obj[a]) && o._router.obj[a]('change', o._win.e.change);
+        },
+    },
+    LUF = {
+        has_flow(f) { try { return f && !f.is_new() && f.states && !!f.states.get_state(); } catch(_) {} },
+        is_field(f) { return f && f.df && !/^((Tab|Section|Column) Break|Table)$/.test(f.df.fieldtype); },
+        is_table(f) { return f && f.df && f.df.fieldtype === 'Table'; },
+    },
+    LUC = {
+        get(f, k, g, r, c, d) {
+            try {
+                f = f.get_field(k);
+                if (g || r != null) f = f.grid;
+                if (r != null) f = f.get_row(r);
+                if (c) f = (r != null && d && f.grid_form.fields_dict[c]) || f.get_field(c);
+                return f;
+            } catch(_) {}
+        },
+        reload(f, k, r, c) {
+            if (r != null && !c) {
+                try { (LU.$isNum(r) || LU.$isStrVal(r)) && (f = this.get(f, k, 1)) && f.refresh_row(r); } catch(_) {}
+                return;
+            }
+            if (r != null && c) {
+                if (!LU.$isStrVal(c) || !(f = this.get(f, k, 1, r))) return;
+                try {
+                    (r = f.on_grid_fields_dict[c]) && r.refresh && r.refresh();
+                    (r = f.grid_form && f.grid_form.refresh_field) && r(c);
+                } catch(_) {}
+                return;
+            }
+            if (!c) {
+                try { LU.$isStrVal(k) && f.refresh_field && f.refresh_field(k); } catch(_) {}
+                return;
+            }
+            if (!LU.$isStrVal(c) || !(f = this.get(f, k, 1)) || !LU.$isArrVal(f.grid_rows)) return;
+            try {
+                for (var i = 0, l = f.grid_rows, x; i < l; i++) {
+                    r = f.grid_rows[i];
+                    (x = r.on_grid_fields_dict[c]) && x.refresh && x.refresh();
+                    (x = r.grid_form && r.grid_form.refresh_field) && x(c);
+                }
+            } catch(_) {}
+        },
+        prop(f, k, g, r, c, p, v) {
+            if (LU.$isBaseObj(k)) for (var x in k) { this.prop(f, x, g, r, c, k[x]); }
+            else if (LU.$isBaseObj(c)) for (var x in c) { this.prop(f, k, g, r, x, c[x]); }
+            else {
+                (g || r != null) && (f = this.get(f, k, g, r)) && (k = c);
+                var m = r != null ? 'set_field_property' : (g ? 'update_docfield_property' : 'set_df_property');
+                try {
+                    if (!LU.$isBaseObj(p)) f[m](k, p, v);
+                    else for (var x in p) { f[m](k, x, p[x]); }
+                    g && r == null && f.debounced_refresh();
+                } catch(_) {}
+            }
+        },
+        toggle(f, k, g, r, c, e, i) {
+            var tf = this.get(f, k, g, r, c, 1);
+            e = e ? 0 : 1;
+            if (!tf || !tf.df || cint(tf.df.hidden) || (i && tf.df._ignore) || cint(tf.df.read_only) === e) return;
+            this.prop(f, k, g, r, c, 'read_only', e);
+            try {
+                tf.df.translatable && tf.$wrapper
+                && (tf = tf.$wrapper.find('.clearfix .btn-translation')) && tf.hidden(e ? 0 : 1);
+            } catch(_) {}
+        },
+        get_desc(f, k, g, r, c, b) {
+            k && (f = this.get(f, k, g, r, c, 1));
+            return cstr((f && f.df && ((b && f.df._description) || (!b && f.df.description))) || '');
+        },
+        desc(f, k, g, r, c, m) {
+            var x = 0;
+            k && (f = this.get(f, k, g, r, c, 1));
+            if (f.df._description == null) f.df._description = f.df.description || '';
+            if (!LU.$isStr(m)) m = '';
+            try {
+                if (m.length && f.set_new_description) ++x && f.set_new_description(m);
+                else if (f.set_description) {
+                    if (!m.length) { m = f.df._description || ''; delete f.df._description; }
+                    ++x && f.set_description(m);
+                }
+                f.toggle_description && f.toggle_description(m.length > 0);
+            } catch(_) {}
+            return x;
+        },
+        status(f, k, g, r, c, m) {
+            var v = LU.$isStrVal(m), tf = this.get(f, k, g, r, c, 1), x = 0;
+            if ((!v && tf.df.invalid) || (v && !tf.df.invalid))
+                try {
+                    ++x && ((tf.df.invalid = v ? 1 : 0) || 1) && tf.set_invalid && tf.set_invalid();
+                } catch(_) {}
+            this.desc(tf, 0, 0, null, 0, m) && x++;
+            x && this.reload(f, k, r, c);
+        },
+    },
+    LUT = {
+        setup(f, k) {
+            cint(k.df.read_only) && (k.df._ignore = 1);
+            for (var ds = this._fields(this._grid(f, k.df.fieldname)), i = 0, l = ds.length, d; i < l; i++)
+                (d = ds[i]) && cint(d.read_only) && (d._ignore = 1);
+        },
+        toggle(f, k, e, o, i) {
+            var tf = this._grid(f, k, i), x;
+            if (!tf) return;
+            x = !e || !!tf._;
+            x && (!o || !o.add) && this.toggle_add(tf, 0, e);
+            x && (!o || !o.del) && this.toggle_del(tf, 0, e);
+            x && (!o || !o.edit) && this.toggle_edit(tf, 0, o && o.keep, e);
+            x && (!o || !o.sort) && this.toggle_sort(tf, 0, e);
+            LUC.reload(f, k);
+            x && (!o || !o.del) && this.toggle_check(tf, 0, e);
+            if (e && tf._) delete tf._;
+        },
+        toggle_add(f, k, e) {
+            var tf = k ? this._grid(f, k) : f;
+            if (!tf) return;
+            if (e) {
+                (!tf._ || tf._.add != null) && (tf.df.cannot_add_rows = tf._ ? tf._.add : false);
+                if (k && tf._) delete tf._.add;
+            } else {
+                (tf._ = tf._ || {}) && tf._.add == null && (tf._.add = tf.df.cannot_add_rows);
+                tf.df.cannot_add_rows = true;
+            }
+            k && LUC.reload(f, k);
+            return 1;
+        },
+        toggle_del(f, k, e) {
+            var tf = k ? this._grid(f, k) : f;
+            if (!tf) return;
+            if (e) {
+                (!tf._ || tf._.del != null) && (tf.df.cannot_delete_rows = tf._ ? tf._.del : false);
+                if (k && tf._) delete tf._.del;
+            } else {
+                (tf._ = tf._ || {}) && tf._.del == null && (tf._.del = tf.df.cannot_delete_rows);
+                tf.df.cannot_delete_rows = true;
+            }
+            k && LUC.reload(f, k);
+            k && this.toggle_check(tf, 0, e);
+            return 1;
+        },
+        toggle_edit(f, k, g, e) {
+            var tf = k ? this._grid(f, k) : f;
+            if (!tf) return;
+            if (e) {
+                (!tf._ || tf._.edit != null) && (tf.df.in_place_edit = tf._ ? tf._.edit : true);
+                tf._ && tf._.grid != null && tf.meta && (tf.meta.editable_grid = tf._.grid);
+                (!tf._ || tf._.static != null) && (tf.static_rows = tf._ ? tf._.static : false);
+                if (tf._ && tf._.read && tf._.read.length) {
+                    for (var ds = this._fields(tf), i = 0, l = ds.length, d; i < l; i++)
+                        (d = ds[i]) && !d._ignore && tf._.read.includes(d.fieldname) && (d.read_only = 0);
+                }
+                if (k && tf._) for (var x = ['edit', 'grid', 'static', 'read'], i = 0; i < 4; i++) { delete tf._[x[i]]; }
+                k && LUC.reload(f, k);
+                return 1;
+            }
+            (tf._ = tf._ || {}) && tf._.edit == null && (tf._.edit = tf.df.in_place_edit);
+            tf.df.in_place_edit = false;
+            tf.meta && tf._.grid == null && (tf._.grid = tf.meta.editable_grid);
+            tf.meta && (tf.meta.editable_grid = false);
+            tf._.static == null && (tf._.static = tf.static_rows);
+            tf.static_rows = true;
+            tf._.read == null && (tf._.read = []);
+            for (var ds = this._fields(tf), i = 0, x = 0, l = ds.length, d; i < l; i++)
+                (d = ds[i]) && !d._ignore && !tf._.read.includes(d.fieldname)
+                && (!g || !g.includes(d.fieldname)) && (d.read_only = 1)
+                && (tf._.read[x++] = d.fieldname);
+            k && LUC.reload(f, k);
+            return 1;
+        },
+        toggle_sort(f, k, e) {
+            var tf = k ? this._grid(f, k) : f;
+            if (!tf) return;
+            if (e) {
+                (!tf._ || tf._.sort != null) && (tf.sortable_status = tf._ ? tf._.sort : true);
+                if (k && tf._) delete tf._.sort;
+            } else {
+                (tf._ = tf._ || {}) && tf._.sort == null && (tf._.sort = tf.sortable_status);
+                tf.sortable_status = false;
+            }
+            k && LUC.reload(f, k);
+            return 1;
+        },
+        toggle_check(f, k, e) {
+            var tf = k ? this._grid(f, k) : f;
+            if (!tf) return;
+            if (e) {
+                (!tf._ || tf._.check) && tf.toggle_checkboxes(1);
+                if (k && tf._) delete tf._.check;
+            } else {
+                (tf._ = tf._ || {}) && (tf._.check = 1) && tf.toggle_checkboxes(0);
+            }
+            return 1;
+        },
+        _grid(f, k, i) {
+            return ((!k && (f = f.grid)) || (f = LUC.get(f, k, 1))) && !cint(f.df.hidden) && (!i || !f.df._ignore) && f;
+        },
+        _fields(f) {
+            var ds = [];
+            if (LU.$isArrVal(f.grid_rows)) {
+                for (var i = 0, l = f.grid_rows.length, r; i < l; i++)
+                    (r = f.grid_rows[i]) && LU.$isArrVal(r.docfields) && ds.push.apply(ds, r.docfields);
+            }
+            LU.$isArrVal(f.docfields) && ds.push.apply(ds, f.docfields);
+            return ds;
+        },
+    };
+    
+    
+    class LevelUp extends LevelUpBase {
+        constructor(mod, key, doc, ns, prod) {
+            super(mod, key, doc, ns, prod);
+            this.$xdef({is_enabled: true});
+            this._router = {obj: null, old: 0, val: null};
+            this._win = {
+                e: {
+                    unload: this.$fn(this.destroy),
+                    change: this.$fn(function() { !this._win.c && this._win.fn(); }),
+                },
+                c: 0,
+                fn: this.$fn(function() {
+                    if (this._win.c || !LUR.get(this)) return;
+                    this._win.c++;
+                    this.emit('page_change page_clean');
+                    this.$timeout(function() { this._win.c--; }, 2000);
+                }),
+            };
+            addEventListener('beforeunload', this._win.e.unload);
+            LUR.on(this);
+        }
+        options(opts) { return this.$static(opts); }
+        destroy() {
+            this._win.fn.cancel();
+            LUR.off(this);
+            removeEventListener('beforeunload', this._win.e.unload);
+            this.emit('page_clean destroy after_destroy').off(1);
+            super.destroy();
+        }
+        route(i) { return this._router.val[i] || this._router.val[0]; }
+        get is_list() { return this.route(0) === 'list'; }
+        get is_tree() { return this.route(0) === 'tree'; }
+        get is_form() { return this.route(0) === 'form'; }
+        get is_self() { return this._doc.test(this.route(1)); }
+        is_doctype(v) { return this.route(1) === v; }
+        _is_self_view(f) { return this._doc.test((f && f.doctype) || this.route(1)); }
+        get_list(f) { return this.$isObjLike((f = f || cur_list)) ? f : null; }
+        get_tree(f) { return this.$isObjLike((f = f || cur_tree)) ? f : null; }
+        get_form(f) { return this.$isObjLike((f = f || cur_frm)) ? f : null; }
+        get app_disabled_note() { return __('{0} app is disabled.', [this._mod]); }
+        setup_list(f) {
+            if (!this.is_list || !(f = this.get_list(f)) || !this._is_self_view(f)) return this;
+            var n = !f[this._tmp];
+            if (this._is_enabled) this.enable_list(f);
+            else this.disable_list(f, this.app_disabled_note);
+            n && this.off('page_clean').once('page_clean', function() { this.enable_list(f); });
+            return this;
+        }
+        enable_list(f) {
+            if (!(f = this.get_list(f)) || (f[this._tmp] && !f[this._tmp].disabled)) return this;
+            var k = 'toggle_actions_menu_button';
+            f[this._tmp] && f[this._tmp][k] && (f[k] = f[this._tmp][k]);
+            f.page.clear_inner_toolbar();
+            f.set_primary_action();
+            delete f[this._tmp];
+            return this;
+        }
+        disable_list(f, m) {
+            if (!(f = this.get_list(f)) || (f[this._tmp] && f[this._tmp].disabled)) return this;
+            f.page.hide_actions_menu();
+            f.page.clear_primary_action();
+            f.page.clear_inner_toolbar();
+            m && f.page.add_inner_message(m).removeClass('text-muted').addClass('text-danger');
+            var k = 'toggle_actions_menu_button';
+            !f[this._tmp] && (f[this._tmp] = {});
+            (f[this._tmp][k] = f[k]) && (f[k] = function() {}) && (f[this._tmp].disabled = 1);
+            return this;
+        }
+        setup_tree(f) {
+            if (!this.is_tree || !(f = this.get_tree(f)) || !this._is_self_view(f)) return this;
+            var n = !f[this._tmp];
+            if (this._is_enabled) this.enable_tree(f);
+            else this.disable_tree(f, this.app_disabled_note);
+            n && this.$xdef({tree: f}).off('page_clean').once('page_clean', function() { this.$xdef({tree: null}).enable_tree(f); });
+            return this;
+        }
+        enable_tree(f) {
+            if (!(f = this.get_tree(f)) || (f[this._tmp] && !f[this._tmp].disabled)) return this;
+            var k = 'can_create';
+            f[this._tmp] && f[this._tmp][k] && (f[k] = f[this._tmp][k]);
+            f.page.clear_inner_toolbar();
+            f.set_primary_action();
+            delete f[this._tmp];
+            f.refresh();
+            return this;
+        }
+        disable_tree(f, m) {
+            if (!(f = this.get_tree(f)) || (f[this._tmp] && f[this._tmp].disabled)) return this;
+            f.page.hide_actions_menu();
+            f.page.clear_primary_action();
+            f.page.clear_inner_toolbar();
+            m && f.page.add_inner_message(m).removeClass('text-muted').addClass('text-danger');
+            var k = 'can_create';
+            !f[this._tmp] && (f[this._tmp] = {});
+            (f[this._tmp][k] = f[k]) && (f[k] = false) && (f[this._tmp].disabled = 1);
+            f.refresh();
+            return this;
+        }
+        setup_form(f) {
+            if (!this.is_form || !(f = this.get_form(f)) || !this._is_self_view(f)) return this;
+            var n = !f[this._tmp];
+            if (n && this.$isArrVal(f.fields))
+                try {
+                    for (var i = 0, l = f.fields.length, c; i < l; i++) {
+                        if (!(c = f.fields[i])) continue;
+                        if (LUF.is_table(c)) LUT.setup(f, c);
+                        else if (LUF.is_field(c) && cint(c.df.read_only)) c.df._ignore = 1;
+                    }
+                } catch(_) {}
+            if (this._is_enabled) this.enable_form(f);
+            else this.disable_form(f, {message: this.app_disabled_note});
+            n && this.off('page_clean').once('page_clean', function() { this.enable_form(f); });
+            return this;
+        }
+        enable_form(f) {
+            if (!(f = this.get_form(f)) || (f[this._tmp] && !f[this._tmp].disabled)) return this;
+            try {
+                if (this.$isArrVal(f.fields))
+                    for (var i = 0, l = f.fields.length, c; i < l; i++) {
+                        if (!(c = f.fields[i]) || !c.df.fieldname) continue;
+                        if (LUF.is_table(c)) LUT.toggle(f, c.df.fieldname, 1, 0, 1);
+                        else if (LUF.is_field(c)) LUC.toggle(f, c.df.fieldname, 0, null, 0, 1, 1);
+                    }
+                LUF.has_flow(f) ? f.page.show_actions_menu() : f.enable_save();
+                f.set_intro();
+            } catch(e) { this._error('Enable form', e.message, e.stack); }
+            finally {
+                delete f[this._tmp];
+                this.emit('form_enabled', f);
+            }
+            return this;
+        }
+        disable_form(f, o) {
+            if (!(f = this.get_form(f)) || (f[this._tmp] && f[this._tmp].disabled)) return this;
+            o = this.$assign({ignore: []}, o);
+            try {
+                if (this.$isArrVal(f.fields))
+                    for (var i = 0, l = f.fields.length, c; i < l; i++) {
+                        if (!(c = f.fields[i]) || !c.df.fieldname || o.ignore.includes(c.df.fieldname)) continue;
+                        if (LUF.is_table(c)) LUT.toggle(f, c.df.fieldname, 0, 0, 1);
+                        else if (LUF.is_field(c)) LUC.toggle(f, c.df.fieldname, 0, null, 0, 0, 1);
+                    }
+                LUF.has_flow(f) ? f.page.hide_actions_menu() : f.disable_save();
+                if (o.message) f.set_intro(o.message, o.color || 'red');
+            } catch(e) { this._error('Disable form', e.message, e.stack); }
+            finally {
+                (f[this._tmp] || (f[this._tmp] = {})) && (f[this._tmp].disabled = 1);
+                this.emit('form_disabled', f);
+            }
+            return this;
+        }
+        get_field(f, k) { if ((f = this.get_form(f))) return LUC.get(f, k); }
+        get_grid(f, k) { if ((f = this.get_form(f))) return LUC.get(f, k, 1); }
+        get_tfield(f, k, c) { if ((f = this.get_form(f))) return LUC.get(f, k, 1, null, c); }
+        get_row(f, k, r) { if ((f = this.get_form(f))) return LUC.get(f, k, 1, r); }
+        get_rfield(f, k, r, c) { if ((f = this.get_form(f))) return LUC.get(f, k, 1, r, c); }
+        get_rmfield(f, k, r, c) { if ((f = this.get_form(f))) return LUC.get(f, k, 1, r, c, 1); }
+        reload_field(f, k) {
+            (f = this.get_form(f)) && LUC.reload(f, k);
+            return this;
+        }
+        reload_tfield(f, k, c) {
+            (f = this.get_form(f)) && LUC.reload(f, k, null, c);
+            return this;
+        }
+        reload_row(f, k, r) {
+            (f = this.get_form(f)) && LUC.reload(f, k, r);
+            return this;
+        }
+        reload_rfield(f, k, r, c) {
+            (f = this.get_form(f)) && LUC.reload(f, k, r, c);
+            return this;
+        }
+        field_prop(f, k, p, v) {
+            (f = this.get_form(f)) && LUC.prop(f, k, 0, null, 0, p, v);
+            return this;
+        }
+        tfield_prop(f, k, c, p, v) {
+            (f = this.get_form(f)) && LUC.prop(f, k, 1, null, c, p, v);
+            return this;
+        }
+        rfield_prop(f, k, r, c, p, v) {
+            (f = this.get_form(f)) && LUC.prop(f, k, 1, r, c, p, v);
+            return this;
+        }
+        toggle_field(f, k, e) {
+            (f = this.get_form(f)) && LUC.toggle(f, k, 0, null, 0, e);
+            return this;
+        }
+        toggle_table(f, k, e, o) {
+            (f = this.get_form(f)) && LUT.toggle(f, k, e ? 1 : 0, o);
+            return this;
+        }
+        toggle_tfield(f, k, c, e) {
+            (f = this.get_form(f)) && LUC.toggle(f, k, 1, null, c, e);
+            return this;
+        }
+        toggle_rfield(f, k, r, c, e) {
+            (f = this.get_form(f)) && LUC.toggle(f, k, 1, r, c, e);
+            return this;
+        }
+        table_add(f, k, e) {
+            (f = this.get_form(f)) && LUT.toggle_add(f, k, e ? 1 : 0);
+            return this;
+        }
+        table_edit(f, k, i, e) {
+            if (!this.$isArrVal(i)) {
+                if (e == null) e = i;
+                i = null;
+            }
+            (f = this.get_form(f)) && LUT.toggle_edit(f, k, i, e ? 1 : 0);
+            return this;
+        }
+        table_del(f, k, e) {
+            (f = this.get_form(f)) && LUT.toggle_del(f, k, e ? 1 : 0);
+            return this;
+        }
+        table_sort(f, k, e) {
+            (f = this.get_form(f)) && LUT.toggle_sort(f, k, e ? 1 : 0);
+            return this;
+        }
+        field_view(f, k, s) { return this.field_prop(f, k, 'hidden', s ? 0 : 1); }
+        tfield_view(f, k, c, s) { return this.tfield_prop(f, k, c, 'hidden', s ? 0 : 1); }
+        rfield_view(f, k, r, c, s) { return this.rfield_prop(f, k, r, c, 'hidden', s ? 0 : 1); }
+        field_desc(f, k, m) {
+            (f = this.get_form(f)) && LUC.desc(f, k, 0, null, 0, m);
+            return this;
+        }
+        tfield_desc(f, k, c, m) {
+            (f = this.get_form(f)) && LUC.desc(f, k, 1, null, c, m);
+            return this;
+        }
+        rfield_desc(f, k, r, c, m) {
+            (f = this.get_form(f)) && LUC.desc(f, k, 1, r, c, m);
+            return this;
+        }
+        get_field_desc(f, k, b) {
+            return ((f = this.get_form(f)) && LUC.get_desc(f, k, 0, null, 0, b)) || '';
+        }
+        get_tfield_desc(f, k, c, b) {
+            return ((f = this.get_form(f)) && LUC.get_desc(f, k, 1, null, c, b)) || '';
+        }
+        get_rfield_desc(f, k, r, c, b) {
+            return ((f = this.get_form(f)) && LUC.get_desc(f, k, 1, r, c, b)) || '';
+        }
+        field_status(f, k, m) {
+            (f = this.get_form(f)) && LUC.status(f, k, 0, null, 0, m);
+            return this;
+        }
+        tfield_status(f, k, c, m) {
+            (f = this.get_form(f)) && LUC.status(f, k, 1, null, c, m);
+            return this;
+        }
+        rfield_status(f, k, r, c, m) {
+            (f = this.get_form(f)) && LUC.status(f, k, 1, r, c, m);
+            return this;
+        }
+    }
 
 
-class AlertsStyle extends LevelUpCore {
-    constructor(id, _class) {
-        super();
-        this._id = 'style-' + id;
-        this._class = _class;
-        this._dom = document.getElementById(this._id);
-        if (!this._dom) {
-            this._dom = document.createElement('style');
-            this._dom.id = this._id;
-            this._dom.type = 'text/css';
-            document.getElementsByTagName('head')[0].appendChild(this._dom);
+    class Alerts extends LevelUp {
+        constructor() {
+            super(__('Alerts'), 'alerts', 'Alert', 'alerts.utils', 0);
+            this.$xdef({
+                id: frappe.utils.get_random(5),
+                is_ready: 0,
+                is_enabled: 0,
+                use_fallback_sync: 0,
+                fallback_sync_delay: 5,
+            });
+            this._dialog = null;
+            this._is_init = 0;
+            this._is_first = 1;
+            this._in_req = 0;
+            this._styles = {};
+            this._list = [];
+            this._seen = [];
+            this._mock = null;
+            
+            this.request('get_settings', null, this._setup);
+        }
+        get has_alerts() { return this._list.length > 0; }
+        get _has_seen() { return this._seen.length > 0; }
+        mock() { return (this._mock || (this._mock = new AlertsMock())).show(); }
+        show() { return this.has_alerts ? this._render() : this; }
+        _setup(opts) {
+            this._is_ready = 1;
+            this._options(opts);
+            this.xon('page_change', function() {
+                this._is_enabled && this._init();
+            })
+            .xreal('status_changed', function(ret, sync) {
+                if (!this.$isBaseObj(ret)) return this._error('Invalid status change event data.', ret);
+                var old = this._is_enabled;
+                this._options(ret);
+                if (this._is_enabled !== old) this.emit('change');
+                this._is_enabled && !sync && this._init();
+                if (!sync) this._queue_sync();
+            })
+            .xreal('type_changed', function(ret) {
+                this._debug('real type_changed', ret);
+                if (!this.$isDataObjVal(ret)) return;
+                var name = cstr(ret.name);
+                if (cstr(ret.action) === 'trash') {
+                    delete this._types[name];
+                    delete this._styles[name];
+                } else {
+                    this._types[name] = {
+                        name: name,
+                        priority: cint(ret.priority),
+                        timeout: cint(ret.display_timeout),
+                        sound: cstr(ret.display_sound),
+                        custom_sound: cstr(ret.custom_display_sound)
+                    };
+                    if (!this._styles[name])
+                        this._styles[name] = new AlertsStyle(this._id, this._slug(name));
+                    
+                    this._styles[name].build(ret);
+                }
+            })
+            .xreal('show_alert', function(ret) {
+                this._debug('real show_alert', ret);
+                if (this._is_enabled && this._is_valid(ret)) this._queue(ret);
+            });
+            this.emit('ready');
+            this._is_enabled && this._init();
+        }
+        _options(opts) {
+            this.$xdef(opts);
+            this._sync_tm && (this._sync_tm = this.$timeout(this._sync_tm));
+            if (this._use_fallback_sync)
+                this._sync_delay = this._fallback_sync_delay * 60 * 1000;
+        }
+        _init() {
+            if (this._init) return this.show();
+            this._is_init = 1;
+            this.$timeout(this._get_alerts, 700);
+        }
+        _queue_sync() {
+            if (!this._use_fallback_sync || !this._is_init || this._sync_tm) return;
+            this._sync_tm = this.$timeout(this._get_alerts, this._sync_delay);
+        }
+        _get_alerts() {
+            if (this._in_req) return;
+            this._in_req = 1;
+            this._sync_tm && (this._sync_tm = this.$timeout(this._sync_tm));
+            this.request(
+                'sync_alerts',
+                {init: this._is_first},
+                function(ret) {
+                    this._in_req = 0;
+                    if (!this.$isBaseObj(ret)) {
+                        this._queue_sync();
+                        return this._error('Invalid alerts sync data.', ret);
+                    }
+                    this._is_first = 0;
+                    if (this.$isBaseObjVal(ret.system))
+                        this.call('alerts_app_status_changed', ret.system, 1);
+                    if (!this._is_enabled) return this._queue_sync();
+                    if (this.$isBaseObjVal(ret.events))
+                        for (var k in ret.events) { this.emit(k, ret.events[k]); }
+                    if (this.$isBaseObj(ret.types)) this._build_types(ret.types);
+                    if (this.$isArrVal(ret.alerts)) this._queue(ret.alerts);
+                    this._queue_sync();
+                },
+                function(e) {
+                    this._in_req = 0;
+                    this._queue_sync();
+                    this._error(e.self ? e.message : 'Getting user alerts failed.', e.message);
+                }
+            );
+        }
+        _get_type(name) { return this._types[name] || {name}; }
+        _build_types(data) {
+            this._destroy_types();
+            for (var k in data) {
+                this._types[k] = {
+                    name: k,
+                    priority: cint(data[k].priority),
+                    timeout: cint(data[k].display_timeout),
+                    sound: cstr(data[k].display_sound),
+                    custom_sound: cstr(data[k].custom_display_sound)
+                };
+                this._styles[k] = new AlertsStyle(this._id, this._slug(k));
+                this._styles[k].build(data[k]);
+            }
+        }
+        _destroy_types() {
+            this.$reduce(this._styles, function(o, k) {
+                try { o.destroy(); } catch(_) {}
+                delete this._types[k];
+                delete this._styles[k];
+            });
+        }
+        _is_valid(data) {
+            if (!this.$isBaseObjVal(data)) return 0;
+            if (this._seen.includes(data.name)) return 0;
+            var user = frappe.session.user, score = 0;
+            if (this.$isArrVal(data.users) && data.users.includes(user)) score++;
+            if (!score && this.$isArrVal(data.roles) && frappe.user.has_role(data.roles)) score++;
+            if (!score) return 0;
+            if (this.$isArr(data.seen_today) && data.seen_today.includes(user)) return 0;
+            var seen_by = this.$isBaseObj(data.seen_by) ? data.seen_by : {},
+            seen = seen_by[user] != null ? cint(seen_by[user]) : -1;
+            if (cint(data.is_repeatable) < 1 && seen > 0) return 0;
+            if (seen >= cint(data.number_of_repeats)) return 0;
+            return 1;
+        }
+        _queue(data) {
+            if (this.$isBaseObj(data)) this._list.push(data);
+            else if (this.$isArrVal(data)) this._list.push.apply(this._list, data);
+            this.has_alerts && this._list.sort(this.$fn(function(a, b) {
+                a = this._get_type(a.alert_type).priority || 0;
+                b = this._get_type(b.alert_type).priority || 0;
+                return cint(b) - cint(a);
+            }, this));
+            this.show();
+        }
+        _render() {
+            if (this.has_alerts) this._render_dialog();
+            else if (this._has_seen) this._process_seen();
+            return this;
+        }
+        _mark_seen() {
+            this._dialog && this._seen.push(this._dialog.name);
+        }
+        _render_dialog() {
+            if (!this._dialog) {
+                this._dialog = new AlertsDialog(this._id, 'alerts-' + this._id);
+                this._rerender = this.$fn(this._render);
+                this._remark_seen = this.$fn(this._mark_seen);
+            }
+            
+            var data = this._list.shift(),
+            type = this._get_type(data.alert_type);
+            this._dialog
+                .reset()
+                .setName(data.name)
+                .setTitle(data.title)
+                .setMessage(data.message)
+                .setTimeout(type.timeout || 0)
+                .setSound(type.sound, type.custom_sound)
+                .onShow(this._remark_seen)
+                .onHide(this._rerender, 200)
+                .render(this._slug(type.name))
+                .show();
+        }
+        _process_seen() {
+            var seen = this._seen.splice(0, this._seen.length);
+            this.request(
+                'sync_seen',
+                {names: seen},
+                function(ret) {
+                    if (ret) return;
+                    this._seen = seen;
+                    this._error('Marking alerts as seen error.', ret, seen);
+                    this._retry_mark_seens();
+                },
+                function(e) {
+                    this._seen = seen;
+                    this._error(e.self ? e.message : 'Marking alerts as seen error.', seen, e && e.message);
+                    this._retry_mark_seens();
+                }
+            );
+        }
+        _retry_mark_seens() {
+            if (!this._seen_retry) {
+                this._seen_retry = 1;
+                this.$timeout(this._process_seen, 2000);
+            } else {
+                delete this._seen_retry;
+                this.error(__('{0} app is currently facing a problem.', [this.module]));
+            }
+        }
+        _slug(v) { return v.toLowerCase().replace(/ /g, '-'); }
+        destroy() {
+            //frappe.alerts = null;
+            //this._destroy_types();
+            //if (this._dialog) try { this._dialog.destroy(); } catch(_) {}
+            if (this._mock) try { this._mock.destroy(); } catch(_) {}
+            this._mock = null;
+            //super.destroy();
         }
     }
-    build(
-        background, border, title, content,
-        dark_background, dark_border, dark_title, dark_content
-    ) {
-        var css = [],
-        tpl = [
-            '$0{background:$1 !important}',
-            '$0,$0>.modal-header,$0>.modal-footer{border:1px solid $1 !important}',
-            '$0>$1>$2>.modal-title{color:$3 !important}'
-                + '$0>$1>$2>.indicator::before{background:$3 !important}'
-                + '$0>$1>.modal-actions>.btn{color:$3 !important}',
-            '$0>$1,$0>$1>.alerts-message{color:$2 !important}'
-        ],
-        rgx = [/\$0/g, /\$1/g, /\$2/g, /\$3/g, /\$t/g];
-        if (this.$isStrVal(background))
-            css.push(tpl[0].replace(rgx[1], background));
-        if (this.$isStrVal(border))
-            css.push(tpl[1].replace(rgx[1], border));
-        if (this.$isStrVal(title))
-            css.push(tpl[2].replace(rgx[1], '.modal-header').replace(rgx[2], '.title-section')
-                .replace(rgx[3], title));
-        if (this.$isStrVal(content))
-            css.push(tpl[3].replace(rgx[1], '.modal-body').replace(rgx[2], content));
-        if (this.$isStrVal(dark_background))
-            css.push(tpl[0].replace(rgx[0], '$t $0').replace(rgx[1], dark_background));
-        if (this.$isStrVal(dark_border))
-            css.push(tpl[1].replace(rgx[0], '$t $0').replace(rgx[1], dark_border));
-        if (this.$isStrVal(dark_title))
-            css.push(tpl[2].replace(rgx[0], '$t $0').replace(rgx[1], '.modal-header')
-                .replace(rgx[2], '.title-section').replace(rgx[3], dark_title));
-        if (this.$isStrVal(dark_content))
-            css.push(tpl[3].replace(rgx[0], '$t $0').replace(rgx[1], '.modal-body')
-                .replace(rgx[2], dark_content));
-        if (css.length) {
-            var sel = '#' + this._class + '>.modal-content';
-            css = css.join("\n").replace(rgx[0], sel).replace(rgx[4], '[data-theme="dark"]');
+    
+    
+    class AlertsMock extends LevelUpCore {
+        constructor() {
+            super();
+            this._id = frappe.utils.get_random(5);
+        }
+        build(data) {
+            if (!this.$isDataObjVal(data)) return this;
+            if (!this._dialog)
+                this._dialog = new AlertsDialog(this._id, 'alerts-mock-' + this._id);
+            
+            this._dialog
+                .setTitle(__('Mock Alert'))
+                .setMessage(data.message || __('This is a mock alert message.'))
+                .setTimeout(data.display_timeout)
+                .setSound(data.display_sound, data.custom_display_sound);
+            
+            if (!data.alert_type) this._dialog.setStyle(data).render();
+            else this._dialog.render(this._slug(data.alert_type));
+            
+            return this;
+        }
+        show() {
+            this._dialog && this._dialog.show();
+            return this;
+        }
+        hide() {
+            this._dialog && this._dialog.hide();
+            return this;
+        }
+        _slug(v) { return v.toLowerCase().replace(/ /g, '-'); }
+        destroy() {
+            this._dialog && this._dialog.destroy();
+            super.destroy();
+        }
+    }
+    
+    
+    class AlertsDialog extends LevelUpCore {
+        constructor(id, _class) {
+            super();
+            this._id = id;
+            this._class = _class;
+            this._def_class = _class;
+            this._body = null;
+            this.$getter('name', '', 0, 1);
+            this._title = null;
+            this._message = null;
+            this._timeout = 0;
+            this._sound = {loaded: 0, playing: 0, tm: null};
+            this._visible = 0;
+            
+        }
+        setName(text) {
+            if (this.$isStrVal(text)) this._name = text;
+            return this;
+        }
+        setTitle(text, args) {
+            if (this.$isStrVal(text)) this._title = __(text, args);
+            return this;
+        }
+        setMessage(text, args) {
+            if (this.$isStrVal(text)) this._message = __(text, args);
+            return this;
+        }
+        setStyle(data) {
+            if (!this._style) this._style = new AlertsStyle(this._id, this._class);
+            this._style.build(data);
+            return this;
+        }
+        setTimeout(sec) {
+            if (this.$isNum(sec) && sec > 0) this._timeout = sec * 1000;
+            return this;
+        }
+        setSound(file, fallback) {
+            this.stopSound();
+            this._sound.loaded = 0;
+            if (!this.$isStrVal(file) || file === 'None') return this;
+            if (file === 'Custom') {
+                if (!this.$isStrVal(fallback) || !(/\.(mp3|wav|ogg)$/i).test(fallback)) return this;
+                file = frappe.utils.get_file_link(fallback);
+            } else file = '/assets/frappe/sounds/' + file.toLowerCase() + '.mp3';
+            if (!this._$sound) {
+                this._$sound = $('<audio>')
+                    .attr({
+                        id: 'sound-' + this._id,
+                        volume: '0.2',
+                        preload: 'auto',
+                    })
+                    .click(function(e) { try { e.target.play(); } catch(_) {} })
+                    .hide()
+                    .appendTo('body');
+                this._on_play = this.$fn(function() { this._sound.loaded = 1; });
+                this._$sound.on('canplaythrough', this._on_play);
+            }
+            this._$sound.attr('src', file);
+            this._$sound[0].load();
+            return this;
+        }
+        beforeShow(fn) {
+            this._pre_show = this.$fn(fn);
+            return this;
+        }
+        onShow(fn, delay) {
+            if (!this.$isNum(delay) || delay < 1) this._on_show = this.$fn(fn);
+            else this._on_show = this.$afn(this.$timeout, [fn, delay]);
+            return this;
+        }
+        onHide(fn, delay) {
+            if (!this.$isNum(delay) || delay < 1) this._on_hide = this.$fn(fn);
+            else this._on_hide = this.$afn(this.$timeout, [fn, delay]);
+            return this;
+        }
+        render(clss) {
+            if (!this._dialog) {
+                this._dialog = new frappe.ui.Dialog({});
+                this._dialog.onhide = this.$fn(this.stopSound, this);
+                this._container = this._dialog.$wrapper.find('.modal-dialog').first();
+                this._container.addClass('modal-dialog-centered modal-dialog-scrollable');
+                this._body = $('<div class="alerts-message">');
+                this._dialog.modal_body.append(this._body);
+            }
+            if (this._title) this._dialog.set_title(this._title);
+            if (!clss || clss !== this._class) {
+                this._class = clss || this._def_class;
+                this._container.attr('id', this._class);
+            }
+            this._body.empty();
+            this._message && this._body.html(this._message);
+            if (this._on_hide) this._dialog.on_hide = this._on_hide;
+            if (this._on_show) this._dialog.on_page_show = this._on_show;
+            return this;
+        }
+        show() {
+            if (this._visible || !this._dialog) return this;
+            this._visible = 1;
+            if (this._pre_show) this._pre_show();
+            this.playSound();
+            this._dialog.show();
+            if (this._timeout) this._hide_tm = this.$timeout(function() {
+                delete this._hide_tm;
+                this.hide();
+            }, this._timeout);
+            return this;
+        }
+        hide() {
+            if (!this._visible || !this._dialog) return this;
+            this._visible = 0;
+            this._hide_tm && this.$timeout(this._hide_tm);
+            delete this._hide_tm;
+            this._dialog.hide();
+            return this;
+        }
+        playSound() {
+            if (!this._visible || !this._$sound) return this;
+            if (!this._sound.loaded) {
+                this._sound.tm = this.$timeout(this.playSound, 200);
+            } else {
+                this._sound.playing = 1;
+                delete this._sound.tm;
+                this._$sound.click();
+            }
+            return this;
+        }
+        stopSound() {
+            if (this._visible || !this._$sound) return this;
+            this._sound.tm && this.$timeout(this._sound.tm);
+            delete this._sound.tm;
+            if (this._sound.playing)
+                try { this._$sound[0].stop(); } catch(_) {}
+            this._sound.playing = 0;
+            return this;
+        }
+        reset() {
+            this.hide();
+            this._class = this._def_class;
+            this._name = '';
+            this._title = null;
+            this._message = null;
+            this._timeout = 0;
+            this._sound.loaded = this._sound.playing = 0;
+        }
+        destroy() {
+            this.reset();
+            if (this._dialog) {
+                this._body.remove();
+                try { this._dialog.$wrapper.modal('dispose'); } catch(_) {}
+                try { this._dialog.$wrapper.remove(); } catch(_) {}
+            }
+            if (this._style) this._style.destroy();
+            if (this._$sound) this._$sound.off('canplaythrough', this._on_play).remove();
+            super.destroy();
+        }
+    }
+    
+    
+    class AlertsStyle extends LevelUpCore {
+        constructor(id, _class) {
+            super();
+            this._id = 'style-' + id;
+            this._class = _class;
+            this._dom = this.$getElem(this._id);
+            if (!this._dom) this._dom = this.$load('', {id: this._id});
+        }
+        build(data) {
+            if (!this.$isBaseObjVal(data)) return this;
+            var tpl = [
+                '$0{background:$1 !important}',
+                '$0,$0>.modal-header,$0>.modal-footer{border:1px solid $1 !important}',
+                '$0>$1>$2>.modal-title{color:$3 !important}'
+                    + '$0>$1>$2>.indicator::before{background:$3 !important}'
+                    + '$0>$1>.modal-actions>.btn{color:$3 !important}',
+                '$0>$1,$0>$1>.alerts-message{color:$2 !important}'
+            ],
+            rgx = [/\$0/g, /\$1/g, /\$2/g, /\$3/g, /\$t/g],
+            opt = {
+                background: [0, [[1]]],
+                border: [1, [[1]]],
+                title: [2, [[1, '.modal-header'], [2, '.title-section'], [3]]],
+                content: [3, [[1, '.modal-body'], [2]]],
+                dark_background: [0, [[0, '$t $0'], [1]]],
+                dark_border: [1, [[0, '$t $0'], [1]]],
+                dark_title: [2, [[0, '$t $0'], [1, '.modal-header'], [2, '.title-section'], [3]]],
+                dark_content: [3, [[0, '$t $0'], [1, '.modal-body'], [2]]],
+            },
+            css = this.$reduce(opt, function(v, k, r) {
+                if (this.$isStrVal(data[k]))
+                    r.push(this.$reduce(v[1], function(z, i, t) {
+                        return t.replace(rgx[z[0]], z[1] || data[k]);
+                    }, tpl[v[0]]));
+                return r;
+            }, []);
+            if (!css.length) return this;
+            css = css.join("\n")
+                .replace(rgx[0], '#' + this._class + '>.modal-content')
+                .replace(rgx[4], '[data-theme="dark"]');
             if (this._dom.styleSheet) this._dom.styleSheet.cssText = css;
             else {
                 while (this._dom.firstChild)
                     this._dom.removeChild(this._dom.firstChild);
                 this._dom.appendChild(document.createTextNode(css));
             }
+            return this;
         }
-        return this;
+        destroy() {
+            this._dom && this._dom.parentNode.removeChild(this._dom);
+            super.destroy();
+        }
     }
-    destroy() {
-        if (this._dom)
-            this._dom.parentNode.removeChild(this._dom);
-        super.destroy();
-    }
-}
-
-
-$(document).ready(function() {
-   if (frappe == null || typeof frappe !== 'object')
-        throw new Error('Frappe framework is required.');
-    let app = new LevelUpCore(),
-    id = 'core-polyfill';
-    function $onload() {
-        Promise.wait = function(ms) { return new Promise(function(resolve) { setTimeout(resolve, ms); }); };
-        Promise.prototype.timeout = function(ms) {
-            return Promise.race([this, Promise.wait(ms).then(function() { throw new Error('Time out'); })]);
-        };
-    }
-    if (
-        app.$isFunc(Promise) && app.$isFunc(id.trim)
-        && app.$isFunc(id.includes) && app.$isFunc(id.startsWith)
-        && app.$isFunc(id.endsWith) && app.$isFunc([].includes)
-        && app.$isFunc(app.$isFunc.bind)
-    ) $onload();
-    else if (app.$hasElem(id)) $onload();
-    else app.$loadJs(
-        'https://polyfill.io/v3/polyfill.min.js?features=String.prototype.trim%2CString.prototype.includes%2CString.prototype.startsWith%2CString.prototype.endsWith%2CArray.prototype.includes%2CFunction.prototype.bind%2CPromise',
-        {id: id, onload: $onload}
-    );
-    $.fn.hidden = function(s) { return this.toggleClass('lu-hidden', !!s); };
-    $.fn.isHidden = function() { return this.hasClass('lu-hidden'); };
-    !app.$hasElem('lu-style') && app.$load('.lu-hidden { display: none; }', {id: 'lu-style'});
     
-    frappe.alerts = new Alerts();
-});
+    
+    $(document).ready(function() {
+       if (!frappe || typeof frappe !== 'object') throw new Error('Frappe framework is required.');
+        var id = 'core-polyfill';
+        function $onload() {
+            Promise.wait = function(ms) { return new Promise(function(resolve) { setTimeout(resolve, ms); }); };
+            Promise.prototype.timeout = function(ms) {
+                return Promise.race([this, Promise.wait(ms).then(function() { throw new Error('Time out'); })]);
+            };
+        }
+        if (
+            LU.$isFunc(Promise) && LU.$isFunc(id.trim) && LU.$isFunc(id.includes)
+            && LU.$isFunc(id.startsWith) && LU.$isFunc(id.endsWith)
+            && LU.$isFunc([].includes) && LU.$isFunc(LU.$isFunc.bind)
+        ) $onload();
+        else if (LU.$getElem(id)) $onload();
+        else LU.$loadJs(
+            'https://polyfill.io/v3/polyfill.min.js?features=String.prototype.trim%2CString.prototype.includes%2CString.prototype.startsWith%2CString.prototype.endsWith%2CArray.prototype.includes%2CFunction.prototype.bind%2CPromise',
+            {id: id, onload: $onload}
+        );
+        $.fn.hidden = function(s) { return this.toggleClass('lu-hidden', !!s); };
+        $.fn.isHidden = function() { return this.hasClass('lu-hidden'); };
+        !LU.$getElem('lu-style') && LU.$load('.lu-hidden { display: none; }', {id: 'lu-style'});
+        
+        frappe.alerts = new Alerts();
+    });
+}());

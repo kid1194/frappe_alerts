@@ -33,8 +33,12 @@ on_login = ["alerts.utils.access.on_login"]
 
 
 scheduler_events = {
+    "cron": {
+        "0 0 * * *": [
+            "alerts.utils.alert.update_alerts",
+        ]
+    },
     "daily": [
-        "alerts.utils.alert.update_alerts",
         "alerts.utils.update.auto_check_for_update"
     ]
 }

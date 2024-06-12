@@ -7,7 +7,7 @@
 import frappe
 
 
-# [Alerts Alert Form]
+# [A Alert Form]
 @frappe.whitelist()
 def search_users(doctype, txt, searchfield, start, page_len, filters, as_dict=False):
     from .search import filter_search, prepare_data
@@ -35,20 +35,29 @@ def search_users(doctype, txt, searchfield, start, page_len, filters, as_dict=Fa
     
     qry = (
         frappe.qb.from_(doc)
-        .select(doc.name)
+        .select(
+            doc.name.as_("label"),
+            doc.name.as_("value")
+        )
         .where(doc.name.isin(hqry))
         .where(doc.enabled == 1)
     )
     qry = filter_search(doc, qry, dt, txt, doc.name, "name")
     
-    existing = filters.get("existing", "")
-    if existing and isinstance(existing, str):
+    if filters and isinstance(filters, str):
         from .common import parse_json
-        
-        existing = parse_json(existing)
+            
+        filters = parse_json(filters)
     
-    if existing and isinstance(existing, list):
-        qry = qry.where(doc.name.notin(existing))
+    if filters and isinstance(filters, dict):
+        existing = filters.get("existing", "")
+        if existing and isinstance(existing, str):
+            from .common import parse_json
+            
+            existing = parse_json(existing)
+        
+        if existing and isinstance(existing, list):
+            qry = qry.where(doc.name.notin(existing))
     
     data = qry.run(as_dict=as_dict)
     data = prepare_data(data, dt, "name", txt, as_dict)

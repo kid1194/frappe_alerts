@@ -1,5 +1,5 @@
 {
- "creation": "2023-04-04 04:04:04.119400",
+ "creation": "2023-04-04 04:04:04",
  "description": "Settings for Alerts",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -7,6 +7,10 @@
   "general_section",
   "is_enabled",
   "general_column",
+  "alerts_section",
+  "use_fallback_sync",
+  "alerts_column",
+  "fallback_sync_delay",
   "update_section",
   "auto_check_for_update",
   "send_update_notification",
@@ -35,6 +39,31 @@
   {
    "fieldname": "general_column",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "alerts_section",
+   "fieldtype": "Section Break",
+   "label": "Alerts Settings"
+  },
+  {
+   "fieldname": "use_fallback_sync",
+   "fieldtype": "Check",
+   "label": "Use Fallback Sync Method",
+   "description": "Enabled only if realtime events service isn't working",
+   "read_only_depends_on": "eval:!doc.is_enabled"
+  },
+  {
+   "fieldname": "alerts_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "fallback_sync_delay",
+   "fieldtype": "Int",
+   "label": "Fallback Sync Delay (Minutes)",
+   "description": "Number of minutes to wait between sync requests",
+   "default": "5",
+   "non_negative": 1,
+   "read_only_depends_on": "eval:!doc.use_fallback_sync"
   },
   {
    "fieldname": "update_section",
@@ -119,7 +148,7 @@
  ],
  "icon": "fa fa-cog",
  "issingle": 1,
- "modified": "2024-01-27 04:04:04.119400",
+ "modified": "2024-06-05 04:04:04",
  "modified_by": "Administrator",
  "module": "Alerts",
  "name": "Alerts Settings",

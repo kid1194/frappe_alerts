@@ -55,7 +55,7 @@
    "fieldname": "display_priority",
    "fieldtype": "Int",
    "label": "Display Priority",
-   "description": "Alerts of types with higher priority gets displayed first",
+   "description": "Alerts of types with higher priority gets displayed first.",
    "default": "0",
    "non_negative": 1,
    "in_list_view": 1,
@@ -87,9 +87,10 @@
    "fieldname": "custom_display_sound",
    "fieldtype": "Attach",
    "label": "Custom Display Sound",
+   "description": "A small and short audio file is recommended. Supported formats: MP3 (Best), WAV, OGG.",
    "depends_on": "eval:doc.display_sound === 'Custom'",
    "mandatory_depends_on": "eval:!doc.disabled && doc.display_sound === 'Custom'",
-   "read_only_depends_on": "eval:doc.disabled"
+   "read_only_depends_on": "eval:doc.disabled || doc.display_sound !== 'Custom'"
   },
   {
    "fieldname": "style_section",
@@ -159,7 +160,7 @@
   }
  ],
  "icon": "fa fa-bell-o",
- "modified": "2024-02-20 04:04:04.119400",
+ "modified": "2024-06-12 04:04:04.119400",
  "modified_by": "Administrator",
  "module": "Alerts",
  "name": "Alert Type",

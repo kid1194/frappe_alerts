@@ -6,17 +6,8 @@
 
 # [Hooks]
 def on_login(login_manager):
-    try:
-        from .alert import enqueue_alerts
-        from .type import enqueue_types
-        
-        enqueue_types()
-        enqueue_alerts(login_manager.user)
-    except Exception:
-        from frappe import _
-        
-        from .common import log_error
-        
-        log_error(_(
-            "An error has occurred while caching alerts on the login of user \"{0}\"."
-        ).format(login_manager.user))
+    from .alert import enqueue_alerts
+    from .type import enqueue_types
+    
+    enqueue_types()
+    enqueue_alerts(login_manager.user)

@@ -38,7 +38,6 @@ def filter_search(doc, qry, doctype, search, relevance, filter_column=None):
             "Read Only",
             "Text Editor"
         ]
-        
         for f in fields:
             fmeta = meta.get_field(f.strip())
             if (
@@ -81,10 +80,10 @@ def prepare_data(data, dt, column, search, as_dict):
             )
         ]
     
-    args = [search, as_dict]
+    args = [column, search, as_dict]
     def relevance_sorter(key):
-        value = _(key.name if args[1] else key[0])
-        return (cstr(value).lower().startswith(args[0].lower()) is not True, value)
+        value = _(key.get(args[0]) if args[2] else key[0])
+        return (cstr(value).lower().startswith(args[1].lower()) is not True, value)
     
     data = sorted(data, key=relevance_sorter)
     if as_dict:

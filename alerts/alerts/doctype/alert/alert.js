@@ -7,13 +7,19 @@
 
 
 frappe.ui.form.on('Alert', {
-    setup: function(frm) {
-        frappe.alerts.on('ready change', function() { this.setup_form(frm); });
+    onload: function(frm) {
+        frappe.alerts
+            .on('ready change', function() { this.setup_form(frm); })
+            .on('on_alert', function(d, t) {
+                frm._alert.errs.includes(t) && (d.title = __(frm.doctype));
+            });
         frm._alert = {
+            errs: ['fatal', 'error'],
+            ignore: 0,
             is_draft: false,
             is_submitted: false,
             is_cancelled: false,
-            in_validate: 0,
+            toolbar: 0,
             mindate: moment(),
             to_date: function(v) {
                 return moment(cstr(v), frappe.defaultDateFormat);
@@ -21,135 +27,136 @@ frappe.ui.form.on('Alert', {
             from_datetime: function(v) {
                 v = moment(cstr(v), frappe.defaultDatetimeFormat);
                 v = v.format(frappe.defaultDateFormat);
-                return frm._alert.to_date(v);
+                return this.to_date(v);
             },
             mindate_obj: function() {
-                return frappe.datetime.moment_to_date_obj(frm._alert.mindate);
-            }
+                return frappe.datetime.moment_to_date_obj(this.mindate);
+            },
         };
-    },
-    onload: function(frm) {
-        frm.events.on_load(frm);
-        
-        if (!frm._alerts || frm._alerts.app_disabled || !frm._alert.is_draft) return;
+        frm.events.setup_doc(frm);
+        if (!frm._alert.is_draft) return;
         frm.set_query('role', 'for_roles', function(doc, cdt, cdn) {
             var qry = {filters: {disabled: 0, desk_access: 1}};
-            if ((doc.for_roles || '').length) {
-                qry.filters.name = ['notin', []];
-                for (var i = 0, l = doc.for_roles.length; i < l; i++)
-                    qry.filters.name[1][i] = doc.for_roles[i].role;
-            }
+            if (frappe.alerts.$isArrVal(doc.for_roles))
+                qry.filters.name = ['notin', frappe.alerts.$map(doc.for_roles, function(v) { return v.role; })];
             return qry;
         });
         frm.set_query('user', 'for_users', function(doc, cdt, cdn) {
             var qry = {query: frappe.alerts.get_method('search_users')};
-            if ((doc.for_users || '').length) {
-                qry.filters = {existing: []};
-                for (var i = 0, l = doc.for_users.length; i < l; i++)
-                    qry.filters.existing[i] = doc.for_users[i].user;
-            }
+            if (frappe.alerts.$isArrVal(doc.for_users))
+                qry.filters = {existing: frappe.alerts.$map(doc.for_users, function(v) { return v.user; })};
             return qry;
         });
-        
-        if (!!frm.is_new()) {
-            frm._alert.mindate = moment();
-        } else {
-            if (cstr(frm.doc.creation).length)
+        if (!frm.is_new()) {
+            if (frappe.alerts.$isStrVal(frm.doc.creation))
                 frm._alert.mindate = frm._alert.from_datetime(frm.doc.creation);
-            else if (cstr(frm.doc.from_date).length)
+            else if (frappe.alerts.$isStrVal(frm.doc.from_date))
                 frm._alert.mindate = frm._alert.to_date(frm.doc.from_date);
         }
         var mindate = frm._alert.mindate_obj(),
-        opts = {startDate: mindate, minDate: mindate};
-        frm.set_df_property('from_date', 'options', opts);
-        frm.set_df_property('until_date', 'options', opts);
-        
-        if (!!frm.is_new()) frm.trigger('validate_date');
+        fields = ['from_date', 'until_date'];
+        for (var i = 0, f; i < 2; i++) {
+            f = frm.get_field(fields[i]);
+            f.df.min_date = mindate;
+            f.datepicker && f.datepicker.update('minDate', mindate);
+        }
     },
     refresh: function(frm) {
-        frm.events.setup_toolbar(frm);
+        if (!frm._type.toolbar) {
+            frm.events.toggle_toolbar(frm);
+            frm._type.toolbar = 1;
+        }
     },
     from_date: function(frm) {
-        if (!frm._alert.in_validate)
-            frm.events.validate_date(frm);
-        frm._alert.in_validate = 0;
+        if (frm._alert.ignore) return;
+        var key = 'from_date',
+        val = cstr(frm.doc[key]);
+        if (!val.length || cint(frm._alert.mindate.diff(val, 'days')) > 0) {
+            frm._alert.ignore++;
+            frm.set_value(key, frm._alert.mindate.format());
+            frm._alert.ignore--;
+        }
+        frm.events.until_date(frm);
     },
     until_date: function(frm) {
-        if (!frm._alert.in_validate)
-            frm.events.validate_date(frm);
-        frm._alert.in_validate = 0;
+        if (frm._alert.ignore) return;
+        var from = cstr(frm.doc.from_date);
+        if (!from.length) return frm.events.from_date(frm);
+        var key = 'until_date',
+        val = cstr(frm.doc[key]);
+        if (val === from) return;
+        if (!val.length || cint(frm._alert.to_date(from).diff(val, 'days')) > 0) {
+            frm._alert.ignore++;
+            frm.set_value(key, from);
+            frm._alert.ignore--;
+        }
     },
     validate: function(frm) {
-        if (!cstr(frm.doc.title)) {
-            frappe.throw(__('A valid alert title is required.'));
-            return false;
-        }
-        if (!cstr(frm.doc.alert_type)) {
-            frappe.throw(__('A valid alert type is required.'));
-            return false;
-        }
+        var errs = [];
+        if (!frappe.alerts.$isStrVal(frm.doc.title))
+            errs.push(__('A valid title is required.'));
+        if (!frappe.alerts.$isStrVal(frm.doc.alert_type))
+            errs.push(__('A valid alert type is required.'));
+        if (!frappe.alerts.$isStrVal(frm.doc.from_date))
+            errs.push(__('A valid from date is required.'));
+        if (cint(frm._alert.mindate.diff(frm.doc.from_date, 'days')) > 0)
+            errs.push(__('From date must be later than or equals to "{0}".', [frm._alert.mindate.format()]));
+        if (!frappe.alerts.$isStrVal(frm.doc.until_date))
+            frm.events.until_date(frm);
+        else if (cint(frm._alert.to_date(frm.doc.from_date).diff(frm.doc.until_date, 'days')) > 0)
+            errs.push(__('Until date must be later than or equals to "From Date".'));
+        if (!frappe.alerts.$isStrVal(frm.doc.message))
+            errs.push(__('A valid message is required.'));
         if (
-            !(frm.doc.for_roles || '').length
-            && !(frm.doc.for_users || '').length
-        ) {
-            frappe.throw(__('At least one recipient role or user is required.'));
+            !frappe.alerts.$isArrVal(frm.doc.for_roles)
+            && !frappe.alerts.$isArrVal(frm.doc.for_users)
+        ) errs.push(__('At least one recipient role or user is required.'));
+        if (errs.length) {
+            frappe.alerts.fatal(errs);
             return false;
         }
-        frm.events.validate_date(frm);
+    },
+    after_save: function(frm) {
+        frm.events.setup_doc(frm);
+        frm.events.toggle_toolbar(frm);
     },
     on_submit: function(frm) {
-        frm.events.on_load(frm);
-        frm.events.setup_toolbar(frm);
+        frm.events.setup_doc(frm);
+        frm.events.toggle_toolbar(frm);
     },
-    on_load: function(frm) {
-        var docstatus = !!frm.is_new() ? 0 : cint(frm.doc.docstatus);
+    after_cancel: function(frm) {
+        frm.events.setup_doc(frm);
+        frm.events.toggle_toolbar(frm);
+    },
+    setup_doc: function(frm) {
+        var docstatus = !frm.is_new() ? cint(frm.doc.docstatus) : 0;
         frm._alert.is_draft = docstatus === 0;
         frm._alert.is_submitted = docstatus === 1;
         frm._alert.is_cancelled = docstatus === 2;
-        
-        if (frm._alert.is_draft || !frm._alerts || frm._alerts.form_disabled) return;
-        
+        if (frm._alert.is_draft) return;
         frappe.alerts.disable_form(frm, __('{0} has been {1}.', [
-            cstr(frm.doctype),
-            frm._alert.is_submitted ? 'submitted' : 'cancelled'
-        ]), 0, frm._alert.is_submitted ? 'green' : 'red');
-        
+            cstr(frm.doctype), frm._alert.is_submitted ? __('submitted') : __('cancelled')
+        ]), frm._alert.is_submitted ? 'green' : 'red');
         frm.set_df_property('seen_by_section', 'hidden', 0);
-        
-        frappe.alerts.on('alerts_alert_seen', function(ret) {
-            if (ret && cstr(ret.alert) === cstr(frm.docname)) frm.reload_doc();
+        frappe.alerts.real('alert_seen', function(ret) {
+            if (
+                ret && this.$isArrVal(ret.alerts)
+                && ret.alerts.includes(cstr(frm.docname))
+            ) frm.reload_doc();
         });
     },
-    setup_toolbar: function(frm) {
-        var label = __('Preview');
-        if (!!frm.is_new() || !frm._alert.is_draft) {
-            if (frm.custom_buttons[label]) {
-                frm.custom_buttons[label].remove();
-                delete frm.custom_buttons[label];
-            }
-            return;
+    toggle_toolbar: function(frm) {
+        var label = __('Preview'),
+        del = frm.is_new() || !frm._alert.is_draft;
+        if (frm.custom_buttons[label]) {
+            if (!del) return;
+            frm.custom_buttons[label].remove();
+            delete frm.custom_buttons[label];
         }
-        if (frm.custom_buttons[label]) return;
+        if (del || frm.custom_buttons[label]) return;
         frm.add_custom_button(label, function() {
             frappe.alerts.mock().build(frm.doc);
         });
         frm.change_custom_button_type(label, null, 'info');
-    },
-    validate_date: function(frm) {
-        var from = cstr(frm.doc.from_date),
-        until = cstr(frm.doc.until_date);
-        if (!from.length) from = null;
-        else from = frm._alert.to_date(from);
-        if (!from || cint(frm._alert.mindate.diff(from, 'days')) > 0) {
-            from = frm._alert.mindate;
-            frm._alert.in_validate = 1;
-            frm.set_value('from_date', from.format());
-        }
-        if (!until.length) until = null;
-        else until = frm._alert.to_date(until);
-        if (!until || cint(from.diff(until, 'days') > 0)) {
-            frm._alert.in_validate = 1;
-            frm.set_value('until_date', from.format());
-        }
     },
 });

@@ -1,6 +1,7 @@
 # Dependency directories
 node_modules/
 
+.gitignore
 package-lock.json
 package.json
 eslint.config.mjs

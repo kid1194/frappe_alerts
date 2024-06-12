@@ -5,19 +5,25 @@
 
 
 from .alert import (
-    type_alerts_exists,
+    AlertStatus,
+    type_alerts_exist,
     send_alert,
-    user_alerts,
-    mark_seens
+    sync_alerts,
+    sync_seen
 )
 from .cache import *
 from .common import *
-from .files import delete_files
+from .files import (
+    is_sound_file,
+    delete_files
+)
 from .query import search_users
 from .realtime import (
-    use_realtime,
-    emit_app_status_changed,
+    emit_status_changed,
     emit_type_changed
 )
-from .settings import *
+from .system import (
+    get_settings,
+    check_app_status
+)
 from .update import check_for_update

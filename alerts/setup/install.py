@@ -15,7 +15,7 @@ from alerts import __version__
 def after_sync():
     frappe.clear_cache()
     
-    from alerts.utils.settings import settings
+    from alerts.utils.system import settings
     from alerts.utils.type import add_type
     
     types = [

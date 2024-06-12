@@ -7,33 +7,44 @@
 import frappe
 
 
-# [Alert Type]
+# [A Alert Type]
+def is_sound_file(data: str):
+    import re
+    
+    return True if re.match("\.(mp3|wav|ogg)$", data, re.IGNORECASE) else False
+
+
+# [A Alert Type]
 def delete_files(doctype, name, files):
-    if not files:
-        return 0
+    from .background import uuid_key, is_job_running
     
-    if files and isinstance(files, str):
-        from .common import parse_json
+    if isinstance(name, list):
+        name = list(set(name))
+    else:
+        name = [name]
+    
+    if isinstance(files, list):
+        files = list(set(files))
+    else:
+        files = [files]
+    
+    job_id = uuid_key([name, files])
+    job_id = f"{doctype}-files-delete-{job_id}"
+    if not is_job_running(job_id):
+        from .background import enqueue_job
         
-        files = parse_json(files)
-    
-    if not files or not isinstance(files, list):
-        return 0
-    
-    from .background import enqueue_job
-    
-    enqueue_job(
-        "alerts.utils.files.files_delete",
-        f"{doctype}-files-delete-{name}",
-        queue="long",
-        doctype=doctype,
-        name=name,
-        files=files
-    )
+        enqueue_job(
+            "alerts.utils.files.files_delete",
+            job_id,
+            timeout=len(files) * 200,
+            doctype=doctype,
+            names=name,
+            files=files
+        )
 
 
 # [Internal]
-def files_delete(doctype, name, files):
+def files_delete(doctype, names, files):
     dt = "File"
     data = frappe.get_all(
         dt,
@@ -43,14 +54,12 @@ def files_delete(doctype, name, files):
             [dt, "attached_to_doctype", "=", doctype]
         ]
     )
-    if data and isinstance(data, list):
-        if not isinstance(name, list):
-            name = [name]
-        
-        for v in data:
-            if (
-                not v["attached_to_name"] or
-                v["attached_to_name"] in name
-            ):
-                (frappe.get_doc(dt, v["name"])
-                    .delete(ignore_permissions=True))
+    if not data or not isinstance(data, list):
+        return 0
+    
+    for v in data:
+        if (
+            not v["attached_to_name"] or
+            v["attached_to_name"] in names
+        ):
+            frappe.get_doc(dt, v["name"]).delete(ignore_permissions=True)
