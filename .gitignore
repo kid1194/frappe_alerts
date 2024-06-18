@@ -2,6 +2,7 @@
 node_modules/
 
 .gitignore
+.ruff.toml
 package-lock.json
 package.json
 eslint.config.mjs

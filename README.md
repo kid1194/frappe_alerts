@@ -2,7 +2,7 @@
 
 A small **Frappe** module that displays custom alerts to specific recipients after login.
 
-![v1.0.6](https://img.shields.io/badge/v1.0.6-2024/06/12-green?style=plastic)
+![v1.0.7](https://img.shields.io/badge/v1.0.7-2024/06/19-green?style=plastic)
 
 **Apologies in advance for any problem or bug you face with this module.**
 **Please report any problem or bug you face so it can be fixed.**
@@ -62,15 +62,11 @@ cd ~/frappe-bench
 
 2. Get plugin from Github
 
-*(Required only once)*
-
 ```
 bench get-app https://github.com/kid1194/frappe_alerts
 ```
 
-3. Build plugin
-
-*(Required only once)*
+3. Build plugin files
 
 ```
 bench build --app alerts
@@ -82,7 +78,11 @@ bench build --app alerts
 bench --site [sitename] install-app alerts
 ```
 
-5. Check the [usage](#usage) section
+5. Restart bench to clear cache
+
+```
+bench restart
+```
 
 #### Update
 1. Go to app directory
@@ -97,13 +97,13 @@ cd ~/frappe-bench/apps/alerts
 git pull
 ```
 
-3. Go to bench directory
+3. Go back to bench directory
 
 ```
 cd ~/frappe-bench
 ```
 
-4. Build plugin
+4. Build plugin files
 
 ```
 bench build --app alerts
@@ -115,7 +115,7 @@ bench build --app alerts
 bench --site [sitename] migrate
 ```
 
-6. (Optional) Restart bench
+6. Restart bench to clear cache
 
 ```
 bench restart
@@ -140,7 +140,7 @@ bench --site [sitename] uninstall-app alerts
 bench remove-app alerts
 ```
 
-4. (Optional) Restart bench
+4. Restart bench to clear cache
 
 ```
 bench restart
@@ -162,7 +162,7 @@ bench restart
   - Select `None` to disable the `Display Sound`
 - To customize the look of the alert:
   - Change the `Background Color`, `Border Color`, `Title Color` and `Content Color` for both, **Light** and **Dark** themes
-  - Click on `Preview` to see how the custom style will look
+  - After saving form, click on `Preview` to see how the custom style will look
 
 ### Alert
 - Go to `Alert` and create new entry

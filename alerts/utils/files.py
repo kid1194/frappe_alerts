@@ -52,7 +52,9 @@ def files_delete(doctype, names, files):
         filters=[
             [dt, "file_url", "in", files],
             [dt, "attached_to_doctype", "=", doctype]
-        ]
+        ],
+        ignore_permissions=True,
+        strict=False
     )
     if not data or not isinstance(data, list):
         return 0

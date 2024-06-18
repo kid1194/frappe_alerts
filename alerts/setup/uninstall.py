@@ -12,6 +12,7 @@ def after_uninstall():
     from frappe.model.delete_doc import delete_doc
     
     docs = [
+        ["Report", ["Alert Report"]],
         ["DocType", [
             "Alert Seen By",
             "Alert For Role",
@@ -29,7 +30,7 @@ def after_uninstall():
         (
             frappe.qb.from_(doc)
             .delete()
-            .where(doc.document_type.isin(docs[0][1]))
+            .where(doc.document_type.isin(docs[1][1]))
         ).run()
     except Exception:
         pass

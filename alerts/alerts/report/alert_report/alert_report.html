@@ -1,0 +1,56 @@
+<h2 class="text-center">{%= __("Alert Report") %}</h2>
+
+{% if (filters.alert_type) { %}
+<h4 class="text-center">{%= filters.alert_type %}</h4>
+{% } %}
+
+{% if (filters.from_date || filters.until_date) { %}
+<h5 class="text-center">
+    {%= __("From") %}: 
+    {% if (filters.from_date) { %}
+    {%= frappe.datetime.str_to_user(filters.from_date) %}
+    {% } else { %}
+    {%= __("Beginning") %}
+    {% } %}
+        
+    {%= __("Until") %}: 
+    {% if (filters.until_date) { %}
+    {%= frappe.datetime.str_to_user(filters.until_date) %}
+    {% } else { %}
+    {%= __("Today") %}
+    {% } %}
+</h5>
+{% } %}
+
+<hr>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th style="width: 15%">{%= __("Alert") %}</th>
+            <th class="text-center" style="width: 15%">{%= __("Title") %}</th>
+            <th class="text-center" style="width: 15%">{%= __("Alert Type") %}</th>
+            <th class="text-center" style="width: 15%">{%= __("From Date") %}</th>
+            <th class="text-center" style="width: 15%">{%= __("Until Date") %}</th>
+            <th class="text-center" style="width: 5%">{%= __("Repeatable") %}</th>
+            <th class="text-center" style="width: 10%">{%= __("Reached") %}</th>
+            <th class="text-center" style="width: 10%">{%= __("Status") %}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for(var i=0, l=data.length; i<l; i++) { %}
+            <tr>
+                <td><b>{%= frappe.format(data[i].alert, {fieldtype: "Link"}) || "&nbsp;" %}</b></td>
+                <td>{%= data[i].title || "&nbsp;" %}</td>
+                <td class="text-center">{%= frappe.format(data[i].alert_type, {fieldtype: "Link"}) || "&nbsp;" %}</td>
+                <td class="text-center">{%= frappe.datetime.str_to_user(data[i].from_date) %}</td>
+                <td class="text-center">{%= frappe.datetime.str_to_user(data[i].until_date) %}</td>
+                <td class="text-center">{%= data[i].is_repeatable || __("No") %}</td>
+                <td class="text-center">{%= format_number(data[i].reached || 0, null, 0) %}</td>
+                <td class="text-center">{%= data[i].status || "&nbsp;" %}</td>
+            </tr>
+        {% } %}
+    </tbody>
+</table>
+
+<p class="text-right text-muted">{%= __("Printed On") %}: {%= frappe.datetime.str_to_user(frappe.datetime.get_datetime_as_string()) %}</p>

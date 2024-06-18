@@ -2,7 +2,7 @@
  "allow_copy": 1,
  "allow_import": 1,
  "autoname": "Prompt",
- "creation": "2022-04-04 04:04:04.119400",
+ "creation": "2022-04-04 04:04:04",
  "description": "Alert type for Alerts",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -10,6 +10,7 @@
   "main_section",
   "disabled",
   "main_column",
+  "disable_note",
   "options_section",
   "display_priority",
   "display_timeout",
@@ -47,6 +48,12 @@
    "fieldtype": "Column Break"
   },
   {
+   "fieldname": "disable_note",
+   "fieldtype": "HTML",
+   "label": "",
+   "read_only": 1
+  },
+  {
    "fieldname": "options_section",
    "fieldtype": "Section Break",
    "label": "Options"
@@ -55,21 +62,19 @@
    "fieldname": "display_priority",
    "fieldtype": "Int",
    "label": "Display Priority",
-   "description": "Alerts of types with higher priority gets displayed first.",
+   "description": "Alerts of higher priority types gets displayed first.",
    "default": "0",
    "non_negative": 1,
-   "in_list_view": 1,
-   "read_only_depends_on": "eval:doc.disabled"
+   "in_list_view": 1
   },
   {
    "fieldname": "display_timeout",
    "fieldtype": "Int",
    "label": "Display Timeout (Seconds)",
-   "description": "Close alerts automatically after a specific time. Default: 0 - No Timeout",
+   "description": "Auto close alerts after a specific time. Default: 0 - No Timeout",
    "default": "0",
    "non_negative": 1,
-   "in_list_view": 1,
-   "read_only_depends_on": "eval:doc.disabled"
+   "in_list_view": 1
   },
   {
    "fieldname": "options_column",
@@ -80,8 +85,7 @@
    "fieldtype": "Select",
    "label": "Display Sound",
    "options": "None\nAlert\nError\nClick\nCancel\nSubmit\nCustom",
-   "default": "None",
-   "read_only_depends_on": "eval:doc.disabled"
+   "default": "None"
   },
   {
    "fieldname": "custom_display_sound",
@@ -89,8 +93,8 @@
    "label": "Custom Display Sound",
    "description": "A small and short audio file is recommended. Supported formats: MP3 (Best), WAV, OGG.",
    "depends_on": "eval:doc.display_sound === 'Custom'",
-   "mandatory_depends_on": "eval:!doc.disabled && doc.display_sound === 'Custom'",
-   "read_only_depends_on": "eval:doc.disabled || doc.display_sound !== 'Custom'"
+   "mandatory_depends_on": "eval:doc.display_sound === 'Custom'",
+   "read_only_depends_on": "eval:doc.display_sound !== 'Custom'"
   },
   {
    "fieldname": "style_section",
@@ -100,14 +104,12 @@
   {
    "fieldname": "background",
    "fieldtype": "Color",
-   "label": "Background Color",
-   "read_only_depends_on": "eval:doc.disabled"
+   "label": "Background Color"
   },
   {
    "fieldname": "border_color",
    "fieldtype": "Color",
-   "label": "Border Color",
-   "read_only_depends_on": "eval:doc.disabled"
+   "label": "Border Color"
   },
   {
    "fieldname": "style_column",
@@ -116,14 +118,12 @@
   {
    "fieldname": "title_color",
    "fieldtype": "Color",
-   "label": "Title Color",
-   "read_only_depends_on": "eval:doc.disabled"
+   "label": "Title Color"
   },
   {
    "fieldname": "content_color",
    "fieldtype": "Color",
-   "label": "Content Color",
-   "read_only_depends_on": "eval:doc.disabled"
+   "label": "Content Color"
   },
   {
    "fieldname": "dark_style_section",
@@ -133,14 +133,12 @@
   {
    "fieldname": "dark_background",
    "fieldtype": "Color",
-   "label": "Background Color",
-   "read_only_depends_on": "eval:doc.disabled"
+   "label": "Background Color"
   },
   {
    "fieldname": "dark_border_color",
    "fieldtype": "Color",
-   "label": "Border Color",
-   "read_only_depends_on": "eval:doc.disabled"
+   "label": "Border Color"
   },
   {
    "fieldname": "dark_style_column",
@@ -149,18 +147,16 @@
   {
    "fieldname": "dark_title_color",
    "fieldtype": "Color",
-   "label": "Title Color",
-   "read_only_depends_on": "eval:doc.disabled"
+   "label": "Title Color"
   },
   {
    "fieldname": "dark_content_color",
    "fieldtype": "Color",
-   "label": "Content Color",
-   "read_only_depends_on": "eval:doc.disabled"
+   "label": "Content Color"
   }
  ],
  "icon": "fa fa-bell-o",
- "modified": "2024-06-12 04:04:04.119400",
+ "modified": "2024-06-18 04:04:04",
  "modified_by": "Administrator",
  "module": "Alerts",
  "name": "Alert Type",

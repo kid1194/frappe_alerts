@@ -18,6 +18,7 @@ frappe.ui.form.on('Alert Type', {
         };
     },
     refresh: function(frm) {
+        if (!frm.is_new() && !frm._type.setup) frm.events.setup_disable_note(frm);
         if (!frm._type.toolbar) {
             frm.events.toggle_toolbar(frm);
             frm._type.toolbar = 1;
@@ -40,6 +41,15 @@ frappe.ui.form.on('Alert Type', {
     },
     after_save: function(frm) {
         frm.events.toggle_toolbar(frm);
+    },
+    setup_disable_note: function(frm) {
+        frm._type.setup = 1;
+        frm.get_field('disable_note').$wrapper.empty().append('\
+<h4 class="text-danger">' + __('Note') + ':</h4>\
+<p class="text-danger">\
+    ' + __('Disabling the alert type will prevent all linked alerts from being displayed.') + '\
+</p>\
+        ');
     },
     toggle_toolbar: function(frm) {
         var label = __('Preview'),

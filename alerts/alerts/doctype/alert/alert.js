@@ -117,7 +117,6 @@ frappe.ui.form.on('Alert', {
         }
     },
     after_save: function(frm) {
-        frm.events.setup_doc(frm);
         frm.events.toggle_toolbar(frm);
     },
     on_submit: function(frm) {
@@ -129,7 +128,7 @@ frappe.ui.form.on('Alert', {
         frm.events.toggle_toolbar(frm);
     },
     setup_doc: function(frm) {
-        var docstatus = !frm.is_new() ? cint(frm.doc.docstatus) : 0;
+        var docstatus = cint(frm.doc.docstatus);
         frm._alert.is_draft = docstatus === 0;
         frm._alert.is_submitted = docstatus === 1;
         frm._alert.is_cancelled = docstatus === 2;

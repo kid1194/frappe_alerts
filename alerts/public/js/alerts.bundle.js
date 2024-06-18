@@ -10,7 +10,7 @@
     var LU = {
         $type(v) {
             if (v == null) return v === null ? 'Null' : 'Undefined';
-            var t = Object.prototype.toString.call(v).slice(8, -1);
+            let t = Object.prototype.toString.call(v).slice(8, -1);
             return t === 'Number' && isNaN(v) ? 'NaN' : t;
         },
         $hasProp(k, o) { return Object.prototype.hasOwnProperty.call(o || this, k); },
@@ -30,7 +30,7 @@
         $isArrLike(v) { return this.$isArr(v) || this.$isArgs(v); },
         $isArrLikeVal(v) { return this.$isArrLike(v) && v.length; },
         $isEmptyObj(v) {
-            if (this.$isObjLike(v)) for (var k in v) { if (this.$hasProp(k, v)) return false; }
+            if (this.$isObjLike(v)) for (let k in v) { if (this.$hasProp(k, v)) return false; }
             return true;
         },
         $isBaseObj(v) { return !this.$isArgs(v) && this.$is(v, 'Object'); },
@@ -38,7 +38,7 @@
         $fnStr(v) { return Function.prototype.toString.call(v); },
         $isObj(v, _) {
             if (!this.$isObjLike(v)) return false;
-            var k = 'constructor';
+            let k = 'constructor';
             v = Object.getPrototypeOf(v);
             return this.$hasProp(k, v) && this.$isFunc(v[k])
                 && (!_ || this.$fnStr(v[k]) === this.$fnStr(Object));
@@ -57,37 +57,37 @@
         $clone(v) { return this.$parseJson(this.$toJson(v)); },
         $filter(v, fn) {
             fn = this.$fn(fn) || function(v) { return v != null; };
-            var o = this.$isBaseObj(v), r = o ? {} : [];
-            if (o) for (var k in v) { if (this.$hasProp(k, v) && fn(v[k], k) !== false) r[k] = v[k]; }
-            else for (var i = 0, x = 0, l = v.length; i < l; i++) { if (fn(v[i], i) !== false) r[x++] = v[i]; }
+            let o = this.$isBaseObj(v), r = o ? {} : [];
+            if (o) for (let k in v) { if (this.$hasProp(k, v) && fn(v[k], k) !== false) r[k] = v[k]; }
+            else for (let i = 0, x = 0, l = v.length; i < l; i++) { if (fn(v[i], i) !== false) r[x++] = v[i]; }
             return r;
         },
         $map(v, fn) {
             if (!(fn = this.$fn(fn))) return this.$clone(v);
-            var o = this.$isBaseObj(v), r = o ? {} : [];
-            if (o) for (var k in v) { if (this.$hasProp(k, v)) r[k] = fn(v[k], k); }
-            else for (var i = 0, x = 0, l = v.length; i < l; i++) { r[x++] = fn(v[i], i); }
+            let o = this.$isBaseObj(v), r = o ? {} : [];
+            if (o) for (let k in v) { if (this.$hasProp(k, v)) r[k] = fn(v[k], k); }
+            else for (let i = 0, x = 0, l = v.length; i < l; i++) { r[x++] = fn(v[i], i); }
             return r;
         },
         $reduce(v, fn, r) {
             if (!(fn = this.$fn(fn))) return r;
-            if (this.$isBaseObj(v)) for (var k in v) { this.$hasProp(k, v) && fn(v[k], k, r); }
-            else for (var i = 0, x = 0, l = v.length; i < l; i++) { fn(v[i], i, r); }
+            if (this.$isBaseObj(v)) for (let k in v) { this.$hasProp(k, v) && fn(v[k], k, r); }
+            else for (let i = 0, x = 0, l = v.length; i < l; i++) { fn(v[i], i, r); }
             return r;
         },
         $assign() {
-            var a = arguments.length && this.$filter(arguments, this.$isBaseObj);
+            let a = arguments.length && this.$filter(arguments, this.$isBaseObj);
             if (!a || !a.length) return {};
             a.length > 1 && Object.assign.apply(null, a);
             return a[0];
         },
         $extend() {
-            var a = arguments.length && this.$filter(arguments, this.$isBaseObj);
+            let a = arguments.length && this.$filter(arguments, this.$isBaseObj);
             if (!a || a.length < 2) return a && a.length ? a[0] : {};
-            var d = this.$isBoolLike(arguments[0]) && arguments[0],
+            let d = this.$isBoolLike(arguments[0]) && arguments[0],
             t = this.$map(a[0], this.$isBaseObj);
-            for (var i = 1, l = a.length; i < l; i++)
-                for (var k in a[i]) {
+            for (let i = 1, l = a.length; i < l; i++)
+                for (let k in a[i]) {
                     if (!this.$hasProp(k, a[i]) || a[i][k] == null) continue;
                     d && t[k] && this.$isBaseObj(a[i][k]) ? this.$extend(d, a[0][k], a[i][k]) : (a[0][k] = a[i][k]);
                 }
@@ -103,28 +103,29 @@
             if (!this.$isFunc(fn)) return;
             a = a == null || this.$isArrLike(a) ? a : [a];
             o = o || this;
-            var l = a != null && a.length;
+            let l = a != null && a.length;
             return !l ? fn.call(o) : (l < 2 ? fn.call(o, a[0]) : (l < 3 ? fn.call(o, a[0], a[1])
                 : (l < 4 ? fn.call(o, a[0], a[1], a[2]) : fn.apply(o, a))));
         },
         $try(fn, a, o) { try { return this.$call(fn, a, o); } catch(e) { console.error(e.message, e.stack); } },
-        $xtry(fn, a, o) { return this.$afn(this.$try, [fn, a, o]); },
+        $xtry(fn, a, o) { return this.fn(function() { return this.try(fn, a, o); }); },
         $timeout(fn, tm, a, o) {
             return tm != null ? setTimeout(this.$afn(fn, a, o), tm) : ((fn && clearTimeout(fn)) || this);
         },
         $proxy(fn, tm) {
+            var me = this;
             return {
-                _fn(a, d) { this.cancel() || (d ? (this._r = LU.$timeout(fn, tm, a)) : LU.$call(fn, a)); },
+                _fn(a, d) { this.cancel() || (d ? (this._r = me.$timeout(fn, tm, a)) : me.$call(fn, a)); },
                 call() { this._fn(arguments); },
                 delay() { this._fn(arguments, 1); },
-                cancel() { LU.$timeout(this._r); delete this._r; },
+                cancel() { me.$timeout(this._r); delete this._r; },
             };
         },
         $def(v, o) { return this.$ext(v, o, 0); },
         $xdef(v, o) { return this.$ext(v, o, 0, 1); },
         $static(v, o) { return this.$ext(v, o, 1); },
         $ext(v, o, s, e) {
-            for (var k in v) { this.$hasProp(k, v) && this.$getter(k, v[k], s, e, o); }
+            for (let k in v) { this.$hasProp(k, v) && this.$getter(k, v[k], s, e, o); }
             return this;
         },
         $getter(k, v, s, e, o) {
@@ -135,9 +136,10 @@
             return this;
         },
         $getElem(k) { return document.getElementById(k); },
+        $hasElem(k) { return !!this.$getElem(k); },
         $makeElem(t, o) {
             t = document.createElement(t);
-            if (o) for (var k in o) { if (this.$hasProp(k, o)) t[k] = o[k]; }
+            if (o) for (let k in o) { if (this.$hasProp(k, o)) t[k] = o[k]; }
             return t;
         },
         $loadJs(s, o) {
@@ -159,14 +161,14 @@
     
     
     class LevelUpCore {
-        destroy() { for (var k in this) { if (this.$hasProp(k)) delete this[k]; } }
+        destroy() { for (let k in this) { if (this.$hasProp(k)) delete this[k]; } }
     }
     LU.$extend(LevelUpCore.prototype, LU);
     frappe.LevelUpCore = LevelUpCore;
     
     
     class LevelUpBase extends LevelUpCore {
-        constructor(mod, key, doc, ns, prod) {
+        constructor(mod, key, doc, ns) {
             super();
             this._mod = mod;
             this._key = key;
@@ -175,7 +177,7 @@
             this._real = this._key + '_';
             this._pfx = '[' + this._key.toUpperCase() + ']';
             this._ns = ns + (!ns.endsWith('.') ? '.' : '');
-            this._prod = prod;
+            this._prod = 0;
             this._events = {
                 list: {},
                 real: {},
@@ -184,6 +186,7 @@
         }
         get module() { return this._mod; }
         get key() { return this._key; }
+        get is_debug() { return !this._prod; }
         $alert(t, m, i, x) {
             m == null && (m = t) && (t = this._mod);
             t = this.$assign({title: t, indicator: i}, this.$isBaseObj(m) ? m : {message: m, as_list: this.$isArr(m)});
@@ -191,8 +194,8 @@
             (x === 'fatal' && (this._err = 1) ? frappe.throw : frappe.msgprint)(t);
             return this;
         }
-        debug(t, m) { return this._prod ? this : this.$alert(t, m, 'gray', 'debug'); }
-        log(t, m) { return this._prod ? this : this.$alert(t, m, 'cyan', 'log'); }
+        debug(t, m) { return this.is_debug ? this.$alert(t, m, 'gray', 'debug') : this; }
+        log(t, m) { return this.is_debug ? this.$alert(t, m, 'cyan', 'log') : this; }
         info(t, m) { return this.$alert(t, m, 'light-blue', 'info'); }
         warn(t, m) { return this.$alert(t, m, 'orange', 'warn'); }
         error(t, m) { return this.$alert(t, m, 'red', 'error'); }
@@ -207,7 +210,7 @@
         warn_(m, s, a) { return this.$toast(m, 'orange', s, a); }
         error_(m, s, a) { return this.$toast(m, 'red', s, a); }
         $console(fn, a) {
-            if (this._prod) return this;
+            if (!this.is_debug) return this;
             !this.$isStr(a[0]) ? Array.prototype.unshift.call(a, this._pfx)
                 : (a[0] = (this._pfx + ' ' + a[0]).trim());
             (console[fn] || console.log).apply(null, a);
@@ -242,18 +245,17 @@
         request(m, a, s, f) {
             s = this.$fn(s);
             f = this.$fn(f);
-            var d = {
+            let d = {
                 method: m.includes('.') ? m : this.get_method(m),
                 callback: this.$fn(function(r) {
                     r = (this.$isBaseObj(r) && r.message) || r;
                     if (!this.$isBaseObj(r) || !r.error) return s && s(r);
                     if (!this.$isBaseObj(r)) r = {};
-                    var k = ['list', 'message', 'error', 'self'],
-                    m = (this.$isArrVal(r[k[0]]) ? this.$map(r[k[0]], function(v) { return __(v); }).join('\n')
-                        : (this.$isStrVal(r[k[1]]) ? __(r[k[1]])
-                        : (this.$isStrVal(r[k[2]]) ? __(r[k[2]]) : '')));
+                    var k = ['list', 'message', 'error', 'self'];
+                    let m = r[k[0]] != null ? r[k[0]] : (r[k[1]] != null ? r[k[1]] : (r[k[2]] != null ? r[k[2]] : null));
+                    m = this.$isArrVal(m) ? this.$map(m, function(v) { return __(v); }).join('\n') : (this.$isStrVal(m) ? __(m) : '');
                     if (!m.trim().length) m = __('The request sent returned an invalid response.');
-                    if (f) r = this.$assign({message: m, self: 1}, this.$filter(r, function(_, x) { return !k.includes(x); }));
+                    if (f) r = this.$assign({message: m, list: m.split('\n'), self: 1}, this.$filter(r, function(_, x) { return !k.includes(x); }));
                     f ? f(r) : this._error(m);
                 }),
                 error: this.$fn(function(r, t) {
@@ -279,26 +281,26 @@
             if (e == null) return this._off();
             if (this.$isBoolLike(e)) return this._off(0, 1);
             e = e.trim().split(' ');
-            for (var i = 0, l = e.length, ev; i < l; i++)
+            for (let i = 0, l = e.length, ev; i < l; i++)
                 (ev = (rl ? this._real : '') + e[i]) && this._events.list[ev] && this._off(ev, fn);
             return this;
         }
         emit(e) {
             e = e.trim().split(' ');
-            for (var a = this.$toArr(arguments, 1), p = Promise.resolve(), i = 0, l = e.length; i < l; i++)
+            for (let a = this.$toArr(arguments, 1), p = Promise.resolve(), i = 0, l = e.length; i < l; i++)
                 this._events.list[e[i]] && this._emit(e[i], a, p);
             return this;
         }
         call(e) {
             e = e.trim().split(' ');
-            for (var a = this.$toArr(arguments, 1), i = 0, l = e.length; i < l; i++)
+            for (let a = this.$toArr(arguments, 1), i = 0, l = e.length; i < l; i++)
                 this._events.list[e[i]] && this._emit(e[i], a);
             return this;
         }
         _on(ev, fn, o, s, r) {
             ev = ev.trim().split(' ');
-            var rd = [];
-            for (var es = this._events, i = 0, l = ev.length, e; i < l; i++) {
+            let rd = [];
+            for (let es = this._events, i = 0, l = ev.length, e; i < l; i++) {
                 e = (r ? this._real : '') + ev[i];
                 e === es.once[0] && this._is_ready && rd.push(es.once[0]);
                 es.once.includes(e) && (o = 1);
@@ -314,9 +316,9 @@
         }
         _off(e, fn) {
             if (e && fn) this._del(e, fn);
-            else if (!e && fn) for (var ev in this._events.list) { this._del(ev); }
+            else if (!e && fn) for (let ev in this._events.list) { this._del(ev); }
             else {
-                var es = this._events;
+                let es = this._events;
                 es.real[e] && frappe.realtime.off(e, es.real[e]);
                 delete es.list[e];
                 delete es.real[e];
@@ -324,15 +326,15 @@
             return this;
         }
         _del(e, fn) {
-            var ev = this._events.list[e].slice(), ret = [];
-            for (var x = 0, i = 0, l = ev.length; i < l; i++)
+            let ev = this._events.list[e].slice(), ret = [];
+            for (let x = 0, i = 0, l = ev.length; i < l; i++)
                 (fn ? ev[i].f !== fn : ev[i].s) && (ret[x++] = ev[i]);
             !ret.length ? this._off(e) : (this._events.list[e] = ret);
         }
         _emit(e, a, p) {
-            var ev = this._events.list[e].slice(), ret = [];
+            let ev = this._events.list[e].slice(), ret = [];
             p && p.catch(this.$fn(function(z) { this._error('Events emit', e, a, z.message); }));
-            for (var x = 0, i = 0, l = ev.length; i < l; i++) {
+            for (let x = 0, i = 0, l = ev.length; i < l; i++) {
                 p ? p.then(this.$xtry(ev[i].f, a)) : this.$try(ev[i].f, a);
                 !ev[i].o && (ret[x++] = ev[i]);
             }
@@ -343,19 +345,19 @@
     
     var LUR = {
         on(o) {
-            for (var k = ['router', 'route'], i = 0, l = k.length; i < l; i++)
+            for (let k = ['router', 'route'], i = 0, l = k.length; i < l; i++)
                 (o._router.obj = frappe[k[i]]) && (i < 1 || (o._router.old = 1));
             this._reg(o, 'on');
             this.get(o);
         },
         off(o) { this._reg(o, 'off'); o._router.obj = o._router.old = null; },
         get(o) {
-            var d = ['app'], v;
+            let d = ['app'], v;
             try { v = !o._router.old ? frappe.get_route() : (o._router.obj ? o._router.obj.parse() : null); } catch(_) {}
             v = LU.$isArrVal(v) ? LU.$filter(LU.$map(v, function(z) { return (z = cstr(z).trim()).length && !/(\#|\?|\&)$/.test(z) ? z : null; })) : d;
             if (v.length) v[0] = v[0].toLowerCase();
-            var r = 0;
-            for (var i = 0, l = v.length; i < l; i++)
+            let r = 0;
+            for (let i = 0, l = v.length; i < l; i++)
                 if ((!o._router.val || o._router.val.indexOf(v[i]) !== i) && ++r) break;
             if (r) o._router.val = v;
             return r > 0;
@@ -398,7 +400,7 @@
             }
             if (!LU.$isStrVal(c) || !(f = this.get(f, k, 1)) || !LU.$isArrVal(f.grid_rows)) return;
             try {
-                for (var i = 0, l = f.grid_rows, x; i < l; i++) {
+                for (let i = 0, l = f.grid_rows, x; i < l; i++) {
                     r = f.grid_rows[i];
                     (x = r.on_grid_fields_dict[c]) && x.refresh && x.refresh();
                     (x = r.grid_form && r.grid_form.refresh_field) && x(c);
@@ -406,20 +408,20 @@
             } catch(_) {}
         },
         prop(f, k, g, r, c, p, v) {
-            if (LU.$isBaseObj(k)) for (var x in k) { this.prop(f, x, g, r, c, k[x]); }
-            else if (LU.$isBaseObj(c)) for (var x in c) { this.prop(f, k, g, r, x, c[x]); }
+            if (LU.$isBaseObj(k)) for (let x in k) { this.prop(f, x, g, r, c, k[x]); }
+            else if (LU.$isBaseObj(c)) for (let x in c) { this.prop(f, k, g, r, x, c[x]); }
             else {
                 (g || r != null) && (f = this.get(f, k, g, r)) && (k = c);
-                var m = r != null ? 'set_field_property' : (g ? 'update_docfield_property' : 'set_df_property');
+                let m = r != null ? 'set_field_property' : (g ? 'update_docfield_property' : 'set_df_property');
                 try {
                     if (!LU.$isBaseObj(p)) f[m](k, p, v);
-                    else for (var x in p) { f[m](k, x, p[x]); }
+                    else for (let x in p) { f[m](k, x, p[x]); }
                     g && r == null && f.debounced_refresh();
                 } catch(_) {}
             }
         },
         toggle(f, k, g, r, c, e, i) {
-            var tf = this.get(f, k, g, r, c, 1);
+            let tf = this.get(f, k, g, r, c, 1);
             e = e ? 0 : 1;
             if (!tf || !tf.df || cint(tf.df.hidden) || (i && tf.df._ignore) || cint(tf.df.read_only) === e) return;
             this.prop(f, k, g, r, c, 'read_only', e);
@@ -433,7 +435,7 @@
             return cstr((f && f.df && ((b && f.df._description) || (!b && f.df.description))) || '');
         },
         desc(f, k, g, r, c, m) {
-            var x = 0;
+            let x = 0;
             k && (f = this.get(f, k, g, r, c, 1));
             if (f.df._description == null) f.df._description = f.df.description || '';
             if (!LU.$isStr(m)) m = '';
@@ -448,7 +450,7 @@
             return x;
         },
         status(f, k, g, r, c, m) {
-            var v = LU.$isStrVal(m), tf = this.get(f, k, g, r, c, 1), x = 0;
+            let v = LU.$isStrVal(m), tf = this.get(f, k, g, r, c, 1), x = 0;
             if ((!v && tf.df.invalid) || (v && !tf.df.invalid))
                 try {
                     ++x && ((tf.df.invalid = v ? 1 : 0) || 1) && tf.set_invalid && tf.set_invalid();
@@ -460,11 +462,11 @@
     LUT = {
         setup(f, k) {
             cint(k.df.read_only) && (k.df._ignore = 1);
-            for (var ds = this._fields(this._grid(f, k.df.fieldname)), i = 0, l = ds.length, d; i < l; i++)
+            for (let ds = this._fields(this._grid(f, k.df.fieldname)), i = 0, l = ds.length, d; i < l; i++)
                 (d = ds[i]) && cint(d.read_only) && (d._ignore = 1);
         },
         toggle(f, k, e, o, i) {
-            var tf = this._grid(f, k, i), x;
+            let tf = this._grid(f, k, i), x;
             if (!tf) return;
             x = !e || !!tf._;
             x && (!o || !o.add) && this.toggle_add(tf, 0, e);
@@ -476,7 +478,7 @@
             if (e && tf._) delete tf._;
         },
         toggle_add(f, k, e) {
-            var tf = k ? this._grid(f, k) : f;
+            let tf = k ? this._grid(f, k) : f;
             if (!tf) return;
             if (e) {
                 (!tf._ || tf._.add != null) && (tf.df.cannot_add_rows = tf._ ? tf._.add : false);
@@ -489,7 +491,7 @@
             return 1;
         },
         toggle_del(f, k, e) {
-            var tf = k ? this._grid(f, k) : f;
+            let tf = k ? this._grid(f, k) : f;
             if (!tf) return;
             if (e) {
                 (!tf._ || tf._.del != null) && (tf.df.cannot_delete_rows = tf._ ? tf._.del : false);
@@ -503,17 +505,17 @@
             return 1;
         },
         toggle_edit(f, k, g, e) {
-            var tf = k ? this._grid(f, k) : f;
+            let tf = k ? this._grid(f, k) : f;
             if (!tf) return;
             if (e) {
                 (!tf._ || tf._.edit != null) && (tf.df.in_place_edit = tf._ ? tf._.edit : true);
                 tf._ && tf._.grid != null && tf.meta && (tf.meta.editable_grid = tf._.grid);
                 (!tf._ || tf._.static != null) && (tf.static_rows = tf._ ? tf._.static : false);
                 if (tf._ && tf._.read && tf._.read.length) {
-                    for (var ds = this._fields(tf), i = 0, l = ds.length, d; i < l; i++)
+                    for (let ds = this._fields(tf), i = 0, l = ds.length, d; i < l; i++)
                         (d = ds[i]) && !d._ignore && tf._.read.includes(d.fieldname) && (d.read_only = 0);
                 }
-                if (k && tf._) for (var x = ['edit', 'grid', 'static', 'read'], i = 0; i < 4; i++) { delete tf._[x[i]]; }
+                if (k && tf._) for (let x = ['edit', 'grid', 'static', 'read'], i = 0; i < 4; i++) { delete tf._[x[i]]; }
                 k && LUC.reload(f, k);
                 return 1;
             }
@@ -524,7 +526,7 @@
             tf._.static == null && (tf._.static = tf.static_rows);
             tf.static_rows = true;
             tf._.read == null && (tf._.read = []);
-            for (var ds = this._fields(tf), i = 0, x = 0, l = ds.length, d; i < l; i++)
+            for (let ds = this._fields(tf), i = 0, x = 0, l = ds.length, d; i < l; i++)
                 (d = ds[i]) && !d._ignore && !tf._.read.includes(d.fieldname)
                 && (!g || !g.includes(d.fieldname)) && (d.read_only = 1)
                 && (tf._.read[x++] = d.fieldname);
@@ -532,7 +534,7 @@
             return 1;
         },
         toggle_sort(f, k, e) {
-            var tf = k ? this._grid(f, k) : f;
+            let tf = k ? this._grid(f, k) : f;
             if (!tf) return;
             if (e) {
                 (!tf._ || tf._.sort != null) && (tf.sortable_status = tf._ ? tf._.sort : true);
@@ -545,7 +547,7 @@
             return 1;
         },
         toggle_check(f, k, e) {
-            var tf = k ? this._grid(f, k) : f;
+            let tf = k ? this._grid(f, k) : f;
             if (!tf) return;
             if (e) {
                 (!tf._ || tf._.check) && tf.toggle_checkboxes(1);
@@ -559,9 +561,9 @@
             return ((!k && (f = f.grid)) || (f = LUC.get(f, k, 1))) && !cint(f.df.hidden) && (!i || !f.df._ignore) && f;
         },
         _fields(f) {
-            var ds = [];
+            let ds = [];
             if (LU.$isArrVal(f.grid_rows)) {
-                for (var i = 0, l = f.grid_rows.length, r; i < l; i++)
+                for (let i = 0, l = f.grid_rows.length, r; i < l; i++)
                     (r = f.grid_rows[i]) && LU.$isArrVal(r.docfields) && ds.push.apply(ds, r.docfields);
             }
             LU.$isArrVal(f.docfields) && ds.push.apply(ds, f.docfields);
@@ -571,8 +573,8 @@
     
     
     class LevelUp extends LevelUpBase {
-        constructor(mod, key, doc, ns, prod) {
-            super(mod, key, doc, ns, prod);
+        constructor(mod, key, doc, ns) {
+            super(mod, key, doc, ns);
             this.$xdef({is_enabled: true});
             this._router = {obj: null, old: 0, val: null};
             this._win = {
@@ -612,7 +614,7 @@
         get app_disabled_note() { return __('{0} app is disabled.', [this._mod]); }
         setup_list(f) {
             if (!this.is_list || !(f = this.get_list(f)) || !this._is_self_view(f)) return this;
-            var n = !f[this._tmp];
+            let n = !f[this._tmp];
             if (this._is_enabled) this.enable_list(f);
             else this.disable_list(f, this.app_disabled_note);
             n && this.off('page_clean').once('page_clean', function() { this.enable_list(f); });
@@ -620,7 +622,7 @@
         }
         enable_list(f) {
             if (!(f = this.get_list(f)) || (f[this._tmp] && !f[this._tmp].disabled)) return this;
-            var k = 'toggle_actions_menu_button';
+            let k = 'toggle_actions_menu_button';
             f[this._tmp] && f[this._tmp][k] && (f[k] = f[this._tmp][k]);
             f.page.clear_inner_toolbar();
             f.set_primary_action();
@@ -633,14 +635,14 @@
             f.page.clear_primary_action();
             f.page.clear_inner_toolbar();
             m && f.page.add_inner_message(m).removeClass('text-muted').addClass('text-danger');
-            var k = 'toggle_actions_menu_button';
+            let k = 'toggle_actions_menu_button';
             !f[this._tmp] && (f[this._tmp] = {});
             (f[this._tmp][k] = f[k]) && (f[k] = function() {}) && (f[this._tmp].disabled = 1);
             return this;
         }
         setup_tree(f) {
             if (!this.is_tree || !(f = this.get_tree(f)) || !this._is_self_view(f)) return this;
-            var n = !f[this._tmp];
+            let n = !f[this._tmp];
             if (this._is_enabled) this.enable_tree(f);
             else this.disable_tree(f, this.app_disabled_note);
             n && this.$xdef({tree: f}).off('page_clean').once('page_clean', function() { this.$xdef({tree: null}).enable_tree(f); });
@@ -648,7 +650,7 @@
         }
         enable_tree(f) {
             if (!(f = this.get_tree(f)) || (f[this._tmp] && !f[this._tmp].disabled)) return this;
-            var k = 'can_create';
+            let k = 'can_create';
             f[this._tmp] && f[this._tmp][k] && (f[k] = f[this._tmp][k]);
             f.page.clear_inner_toolbar();
             f.set_primary_action();
@@ -662,7 +664,7 @@
             f.page.clear_primary_action();
             f.page.clear_inner_toolbar();
             m && f.page.add_inner_message(m).removeClass('text-muted').addClass('text-danger');
-            var k = 'can_create';
+            let k = 'can_create';
             !f[this._tmp] && (f[this._tmp] = {});
             (f[this._tmp][k] = f[k]) && (f[k] = false) && (f[this._tmp].disabled = 1);
             f.refresh();
@@ -670,10 +672,10 @@
         }
         setup_form(f) {
             if (!this.is_form || !(f = this.get_form(f)) || !this._is_self_view(f)) return this;
-            var n = !f[this._tmp];
+            let n = !f[this._tmp];
             if (n && this.$isArrVal(f.fields))
                 try {
-                    for (var i = 0, l = f.fields.length, c; i < l; i++) {
+                    for (let i = 0, l = f.fields.length, c; i < l; i++) {
                         if (!(c = f.fields[i])) continue;
                         if (LUF.is_table(c)) LUT.setup(f, c);
                         else if (LUF.is_field(c) && cint(c.df.read_only)) c.df._ignore = 1;
@@ -688,7 +690,7 @@
             if (!(f = this.get_form(f)) || (f[this._tmp] && !f[this._tmp].disabled)) return this;
             try {
                 if (this.$isArrVal(f.fields))
-                    for (var i = 0, l = f.fields.length, c; i < l; i++) {
+                    for (let i = 0, l = f.fields.length, c; i < l; i++) {
                         if (!(c = f.fields[i]) || !c.df.fieldname) continue;
                         if (LUF.is_table(c)) LUT.toggle(f, c.df.fieldname, 1, 0, 1);
                         else if (LUF.is_field(c)) LUC.toggle(f, c.df.fieldname, 0, null, 0, 1, 1);
@@ -707,7 +709,7 @@
             o = this.$assign({ignore: []}, o);
             try {
                 if (this.$isArrVal(f.fields))
-                    for (var i = 0, l = f.fields.length, c; i < l; i++) {
+                    for (let i = 0, l = f.fields.length, c; i < l; i++) {
                         if (!(c = f.fields[i]) || !c.df.fieldname || o.ignore.includes(c.df.fieldname)) continue;
                         if (LUF.is_table(c)) LUT.toggle(f, c.df.fieldname, 0, 0, 1);
                         else if (LUF.is_field(c)) LUC.toggle(f, c.df.fieldname, 0, null, 0, 0, 1);
@@ -832,7 +834,7 @@
 
     class Alerts extends LevelUp {
         constructor() {
-            super(__('Alerts'), 'alerts', 'Alert', 'alerts.utils', 0);
+            super(__('Alerts'), 'alerts', 'Alert', 'alerts.utils');
             this.$xdef({
                 id: frappe.utils.get_random(5),
                 is_ready: 0,
