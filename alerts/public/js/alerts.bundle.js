@@ -108,7 +108,7 @@
                 : (l < 4 ? fn.call(o, a[0], a[1], a[2]) : fn.apply(o, a))));
         },
         $try(fn, a, o) { try { return this.$call(fn, a, o); } catch(e) { console.error(e.message, e.stack); } },
-        $xtry(fn, a, o) { return this.fn(function() { return this.try(fn, a, o); }); },
+        $xtry(fn, a, o) { return this.$fn(function() { return this.$try(fn, a, o); }); },
         $timeout(fn, tm, a, o) {
             return tm != null ? setTimeout(this.$afn(fn, a, o), tm) : ((fn && clearTimeout(fn)) || this);
         },
