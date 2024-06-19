@@ -7,7 +7,7 @@
 
 
 frappe.ui.form.on('Alert Type', {
-    setup: function(frm) {
+    onload: function(frm) {
         frappe.alerts
             .on('ready change', function() { this.setup_form(frm); })
             .on('on_alert', function(d, t) {
@@ -28,15 +28,16 @@ frappe.ui.form.on('Alert Type', {
         frm.events.toggle_toolbar(frm);
     },
     validate: function(frm) {
+        var errs = [];
         if (cstr(frm.doc.display_sound) === 'Custom') {
-            if (!frappe.alerts.$isStrVal(frm.doc.custom_display_sound)) {
-                frappe.alerts.fatal(__('A valid custom display sound is required.'));
-                return false;
-            }
-            if (!(/\.(mp3|wav|ogg)$/i).test(frm.doc.custom_display_sound)) {
-                frappe.alerts.fatal(__('Custom display sound must be of a supported format (MP3, WAV, OGG).'));
-                return false;
-            }
+            if (!frappe.alerts.$isStrVal(frm.doc.custom_display_sound))
+                errs.push(__('A valid custom display sound is required.'));
+            if (!(/\.(mp3|wav|ogg)$/i).test(frm.doc.custom_display_sound))
+                errs.push(__('Custom display sound must be of a supported format (MP3, WAV, OGG).'));
+        }
+        if (errs.length) {
+            frappe.alerts.fatal(errs);
+            return false;
         }
     },
     after_save: function(frm) {

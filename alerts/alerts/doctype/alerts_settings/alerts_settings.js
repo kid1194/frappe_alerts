@@ -1,5 +1,5 @@
 /*
-*  Alerts © 2022
+*  Alerts © 2024
 *  Author:  Ameen Ahmed
 *  Company: Level Up Marketing & Software Development Services
 *  Licence: Please refer to LICENSE file
@@ -27,19 +27,19 @@ frappe.ui.form.on('Alerts Settings', {
         });
     },
     validate: function(frm) {
-        let err = [];
+        var errs = [];
         if (cint(frm.doc.use_fallback_sync)) {
             if (cint(frm.doc.fallback_sync_delay) < 1)
-                err.push(__('Fallback sync delay must be greater than or equals to 1 minute.'));
+                errs.push(__('Fallback sync delay must be greater than or equals to 1 minute.'));
         }
         if (cint(frm.doc.send_update_notification)) {
             if (!frappe.alerts.$isStrVal(frm.doc.update_notification_sender))
-                err.push(__('A valid update notification sender is required.'));
+                errs.push(__('A valid update notification sender is required.'));
             if (!frappe.alerts.$isArrVal(frm.doc.update_notification_receivers))
-                err.push(__('At least one valid update notification receiver is required.'));
+                errs.push(__('At least one valid update notification receiver is required.'));
         }
-        if (err.length) {
-            frappe.alerts.fatal(err);
+        if (errs.length) {
+            frappe.alerts.fatal(errs);
             return false;
         }
     },
