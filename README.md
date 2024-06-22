@@ -23,10 +23,11 @@ A small **Frappe** module that displays custom alerts to specific recipients aft
 
 ### Contributors
 **The list of people who deserves more than a simple "Thank You".**
-- [![avc](https://img.shields.io/badge/avc-Debug_%7C_Test-red?style=plastic)](https://github.com/git-avc)
-- [![lan9635](https://img.shields.io/badge/lan9635-Debug_%7C_Test-blue?style=plastic)](https://github.com/lan9635)
-- [![satishkakani](https://img.shields.io/badge/satishkakani-Debug-green?style=plastic)](https://github.com/satishkakani)
+- [![avc](https://img.shields.io/badge/avc-Debug_%7C_Test-green?style=plastic)](https://github.com/git-avc)
+- [![lan9635](https://img.shields.io/badge/lan9635-Debug_%7C_Test-green?style=plastic)](https://github.com/lan9635)
+- [![satishkakani](https://img.shields.io/badge/satishkakani-Debug-orange?style=plastic)](https://github.com/satishkakani)
 - [![neomrx](https://img.shields.io/badge/neomrx-Debug-orange?style=plastic)](https://github.com/neomrx)
+- [![rahulrajeevihg](https://img.shields.io/badge/rahulrajeevihg-Debug-orange?style=plastic)](https://github.com/rahulrajeevihg)
 
 ---
 
