@@ -17,6 +17,11 @@ def set_cache(dt, key, data, expiry: int=None):
     frappe.cache().set_value(f"{dt}-{key}", data, expires_in_sec=expiry)
 
 
+# [Alert]
+def del_cache(dt, key):
+    frappe.cache().delete_key(f"{dt}-{key}")
+
+
 # [A Alert, A Alerts Settings, A Type, Alert]
 def clear_doc_cache(dt, name=None):
     frappe.cache().delete_keys(dt)

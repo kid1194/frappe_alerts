@@ -39,7 +39,7 @@ def get_types():
         dt,
         fields=[
             "name",
-            "priority",
+            "display_priority",
             "display_timeout",
             "display_sound",
             "custom_display_sound",

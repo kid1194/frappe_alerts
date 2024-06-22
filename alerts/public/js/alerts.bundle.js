@@ -178,6 +178,7 @@
             this._pfx = '[' + this._key.toUpperCase() + ']';
             this._ns = ns + (!ns.endsWith('.') ? '.' : '');
             this._prod = 0;
+            this._exit = 0;
             this._events = {
                 list: {},
                 real: {},
@@ -225,8 +226,12 @@
             o = this.$extend(1, {
                 url: u, method: 'GET', cache: false, 'async': true, crossDomain: true,
                 headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                success: this.$fn(s),
+                success: this.$fn(function(r, t) {
+                    if (this._exit) return;
+                    (s = this.$fn(s)) && s(r, t);
+                }),
                 error: this.$fn(function(r, t) {
+                    if (this._exit) return;
                     r = this.$isStrVal(r) ? __(r) : (this.$isStrVal(t) ? __(t)
                         : __('The ajax request sent raised an error.'));
                     (f = this.$fn(f)) ? f({message: r}) : this._error(r);
@@ -242,12 +247,13 @@
             return this;
         }
         get_method(v) { return this._ns + v; }
-        request(m, a, s, f) {
+        request(m, a, s, f, x) {
             s = this.$fn(s);
             f = this.$fn(f);
             var d = {
                 method: m.includes('.') ? m : this.get_method(m),
                 callback: this.$fn(function(r) {
+                    if (!x && this._exit) return;
                     r = (this.$isBaseObj(r) && r.message) || r;
                     if (!this.$isBaseObj(r) || !r.error) return s && s(r);
                     if (!this.$isBaseObj(r)) r = {};
@@ -259,6 +265,7 @@
                     f ? f(r) : this._error(m);
                 }),
                 error: this.$fn(function(r, t) {
+                    if (!x && this._exit) return;
                     r = this.$isStrVal(r) ? __(r) : (this.$isStrVal(t) ? __(t) : __('The request sent raised an error.'));
                     f ? f({message: r}) : this._error(r);
                 })
@@ -303,7 +310,7 @@
             for (var es = this._events, i = 0, l = ev.length, e; i < l; i++) {
                 e = (r ? this._real : '') + ev[i];
                 e === es.once[0] && this._is_ready && rd.push(es.once[0]);
-                es.once.includes(e) && (o = 1);
+                !s && es.once.includes(e) && (o = 1);
                 !es.list[e] && (es.list[e] = []) && (!r || frappe.realtime.on(e, (es.real[e] = this._rfn(e))));
                 es.list[e].push({f: fn, o, s});
             }
@@ -311,7 +318,8 @@
         }
         _rfn(e) {
             return this.$fn(function(r) {
-                (r = (this.$isBaseObj(r) && r.message) || r) && this._emit(e, r != null ? [r] : r, Promise.wait(300));
+                !this._exit && (r = (this.$isBaseObj(r) && r.message) || r) && this._emit(e, r != null ? [r] : r, Promise.wait(300));
+                return true;
             });
         }
         _off(e, fn) {
@@ -586,8 +594,12 @@
                 fn: this.$fn(function() {
                     if (this._win.c || !LUR.get(this)) return;
                     this._win.c++;
+                    this._exit++;
                     this.emit('page_change page_clean');
-                    this.$timeout(function() { this._win.c--; }, 2000);
+                    this.$timeout(function() {
+                        this._win.c--;
+                        this._exit--;
+                    }, 2000);
                 }),
             };
             addEventListener('beforeunload', this._win.e.unload);
@@ -851,7 +863,7 @@
             this._seen = [];
             this._mock = null;
             
-            this.request('get_settings', null, this._setup);
+            this.request('get_settings', null, this._setup, null, true);
         }
         get has_alerts() { return this._list.length > 0; }
         get _has_seen() { return this._seen.length > 0; }
@@ -861,6 +873,7 @@
             this._is_ready = 1;
             this._options(opts);
             this.xon('page_change', function() {
+                this.off('change on_alert');
                 this._is_enabled && this._init();
             })
             .xreal('status_changed', function(ret, sync) {
@@ -881,7 +894,7 @@
                 } else {
                     this._types[name] = {
                         name: name,
-                        priority: cint(ret.priority),
+                        priority: cint(ret.display_priority),
                         timeout: cint(ret.display_timeout),
                         sound: cstr(ret.display_sound),
                         custom_sound: cstr(ret.custom_display_sound)
@@ -895,20 +908,20 @@
             .xreal('show_alert', function(ret) {
                 this._debug('real show_alert', ret);
                 if (this._is_enabled && this._is_valid(ret)) this._queue(ret);
-            });
-            this.emit('ready');
-            this._is_enabled && this._init();
+            })
+            .emit('ready');
+            this._is_enabled && this._init(1);
         }
         _options(opts) {
             this.$xdef(opts);
-            this._sync_tm && (this._sync_tm = this.$timeout(this._sync_tm));
+            this._sync_tm && this.$timeout(this._sync_tm) && (this._sync_tm = null);
             if (this._use_fallback_sync)
                 this._sync_delay = this._fallback_sync_delay * 60 * 1000;
         }
-        _init() {
-            if (this._init) return this.show();
+        _init(s) {
+            if (this._is_init) return this.show();
             this._is_init = 1;
-            this.$timeout(this._get_alerts, 700);
+            this.$timeout(this._get_alerts, s ? 300 : 700);
         }
         _queue_sync() {
             if (!this._use_fallback_sync || !this._is_init || this._sync_tm) return;
@@ -917,7 +930,7 @@
         _get_alerts() {
             if (this._in_req) return;
             this._in_req = 1;
-            this._sync_tm && (this._sync_tm = this.$timeout(this._sync_tm));
+            this._sync_tm && this.$timeout(this._sync_tm) && (this._sync_tm = null);
             this.request(
                 'sync_alerts',
                 {init: this._is_first},
@@ -929,10 +942,10 @@
                     }
                     this._is_first = 0;
                     if (this.$isBaseObjVal(ret.system))
-                        this.call('alerts_app_status_changed', ret.system, 1);
+                        this.call('alerts_status_changed', ret.system, 1);
                     if (!this._is_enabled) return this._queue_sync();
                     if (this.$isBaseObjVal(ret.events))
-                        for (var k in ret.events) { this.emit(k, ret.events[k]); }
+                        for (var k in ret.events) { this.emit(k, ret.events[k], 1); }
                     if (this.$isBaseObj(ret.types)) this._build_types(ret.types);
                     if (this.$isArrVal(ret.alerts)) this._queue(ret.alerts);
                     this._queue_sync();
@@ -941,7 +954,8 @@
                     this._in_req = 0;
                     this._queue_sync();
                     this._error(e.self ? e.message : 'Getting user alerts failed.', e.message);
-                }
+                },
+                true
             );
         }
         _get_type(name) { return this._types[name] || {name}; }
@@ -950,7 +964,7 @@
             for (var k in data) {
                 this._types[k] = {
                     name: k,
-                    priority: cint(data[k].priority),
+                    priority: cint(data[k].display_priority),
                     timeout: cint(data[k].display_timeout),
                     sound: cstr(data[k].display_sound),
                     custom_sound: cstr(data[k].custom_display_sound)
@@ -1034,7 +1048,8 @@
                     this._seen = seen;
                     this._error(e.self ? e.message : 'Marking alerts as seen error.', seen, e && e.message);
                     this._retry_mark_seens();
-                }
+                },
+                true
             );
         }
         _retry_mark_seens() {

@@ -5,5 +5,5 @@
 
 
 __module__ = "Alerts"
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 __update_api__ = "https://api.github.com/repos/kid1194/frappe_alerts/releases/latest"

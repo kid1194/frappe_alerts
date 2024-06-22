@@ -12,7 +12,6 @@ from alerts.utils import clear_doc_cache
 
 
 class AlertType(Document):
-    _ignore_fields = ["display_priority"]
     _type_filter = {"fieldtype": ["in", ["Check", "Int", "Select", "Attach", "Color"]]}
     _int_types = ["Check", "Int"]
     
@@ -43,10 +42,7 @@ class AlertType(Document):
         clear_doc_cache(self.doctype, self.name)
         
         for f in self.meta.get("fields"):
-            if (
-                f.fieldname not in self._ignore_fields and
-                self.has_value_changed(f.fieldname)
-            ):
+            if self.has_value_changed(f.fieldname):
                 self.flags.emit_change = 1
                 self.flags.emit_action = "add" if self.is_new() else "change"
                 break
@@ -120,8 +116,7 @@ class AlertType(Document):
         }
         if data["action"] != "trash":
             for f in self.meta.get("fields", self._type_filter):
-                if f.fieldname not in self._ignore_fields:
-                    data[f.fieldname] = self.get(f.fieldname)
+                data[f.fieldname] = self.get(f.fieldname)
         
         emit_type_changed(data)
     

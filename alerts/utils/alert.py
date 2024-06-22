@@ -99,8 +99,8 @@ def type_alerts_exist(alert_type):
 def enqueue_alerts(user: str):
     from .cache import get_cache
     
-    cache = get_cache(_ALERT_DT_, f"{user}-alerts", True)
-    if not cache or not isinstance(cache, list):
+    cache = get_cache(user, "alerts", True)
+    if not cache:
         from .background import is_job_running
         
         job_id = f"alerts-cache-for-{user}"
@@ -108,7 +108,7 @@ def enqueue_alerts(user: str):
             from .background import enqueue_job
             
             enqueue_job(
-                "alerts.utils.alert.get_user_alerts",
+                "alerts.utils.alert.cache_user_alerts",
                 job_id,
                 user=user
             )
@@ -128,7 +128,20 @@ def sync_alerts(init=None):
         return data
     
     if doc["use_fallback_sync"] or init:
-        data["alerts"] = get_user_alerts(frappe.session.user)
+        user = frappe.session.user
+        if init:
+            from .cache import get_cache
+            
+            key = f"alerts-{user}"
+            cache = get_cache(_ALERT_DT_, key, True)
+            if isinstance(cache, list):
+                from .cache import del_cache
+                
+                del_cache(_ALERT_DT_, key)
+                data["alerts"] = cache
+        
+        if "alerts" not in data:
+            data["alerts"] = get_user_alerts(user)
     
     if init:
         from .type import get_types
@@ -198,29 +211,29 @@ def sync_seen(names):
 
 
 # [Internal]
+def cache_user_alerts(user: str):
+    from .cache import set_cache
+    
+    expiry = seconds_left_for_day()
+    data = get_user_alerts(user)
+    set_cache(user, "alerts", True, expiry)
+    set_cache(_ALERT_DT_, f"alerts-{user}", data, expiry)
+
+
+# [Internal]
 def get_user_alerts(user: str):
-    from .cache import get_cache
-    
-    key = f"{user}-alerts"
-    data = get_cache(_ALERT_DT_, key, True)
-    if isinstance(data, list):
-        return data
-    
     from frappe.utils import nowdate
     
     today = nowdate()
-    expiry = seconds_left_for_day()
     alerts = get_daily_alerts(today)
     tmp = []
     if not alerts:
-        _set_cache(key, tmp, expiry)
         return tmp
     
     parents = []
     get_alerts_for_user(user, alerts, parents)
     get_alerts_for_roles(user, alerts, parents)
     if not parents:
-        _set_cache(key, tmp, expiry)
         return tmp
     
     from .type import type_join_query
@@ -242,14 +255,12 @@ def get_user_alerts(user: str):
     qry = type_join_query(qry, doc.alert_type)
     data = qry.run(as_dict=True)
     if not data or not isinstance(data, list):
-        _set_cache(key, tmp, expiry)
         return tmp
     
     data = filter_seen_alerts(data, user, parents, today)
     if not data:
         data = tmp
     
-    _set_cache(key, data, expiry)
     return data
 
 
@@ -541,10 +552,3 @@ def send_alerts(names: list):
                     v["seen_today"].append(x)
         
         emit_show_alert(v)
-
-
-# [Internal]
-def _set_cache(key, data, expiry=None):
-    from .cache import set_cache
-    
-    set_cache(_ALERT_DT_, key, data, expiry)
