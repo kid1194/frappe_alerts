@@ -318,7 +318,7 @@
         }
         _rfn(e) {
             return this.$fn(function(r) {
-                !this._exit && (r = (this.$isBaseObj(r) && r.message) || r) && this._emit(e, r != null ? [r] : r, Promise.wait(300));
+                (r = (this.$isBaseObj(r) && r.message) || r) && this._emit(e, r != null ? [r] : r, Promise.wait(300));
                 return true;
             });
         }
